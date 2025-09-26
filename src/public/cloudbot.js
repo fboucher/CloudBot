@@ -749,9 +749,10 @@ Generate_streamSession = function()
 
 GenerateStreamNotetHeader = function()
 {
+    let today = new Date().toISOString().split('T')[0];
     let headerSection = "---\nlayout: post\ntitle: _____ (stream 222)\n";
     headerSection += "featured-image: https://img.youtube.com/vi/_________/hqdefault.jpg\n";
-    headerSection += "date: " + dateFormat(new Date(), 'yyyy-mm-dd') + "  06:30 -0500\n";
+    headerSection += "date: " + today + "  06:30 -0500\n";
     headerSection += "categories:  " + _streamSession.Project + "\n---\n\n";
     headerSection += "\n## Replay\n\n{% include youtube.html id=\"_________\" %}\n\n";
     headerSection += "<br/><!--more-->\n";

@@ -606,10 +606,10 @@
             
             // Reset scroll position
             content.style.transition = 'none';
-            content.style.transform = 'translateY(100%)';
+            content.style.transform = 'translateY(0)';
             
             // Calculate scroll distance and duration
-            setTimeout(() => {
+            requestAnimationFrame (() => {
                 const panelHeight = panel.clientHeight;
                 const contentHeight = content.scrollHeight;
                 const distance = panelHeight + contentHeight;
@@ -624,7 +624,7 @@
                     content.removeEventListener('transitionend', handler);
                     startStreamNotesScroll();
                 });
-            }, 100); // Allow DOM to update
+            }); // Allow DOM to update
         }
     </script>
 </body>
