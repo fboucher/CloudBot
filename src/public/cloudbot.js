@@ -443,6 +443,27 @@ addTodo = function(description)
 }
 
 
+SetTodoVisibility = function(isVisible)
+{
+    const todoArea = document.getElementById("todoArea");
+    if(!todoArea){
+        return;
+    }
+
+    todoArea.style.display = isVisible ? "block" : "none";
+}
+
+ShowTodoArea = function()
+{
+    SetTodoVisibility(true);
+}
+
+HideTodoArea = function()
+{
+    SetTodoVisibility(false);
+}
+
+
 RefreshTodosArea = function()
 {
     let htmlTodos = "";

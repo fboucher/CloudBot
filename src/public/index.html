@@ -59,6 +59,7 @@
             box-shadow: 5px 10px 5px #888888;
             border: 3px solid rgb(187, 239, 255);
             background-color: rgb(187, 239, 255);
+            display: none;
         }
 
         #todoArea,
@@ -346,6 +347,14 @@
             else if (flags.broadcaster && command === "todo-cancel") {
                 console.log("!todo-cancel was typed in chat");
                 SetTodoStatus(message, TodoStatusEnum.cancel);
+            }
+            else if (command === "todo-show") {
+                console.log("!todo-show was typed in chat");
+                ShowTodoArea();
+            }
+            else if (command === "todo-hide") {
+                console.log("!todo-hide was typed in chat");
+                HideTodoArea();
             }
             else if (command === "scores") {
                 scores();
