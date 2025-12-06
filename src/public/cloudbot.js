@@ -1278,3 +1278,147 @@ if (typeof window !== 'undefined') {
         startBannerTimer();
     });
 }
+
+// Themed Toaster Notifications System
+const toasterThemes = ['toast-pixel', 'toast-cb', 'toast-retro', 'toast-social', 'toast-sponsor'];
+let toasterTimer = null;
+
+const channelToasters = [
+    // Follow/Subscribe messages
+    {
+        title: "🎉 Join Behind My Cloud!",
+        message: "Follow on Twitch (twitch.tv/fboucheros) or Subscribe on YouTube (@behindmycloud)!",
+        themes: ['toast-pixel', 'toast-cb', 'toast-retro']
+    },
+    {
+        title: "📺 Behind My Cloud",
+        message: "Watch live coding, demos prep, and open source projects!",
+        themes: ['toast-cb', 'toast-retro']
+    },
+    {
+        title: "🤖 Hey! It's CeeBee!",
+        message: "Subscribe to Behind My Cloud and join the cloud crew!",
+        themes: ['toast-pixel', 'toast-social']
+    },
+    
+    // GitHub Sponsor messages
+    {
+        title: "💖 Support Frank's Work",
+        message: "Become a GitHub Sponsor at github.com/sponsors/fboucher",
+        themes: ['toast-sponsor']
+    },
+    {
+        title: "☁️ Love the content?",
+        message: "Consider sponsoring on GitHub! Every bit helps Frank create more!",
+        themes: ['toast-sponsor', 'toast-cb']
+    },
+    
+    // Social media messages
+    {
+        title: "📱 Find Frank Online",
+        message: "I'm @fboucheros everywhere! YouTube, Twitch, Twitter, LinkedIn...",
+        themes: ['toast-social']
+    },
+    {
+        title: "👨‍💻 Follow on GitHub",
+        message: "Check out Frank's projects at github.com/fboucher (@fboucher)",
+        themes: ['toast-social', 'toast-retro']
+    },
+    {
+        title: "🌐 Connect With Frank",
+        message: "@fboucheros on social media | @fboucher on GitHub",
+        themes: ['toast-social', 'toast-pixel']
+    },
+    
+    // Channel description
+    {
+        title: "🎬 Behind The Scenes",
+        message: "Content creation, coding, demos, and open source - all live!",
+        themes: ['toast-cb', 'toast-retro']
+    },
+    {
+        title: "☁️ Behind My Cloud",
+        message: "Technical content creation behind the scenes - Join the journey!",
+        themes: ['toast-pixel', 'toast-cb']
+    }
+];
+
+DisplayThemedToaster = function(title, message, themeClass) {
+    toastr.options = {
+        "closeButton": true,
+        "debug": false,
+        "newestOnTop": true,
+        "progressBar": true,
+        "positionClass": "toast-top-right",
+        "preventDuplicates": true,
+        "onclick": null,
+        "showDuration": "400",
+        "hideDuration": "1000",
+        "timeOut": "8000",
+        "extendedTimeOut": "2000",
+        "showEasing": "swing",
+        "hideEasing": "linear",
+        "showMethod": "fadeIn",
+        "hideMethod": "fadeOut",
+        "allowHtml": true,
+        "toastClass": `toast ${themeClass}`,
+        "iconClass": `toast-info ${themeClass}`
+    };
+    
+    console.log(`... displaying themed toaster: ${title} with theme: ${themeClass}`);
+    toastr.info(message, title);
+}
+
+ShowRandomChannelToaster = function() {
+    // Pick a random toaster
+    const randomToaster = channelToasters[Math.floor(Math.random() * channelToasters.length)];
+    
+    // Pick a random theme from the toaster's allowed themes
+    const randomTheme = randomToaster.themes[Math.floor(Math.random() * randomToaster.themes.length)];
+    
+    DisplayThemedToaster(randomToaster.title, randomToaster.message, randomTheme);
+}
+
+StartToasterTimer = function() {
+    // Show first toaster after 3 minutes
+    setTimeout(() => {
+        ShowRandomChannelToaster();
+    }, 180000);
+    
+    // Then show a random toaster every 10 minutes
+    toasterTimer = setInterval(() => {
+        ShowRandomChannelToaster();
+    }, 600000);
+}
+
+StopToasterTimer = function() {
+    if (toasterTimer) {
+        clearInterval(toasterTimer);
+        toasterTimer = null;
+    }
+}
+
+// Test function to visualize all toaster variants
+TestAllToasters = function() {
+    let delay = 0;
+    channelToasters.forEach((toaster, index) => {
+        toaster.themes.forEach(theme => {
+            setTimeout(() => {
+                DisplayThemedToaster(toaster.title, toaster.message, theme);
+            }, delay);
+            delay += 1500; // 1.5 seconds between each toaster
+        });
+    });
+}
+
+// Make test function globally accessible
+if (typeof window !== 'undefined') {
+    window.TestAllToasters = TestAllToasters;
+}
+
+// Auto-start toaster timer when page loads
+if (typeof window !== 'undefined') {
+    window.addEventListener('DOMContentLoaded', () => {
+        StartToasterTimer();
+    });
+}
