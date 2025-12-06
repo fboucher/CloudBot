@@ -137,6 +137,100 @@
             animation-duration: 5s;
         }
 
+        /* Project Banner Styles */
+        #projectBanner {
+            position: fixed;
+            top: -150px;
+            left: 0;
+            width: 100%;
+            height: 120px;
+            background: linear-gradient(135deg, #00a8cc 0%, #0077be 50%, #005a9c 100%);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            padding: 0 40px;
+            border-bottom: 4px solid #bbefff;
+            transition: top 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        #projectBanner.show {
+            top: 0;
+        }
+
+        .banner-content {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            animation: slideInContent 1s ease-out 0.3s both;
+        }
+
+        @keyframes slideInContent {
+            from {
+                opacity: 0;
+                transform: translateX(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .banner-icon {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 30px;
+            font-size: 40px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+            }
+            50% {
+                transform: scale(1.05);
+                box-shadow: 0 0 20px 10px rgba(255, 255, 255, 0);
+            }
+        }
+
+        .banner-info {
+            flex: 1;
+            color: white;
+        }
+
+        .banner-title {
+            font-size: 42px;
+            font-weight: bold;
+            margin: 0 0 8px 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            letter-spacing: 1px;
+        }
+
+        .banner-url {
+            font-size: 24px;
+            margin: 0 0 5px 0;
+            opacity: 0.95;
+            font-family: 'Courier New', monospace;
+        }
+
+        .banner-description {
+            font-size: 20px;
+            margin: 0;
+            opacity: 0.9;
+            font-style: italic;
+        }
+
+        .banner-github-icon {
+            margin-right: 8px;
+        }
+
 
         .rain {
             position: absolute;
@@ -274,6 +368,17 @@
 </head>
 
 <body>
+    <!-- Project Information Banner -->
+    <div id="projectBanner">
+        <div class="banner-content">
+            <div class="banner-icon">☁️</div>
+            <div class="banner-info">
+                <div class="banner-title" id="bannerProjectName"></div>
+                <div class="banner-url" id="bannerGithubUrl"></div>
+                <div class="banner-description" id="bannerDescription"></div>
+            </div>
+        </div>
+    </div>
 
     <h1 id="cbTitle"></h1>
     <p id="lastChatMsg"></p>

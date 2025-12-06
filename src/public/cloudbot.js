@@ -731,6 +731,8 @@ StreamNoteStart = async function(projectName)
             _streamSession.Project = projectName;
             _streamSession.DateTimeStart = new Date();
             console.log('.. streamSession just after : ', _streamSession);
+            // Display banner immediately when project is set
+            showProjectBanner();
         })
         .catch(error => {
             console.error('Error loading stream counter:', error);
@@ -741,6 +743,8 @@ StreamNoteStart = async function(projectName)
             _streamSession.Project = projectName;
             _streamSession.DateTimeStart = new Date();
             console.log('.. streamSession just after (fallback): ', _streamSession);
+            // Display banner immediately when project is set
+            showProjectBanner();
         });
     });
 
@@ -1140,3 +1144,102 @@ makeItRain = function() {
     $('.rain.front-row').append(drops);
     $('.rain.back-row').append(backDrops);
   }
+
+
+// Project Banner Functions
+let bannerTimer = null;
+let githubCache = {};
+const GITHUB_OWNER = 'fboucher'; // Default GitHub owner
+
+showProjectBanner = async function() {
+    const projectName = _streamSession.Project;
+    
+    // Check if project is not set or null
+    if (!projectName || projectName === "" || projectName === null) {
+        console.log("Project not set, calling !attention");
+        Attention("CloudBot", "Project is not set! Please set a project name.");
+        return;
+    }
+
+    const banner = document.getElementById('projectBanner');
+    const nameEl = document.getElementById('bannerProjectName');
+    const urlEl = document.getElementById('bannerGithubUrl');
+    const descEl = document.getElementById('bannerDescription');
+
+    // Set project name
+    nameEl.textContent = projectName;
+
+    // Try to extract GitHub URL pattern from project name
+    let githubUrl = '';
+    let description = '';
+
+    // Check if project name contains github URL pattern or owner/repo format
+    if (projectName.includes('github.com/')) {
+        githubUrl = projectName.includes('http') ? projectName : 'https://github.com/' + projectName.split('github.com/')[1];
+    } else if (projectName.includes('/')) {
+        // Assume format is owner/repo
+        githubUrl = `https://github.com/${projectName}`;
+    } else {
+        // Just a project name, prepend default owner
+        githubUrl = `https://github.com/${GITHUB_OWNER}/${projectName}`;
+    }
+
+    // Fetch description from GitHub API if we have a URL
+    if (githubUrl) {
+        try {
+            const repoPath = githubUrl.replace('https://github.com/', '');
+            
+            // Check cache first
+            if (githubCache[repoPath]) {
+                description = githubCache[repoPath];
+            } else {
+                const apiUrl = `https://api.github.com/repos/${repoPath}`;
+                const response = await fetch(apiUrl);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    description = data.description || '';
+                    githubCache[repoPath] = description; // Cache it
+                }
+            }
+        } catch (error) {
+            console.log('Could not fetch GitHub description:', error);
+        }
+    }
+
+    // Update banner content
+    urlEl.innerHTML = githubUrl ? `<span class="banner-github-icon">🔗</span>${githubUrl}` : '';
+    descEl.textContent = description;
+
+    // Show banner with animation
+    banner.classList.add('show');
+
+    // Hide banner after 30 seconds
+    setTimeout(() => {
+        banner.classList.remove('show');
+    }, 30000);
+}
+
+hideProjectBanner = function() {
+    const banner = document.getElementById('projectBanner');
+    banner.classList.remove('show');
+}
+
+startBannerTimer = function() {
+    // Show banner immediately on start
+    setTimeout(() => {
+        showProjectBanner();
+    }, 5000); // Wait 5 seconds after page load
+
+    // Then show every 15 minutes (900000 ms)
+    bannerTimer = setInterval(() => {
+        showProjectBanner();
+    }, 900000);
+}
+
+// Auto-start banner timer when page loads
+if (typeof window !== 'undefined') {
+    window.addEventListener('DOMContentLoaded', () => {
+        startBannerTimer();
+    });
+}
