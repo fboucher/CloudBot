@@ -98,6 +98,63 @@ app.get('/loadfromfile', (req, res) => {
     });
 });
 
+// GET /getstreamcounter: Get the current stream counter
+app.get('/getstreamcounter', (req, res) => {
+    console.log('..getting stream counter..');
+    const filename = path.join(__dirname, 'io', 'streamCounter.json');
+    fs.readFile(filename, 'utf-8', (err, data) => {
+        if (err) {
+            console.error('Error loading counter:', err);
+            return res.status(500).json({ error: 'Failed to load counter.' });
+        }
+        try {
+            const counter = JSON.parse(data);
+            console.log('Stream counter loaded:', counter);
+            res.json(counter);
+        } catch (parseErr) {
+            console.error('Error parsing counter JSON:', parseErr);
+            res.status(500).json({ error: 'Corrupted counter file.' });
+        }
+    });
+});
+
+// POST /incrementstreamcounter: Increment and save the stream counter
+app.post('/incrementstreamcounter', (req, res) => {
+    console.log('..incrementing stream counter..');
+    const filename = path.join(__dirname, 'io', 'streamCounter.json');
+    
+    // Read current counter
+    fs.readFile(filename, 'utf-8', (err, data) => {
+        let counter;
+        if (err) {
+            // If file doesn't exist, create with default values
+            console.log('Counter file not found, creating new one');
+            counter = { currentStreamNumber: 1, lastStreamDate: new Date().toISOString().split('T')[0] };
+        } else {
+            try {
+                counter = JSON.parse(data);
+            } catch (parseErr) {
+                console.error('Error parsing counter:', parseErr);
+                return res.status(500).json({ error: 'Corrupted counter file.' });
+            }
+        }
+        
+        // Increment the counter
+        counter.currentStreamNumber++;
+        counter.lastStreamDate = new Date().toISOString().split('T')[0];
+        
+        // Save back to file
+        fs.writeFile(filename, JSON.stringify(counter, null, 2), (writeErr) => {
+            if (writeErr) {
+                console.error('Error saving counter:', writeErr);
+                return res.status(500).json({ error: 'Failed to save counter.' });
+            }
+            console.log('Stream counter incremented to:', counter.currentStreamNumber);
+            res.json(counter);
+        });
+    });
+});
+
 // POST /genstreamnotes: Save stream notes to a markdown file
 app.post('/genstreamnotes', (req, res) => {
     console.log('..g.');

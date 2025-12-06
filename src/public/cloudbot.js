@@ -698,13 +698,29 @@ StreamNoteStart = async function(projectName)
     LoadFromFile(projectName, false, function(projectName){
         //console.log('.. the project name: ', projectName);
         //console.log('.. streamSession before : ', _streamSession);
-        if(_streamSession.id == undefined || _streamSession.id == null || _streamSession.id == 0){
-            _streamSession.Id = Math.floor((Math.random() * 100));
-        }
-        _streamSession.Project = projectName;
-        _streamSession.DateTimeStart = new Date();
-        //_streamSession.Reminders.push(new Reminder("time", "What are we working on? Should I update the TimeLog of ToDos?"));
-        console.log('.. streamSession just after : ', _streamSession);
+        
+        // Get the current stream counter and increment it
+        fetch('/incrementstreamcounter', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(response => response.json())
+        .then(counterData => {
+            _streamSession.Id = counterData.currentStreamNumber;
+            _streamSession.Project = projectName;
+            _streamSession.DateTimeStart = new Date();
+            console.log('.. streamSession just after : ', _streamSession);
+        })
+        .catch(error => {
+            console.error('Error loading stream counter:', error);
+            // Fallback to random if counter fails
+            if(_streamSession.id == undefined || _streamSession.id == null || _streamSession.id == 0){
+                _streamSession.Id = Math.floor((Math.random() * 100));
+            }
+            _streamSession.Project = projectName;
+            _streamSession.DateTimeStart = new Date();
+            console.log('.. streamSession just after (fallback): ', _streamSession);
+        });
     });
 
 }
@@ -750,10 +766,10 @@ Generate_streamSession = function()
 GenerateStreamNotetHeader = function()
 {
     let today = new Date().toISOString().split('T')[0];
-    let headerSection = "---\nlayout: post\ntitle: _____ (stream 222)\n";
+    let headerSection = "---\nlayout: post\ntitle: _____ (stream " + _streamSession.Id + ")\n";
     headerSection += "featured-image: https://img.youtube.com/vi/_________/hqdefault.jpg\n";
     headerSection += "date: " + today + "  06:30 -0500\n";
-    headerSection += "categories:  " + _streamSession.Project + "\n---\n\n";
+    headerSection += "categories:  " + _streamSession.Project + "\n---\n\n## Summary\n\n\n\n📺 - Twitch archive - stream no. " + _streamSession.Id + "\n\n";
     headerSection += "\n## Replay\n\n{% include youtube.html id=\"_________\" %}\n\n";
     headerSection += "<br/><!--more-->\n";
 
