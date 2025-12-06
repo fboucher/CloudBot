@@ -1151,6 +1151,13 @@ let bannerTimer = null;
 let githubCache = {};
 const GITHUB_OWNER = 'fboucher'; // Default GitHub owner
 
+const bannerVariants = [
+    { name: 'pixel', className: 'banner-pixel', image: 'public/medias/CB-Yeah.gif', alt: 'CloudBot Yeah', pixelate: false, useMarquee: true },
+    { name: 'cb', className: 'banner-cb', image: 'public/medias/CB-Thumbs-up.gif', alt: 'CloudBot thumbs up', pixelate: false, useMarquee: true },
+    { name: 'retro', className: 'banner-retro', image: 'public/medias/CB-Wow.gif', alt: 'CloudBot Wow', pixelate: false, useMarquee: true }
+];
+let bannerVariantIndex = -1;
+
 showProjectBanner = async function() {
     const projectName = _streamSession.Project;
     
@@ -1165,6 +1172,17 @@ showProjectBanner = async function() {
     const nameEl = document.getElementById('bannerProjectName');
     const urlEl = document.getElementById('bannerGithubUrl');
     const descEl = document.getElementById('bannerDescription');
+    const imageEl = document.getElementById('bannerImage');
+
+    if (!banner || !nameEl || !urlEl || !descEl || !imageEl) {
+        return;
+    }
+
+    // Cycle through visual variants
+    bannerVariantIndex = (bannerVariantIndex + 1) % bannerVariants.length;
+    const variant = bannerVariants[bannerVariantIndex];
+    banner.className = 'banner-base';
+    banner.classList.add(variant.className);
 
     // Set project name
     nameEl.textContent = projectName;
@@ -1200,24 +1218,41 @@ showProjectBanner = async function() {
                     const data = await response.json();
                     description = data.description || '';
                     githubCache[repoPath] = description; // Cache it
+                } else {
+                    console.log('GitHub API response not ok:', response.status);
+                    Attention("CloudBot", `Could not fetch project info from GitHub (status: ${response.status})`);
                 }
             }
         } catch (error) {
             console.log('Could not fetch GitHub description:', error);
+            Attention("CloudBot", `Error fetching project info: ${error.message || 'Network error'}`);
         }
     }
 
     // Update banner content
-    urlEl.innerHTML = githubUrl ? `<span class="banner-github-icon">🔗</span>${githubUrl}` : '';
-    descEl.textContent = description;
+    if (!description || description.trim() === '') {
+        // If description is empty, hide URL and show custom message
+        urlEl.innerHTML = '';
+        descEl.textContent = "Looks like it's a new project, ask Frank about it!";
+    } else {
+        // Normal display with URL and description
+        urlEl.innerHTML = githubUrl ? `<span class="banner-github-icon">🔗</span>${githubUrl}` : '';
+        descEl.textContent = description;
+    }
+    // For side-by-side, ensure both are visible in the same row (handled by HTML/CSS)
+
+    // Apply image and pixelation
+    imageEl.src = variant.image;
+    imageEl.alt = variant.alt;
+    imageEl.classList.toggle('pixelate', !!variant.pixelate);
 
     // Show banner with animation
     banner.classList.add('show');
 
-    // Hide banner after 30 seconds
+    // Hide banner after 60 seconds
     setTimeout(() => {
         banner.classList.remove('show');
-    }, 30000);
+    }, 60000);
 }
 
 hideProjectBanner = function() {
