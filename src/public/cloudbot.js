@@ -297,26 +297,8 @@ ParseMessage = function(message)
 
 DisplayNotification = function(title, message)
 {
-    toastr.options = {
-        "closeButton": false,
-        "debug": false,
-        "newestOnTop": false,
-        "progressBar": true,
-        "positionClass": "toast-top-full-width",
-        "preventDuplicates": false,
-        "onclick": null,
-        "showDuration": "300",
-        "hideDuration": "1000",
-        "timeOut": "5000",
-        "extendedTimeOut": "1000",
-        "showEasing": "swing",
-        "hideEasing": "linear",
-        "showMethod": "fadeIn",
-        "hideMethod": "fadeOut",
-        "allowHtml": true
-    };
-    console.log( "... toasting: " + message);
-    toastr.info(message, title);
+    console.log( "... displaying notification: " + message);
+    displayAnnouncement(title, message, 'theme-cb');
 }
 
 
@@ -1279,146 +1261,199 @@ if (typeof window !== 'undefined') {
     });
 }
 
-// Themed Toaster Notifications System
-const toasterThemes = ['toast-pixel', 'toast-cb', 'toast-retro', 'toast-social', 'toast-sponsor'];
-let toasterTimer = null;
+// ===== ANNOUNCEMENT SYSTEM =====
+// Fresh announcement system with themed pop-ups
+const announcementThemes = ['theme-pixel', 'theme-cb', 'theme-retro', 'theme-social', 'theme-sponsor'];
 
-const channelToasters = [
+const announcements = [
     // Follow/Subscribe messages
     {
         title: "🎉 Join Behind My Cloud!",
         message: "Follow on Twitch (twitch.tv/fboucheros) or Subscribe on YouTube (@behindmycloud)!",
-        themes: ['toast-pixel', 'toast-cb', 'toast-retro']
+        themes: ['theme-pixel', 'theme-cb', 'theme-retro']
     },
     {
         title: "📺 Behind My Cloud",
         message: "Watch live coding, demos prep, and open source projects!",
-        themes: ['toast-cb', 'toast-retro']
+        themes: ['theme-cb', 'theme-retro']
     },
     {
         title: "🤖 Hey! It's CeeBee!",
         message: "Subscribe to Behind My Cloud and join the cloud crew!",
-        themes: ['toast-pixel', 'toast-social']
+        themes: ['theme-pixel', 'theme-social']
+    },
+    {
+        title: "☁️ Cloud Power!",
+        message: "Loving the stream? Follow to catch more live coding action!",
+        themes: ['theme-cb', 'theme-retro', 'theme-social']
     },
     
     // GitHub Sponsor messages
     {
         title: "💖 Support Frank's Work",
         message: "Become a GitHub Sponsor at github.com/sponsors/fboucher",
-        themes: ['toast-sponsor']
+        themes: ['theme-sponsor']
     },
     {
-        title: "☁️ Love the content?",
-        message: "Consider sponsoring on GitHub! Every bit helps Frank create more!",
-        themes: ['toast-sponsor', 'toast-cb']
+        title: "❤️ Love the content?",
+        message: "Consider sponsoring on GitHub! Every bit helps create more!",
+        themes: ['theme-sponsor', 'theme-cb']
+    },
+    {
+        title: "⭐ Support Open Source",
+        message: "Help Frank continue creating amazing open source projects!",
+        themes: ['theme-sponsor', 'theme-retro']
     },
     
     // Social media messages
     {
         title: "📱 Find Frank Online",
         message: "I'm @fboucheros everywhere! YouTube, Twitch, Twitter, LinkedIn...",
-        themes: ['toast-social']
+        themes: ['theme-social']
     },
     {
         title: "👨‍💻 Follow on GitHub",
         message: "Check out Frank's projects at github.com/fboucher (@fboucher)",
-        themes: ['toast-social', 'toast-retro']
+        themes: ['theme-social', 'theme-retro']
     },
     {
         title: "🌐 Connect With Frank",
         message: "@fboucheros on social media | @fboucher on GitHub",
-        themes: ['toast-social', 'toast-pixel']
+        themes: ['theme-social', 'theme-pixel']
+    },
+    {
+        title: "🔗 More Projects",
+        message: "Visit github.com/fboucher for all the cool stuff we're building!",
+        themes: ['theme-social', 'theme-cb']
     },
     
     // Channel description
     {
-        title: "🎬 Behind The Scenes",
-        message: "Content creation, coding, demos, and open source - all live!",
-        themes: ['toast-cb', 'toast-retro']
-    },
-    {
         title: "☁️ Behind My Cloud",
         message: "Technical content creation behind the scenes - Join the journey!",
-        themes: ['toast-pixel', 'toast-cb']
+        themes: ['theme-pixel', 'theme-cb']
+    },
+    {
+        title: "💡 Awesome Stream!",
+        message: "Thanks for hanging out! More exciting projects coming soon!",
+        themes: ['theme-cb', 'theme-social']
+    },
+    {
+        title: "🚀 Innovation Hub",
+        message: "Live coding, demos, and open source development - all in one place!",
+        themes: ['theme-retro', 'theme-pixel']
     }
 ];
 
-DisplayThemedToaster = function(title, message, themeClass) {
-    toastr.options = {
-        "closeButton": true,
-        "debug": false,
-        "newestOnTop": true,
-        "progressBar": true,
-        "positionClass": "toast-top-right",
-        "preventDuplicates": true,
-        "onclick": null,
-        "showDuration": "400",
-        "hideDuration": "1000",
-        "timeOut": "8000",
-        "extendedTimeOut": "2000",
-        "showEasing": "swing",
-        "hideEasing": "linear",
-        "showMethod": "fadeIn",
-        "hideMethod": "fadeOut",
-        "allowHtml": true,
-        "toastClass": `toast ${themeClass}`,
-        "iconClass": `toast-info ${themeClass}`
-    };
-    
-    console.log(`... displaying themed toaster: ${title} with theme: ${themeClass}`);
-    toastr.info(message, title);
+let announcementTimer = null;
+const announcementQueue = [];
+let isDisplayingAnnouncement = false;
+
+displayAnnouncement = function(title, message, themeClass) {
+    const container = document.getElementById('announcementContainer');
+    if (!container) return;
+
+    // Randomize which side the announcement appears on
+    const fromLeft = Math.random() < 0.5;
+    const directionClass = fromLeft ? 'from-left' : 'from-right';
+
+    const announcement = document.createElement('div');
+    announcement.className = `announcement ${themeClass} ${directionClass}`;
+    announcement.innerHTML = `
+        <div class="ann-title">${title}</div>
+        <div class="ann-message">${message}</div>
+    `;
+
+    container.appendChild(announcement);
+    console.log(`... displaying announcement: "${title}" with theme: ${themeClass} on ${directionClass}`);
+
+    // Make it clickable to dismiss
+    announcement.style.cursor = 'pointer';
+    announcement.addEventListener('click', () => {
+        announcement.classList.add('removing');
+        setTimeout(() => {
+            announcement.remove();
+            processNextAnnouncement();
+        }, 400);
+    });
+
+    // Auto-dismiss after 7 seconds
+    const dismissTimeout = setTimeout(() => {
+        if (announcement.parentElement) {
+            announcement.classList.add('removing');
+            setTimeout(() => {
+                if (announcement.parentElement) {
+                    announcement.remove();
+                    processNextAnnouncement();
+                }
+            }, 400);
+        }
+    }, 7000);
+
+    announcement.dismissTimeout = dismissTimeout;
 }
 
-ShowRandomChannelToaster = function() {
-    // Pick a random toaster
-    const randomToaster = channelToasters[Math.floor(Math.random() * channelToasters.length)];
+showRandomAnnouncement = function() {
+    // Pick a random announcement
+    const randomAnnouncement = announcements[Math.floor(Math.random() * announcements.length)];
     
-    // Pick a random theme from the toaster's allowed themes
-    const randomTheme = randomToaster.themes[Math.floor(Math.random() * randomToaster.themes.length)];
+    // Pick a random theme from the announcement's allowed themes
+    const randomTheme = randomAnnouncement.themes[Math.floor(Math.random() * randomAnnouncement.themes.length)];
     
-    DisplayThemedToaster(randomToaster.title, randomToaster.message, randomTheme);
+    displayAnnouncement(randomAnnouncement.title, randomAnnouncement.message, randomTheme);
 }
 
-StartToasterTimer = function() {
-    // Show first toaster after 3 minutes
-    setTimeout(() => {
-        ShowRandomChannelToaster();
-    }, 180000);
-    
-    // Then show a random toaster every 10 minutes
-    toasterTimer = setInterval(() => {
-        ShowRandomChannelToaster();
-    }, 600000);
+queueAnnouncement = function(title, message, themeClass) {
+    announcementQueue.push({ title, message, themeClass });
+    processNextAnnouncement();
 }
 
-StopToasterTimer = function() {
-    if (toasterTimer) {
-        clearInterval(toasterTimer);
-        toasterTimer = null;
+processNextAnnouncement = function() {
+    if (announcementQueue.length > 0 && !isDisplayingAnnouncement) {
+        isDisplayingAnnouncement = true;
+        const ann = announcementQueue.shift();
+        displayAnnouncement(ann.title, ann.message, ann.themeClass);
+        setTimeout(() => {
+            isDisplayingAnnouncement = false;
+        }, 7500);
     }
 }
 
-// Test function to visualize all toaster variants
-TestAllToasters = function() {
+startAnnouncementTimer = function() {
+    // Show first announcement after 3 minutes
+    setTimeout(() => {
+        showRandomAnnouncement();
+    }, 180000);
+    
+    // Then show a random announcement every 20 minutes
+    announcementTimer = setInterval(() => {
+        showRandomAnnouncement();
+    }, 1200000);
+}
+
+stopAnnouncementTimer = function() {
+    if (announcementTimer) {
+        clearInterval(announcementTimer);
+        announcementTimer = null;
+    }
+}
+
+// Test function to visualize all announcement variants
+testAllAnnouncements = function() {
     let delay = 0;
-    channelToasters.forEach((toaster, index) => {
-        toaster.themes.forEach(theme => {
+    announcements.forEach((announcement, index) => {
+        announcement.themes.forEach(theme => {
             setTimeout(() => {
-                DisplayThemedToaster(toaster.title, toaster.message, theme);
+                displayAnnouncement(announcement.title, announcement.message, theme);
             }, delay);
-            delay += 1500; // 1.5 seconds between each toaster
+            delay += 2000; // 2 seconds between each announcement
         });
     });
 }
 
-// Make test function globally accessible
-if (typeof window !== 'undefined') {
-    window.TestAllToasters = TestAllToasters;
-}
-
-// Auto-start toaster timer when page loads
+// Auto-start announcement timer when page loads
 if (typeof window !== 'undefined') {
     window.addEventListener('DOMContentLoaded', () => {
-        StartToasterTimer();
+        startAnnouncementTimer();
     });
 }

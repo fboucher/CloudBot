@@ -3,10 +3,6 @@
 <head>
     <title>Cloud Stuff</title>
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet"
-        type="text/css">
-    <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
     <script src="/io/secret.js"></script>
     <script src="/public/cloudbot.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -36,10 +32,6 @@
             border: 1px solid #cccccc;
             /* Change the border-color of cells here */
             padding: 8px;
-        }
-
-        .toast-title {
-            font-size: 200%;
         }
 
         .textBubble {
@@ -308,71 +300,239 @@
             color: #e0f7ff;
         }
 
-        /* Custom Toaster Themes */
-        .toast-pixel {
-            background: repeating-linear-gradient(135deg, #0a2a43 0px, #0a2a43 10px, #0d3b5c 10px, #0d3b5c 20px) !important;
-            border: 3px solid #59d6ff !important;
-            box-shadow: 0 4px 12px rgba(89, 214, 255, 0.4) !important;
+        /* ===== ANNOUNCEMENT SYSTEM ===== */
+        #announcementContainer {
+            position: fixed;
+            top: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 1001;
+            pointer-events: none;
         }
 
-        .toast-pixel .toast-title,
-        .toast-pixel .toast-message {
-            font-family: 'Press Start 2P', monospace !important;
-            color: #59d6ff !important;
-            text-shadow: 0 0 8px rgba(89, 214, 255, 0.6) !important;
+        .announcement {
+            min-width: 320px;
+            max-width: 420px;
+            padding: 16px 20px;
+            margin: 0 20px;
+            border-radius: 8px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            font-size: 16px;
+            line-height: 1.5;
+            border-left: 5px solid;
+            pointer-events: auto;
+            cursor: pointer;
         }
 
-        .toast-cb {
-            background: linear-gradient(135deg, #00b4d8 0%, #0091d1 50%, #005a9c 100%) !important;
-            border: 3px solid #c5f3ff !important;
-            box-shadow: 0 6px 16px rgba(0, 146, 201, 0.5) !important;
+        .announcement.from-right {
+            align-self: flex-end;
+            animation: slideInRight 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
-        .toast-cb .toast-title,
-        .toast-cb .toast-message {
-            color: white !important;
-            font-weight: bold !important;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+        .announcement.from-left {
+            align-self: flex-start;
+            animation: slideInLeft 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
-        .toast-retro {
-            background: radial-gradient(circle at 20% 20%, #1b2135 0%, #0c0f1b 80%) !important;
-            border: 3px solid #4affde !important;
-            box-shadow: inset 0 0 15px rgba(74, 255, 222, 0.2), 0 6px 16px rgba(0, 0, 0, 0.5) !important;
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(400px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
         }
 
-        .toast-retro .toast-title,
-        .toast-retro .toast-message {
-            font-family: 'VT323', monospace !important;
-            color: #4affde !important;
-            text-shadow: 0 0 10px rgba(74, 255, 222, 0.8) !important;
-            font-size: 120% !important;
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-400px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
         }
 
-        .toast-social {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-            border: 3px solid #9f7aea !important;
-            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4) !important;
+        @keyframes slideOutRight {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(400px);
+            }
         }
 
-        .toast-social .toast-title,
-        .toast-social .toast-message {
-            color: white !important;
-            font-weight: bold !important;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4) !important;
+        @keyframes slideOutLeft {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(-400px);
+            }
         }
 
-        .toast-sponsor {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important;
-            border: 3px solid #ff6b9d !important;
-            box-shadow: 0 6px 16px rgba(240, 147, 251, 0.5) !important;
+        .announcement.removing.from-right {
+            animation: slideOutRight 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
         }
 
-        .toast-sponsor .toast-title,
-        .toast-sponsor .toast-message {
-            color: white !important;
-            font-weight: bold !important;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+        .announcement.removing.from-left {
+            animation: slideOutLeft 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
+        /* Pixel Theme */
+        .announcement.theme-pixel {
+            background: linear-gradient(135deg, #0a2a43 0%, #0d3b5c 100%);
+            border-color: #59d6ff;
+            color: #e0f7ff;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 12px;
+            border: 2px solid #59d6ff;
+            border-left: 5px solid #59d6ff;
+            box-shadow: 0 0 20px rgba(89, 214, 255, 0.4), 0 8px 24px rgba(0, 0, 0, 0.5);
+        }
+
+        .announcement.theme-pixel .ann-title {
+            font-weight: bold;
+            color: #00ffff;
+            margin-bottom: 6px;
+        }
+
+        .announcement.theme-pixel .ann-message {
+            color: #e0f7ff;
+            font-size: 11px;
+        }
+
+        /* CloudBot Theme */
+        .announcement.theme-cb {
+            background: linear-gradient(120deg, rgba(0, 180, 216, 0.9) 0%, rgba(0, 145, 209, 0.9) 100%);
+            border-color: #00d4ff;
+            color: #fff;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.5), 0 8px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .announcement.theme-cb .ann-title {
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+            margin-bottom: 6px;
+        }
+
+        .announcement.theme-cb .ann-message {
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 14px;
+        }
+
+        /* Retro Theme */
+        .announcement.theme-retro {
+            background: linear-gradient(135deg, rgba(27, 33, 53, 0.95) 0%, rgba(12, 15, 27, 0.95) 100%);
+            border-color: #4affde;
+            color: #e0f7ff;
+            box-shadow: 
+                inset 0 0 15px rgba(74, 255, 222, 0.15),
+                0 0 20px rgba(74, 255, 222, 0.4),
+                0 8px 24px rgba(0, 0, 0, 0.5);
+        }
+
+        .announcement.theme-retro .ann-title {
+            font-family: 'VT323', monospace;
+            font-weight: bold;
+            color: #4affde;
+            text-shadow: 0 0 8px rgba(74, 255, 222, 0.8);
+            margin-bottom: 6px;
+        }
+
+        .announcement.theme-retro .ann-message {
+            font-family: 'VT323', monospace;
+            color: #e0f7ff;
+            font-size: 14px;
+        }
+
+        .announcement.theme-retro::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #4affde, transparent);
+            pointer-events: none;
+        }
+
+        /* Sponsor Theme */
+        .announcement.theme-sponsor {
+            background: linear-gradient(120deg, rgba(255, 51, 102, 0.9) 0%, rgba(255, 102, 150, 0.9) 100%);
+            border-color: #ff66ff;
+            color: #fff;
+            box-shadow: 0 0 20px rgba(255, 102, 255, 0.5), 0 8px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .announcement.theme-sponsor .ann-title {
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+            margin-bottom: 6px;
+        }
+
+        .announcement.theme-sponsor .ann-message {
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 14px;
+        }
+
+        .announcement.theme-sponsor::after {
+            content: '💖';
+            display: inline-block;
+            margin-left: 6px;
+            animation: heartbeat 1s infinite;
+        }
+
+        @keyframes heartbeat {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.2);
+            }
+        }
+
+        /* Social Theme */
+        .announcement.theme-social {
+            background: linear-gradient(120deg, rgba(0, 172, 193, 0.9) 0%, rgba(0, 188, 212, 0.9) 100%);
+            border-color: #4dd0e1;
+            color: #fff;
+            box-shadow: 0 0 20px rgba(77, 208, 225, 0.5), 0 8px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .announcement.theme-social .ann-title {
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+            margin-bottom: 6px;
+        }
+
+        .announcement.theme-social .ann-message {
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 14px;
+        }
+
+        .ann-title {
+            margin: 0;
+            padding: 0;
+        }
+
+        .ann-message {
+            margin: 0;
+            padding: 0;
         }
 
         .rain {
@@ -532,6 +692,7 @@
     <h1 id="cbTitle"></h1>
     <p id="lastChatMsg"></p>
     <div id="imageViewer"></div>
+    <div id="announcementContainer"></div>
     <div id="todoArea">
         <h4>To-Dos</h4>
         <div id="todoList"></div>
