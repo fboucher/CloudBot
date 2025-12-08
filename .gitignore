@@ -39,6 +39,14 @@ build/Release
 
 # Dependency directories
 node_modules/
+
+# Environment variables and secrets
+.env
+src/io/secret.js
+
+# Backup files
+*.bak
+node_modules/
 jspm_packages/
 
 # Snowpack dependency directory (https://snowpack.dev/)
