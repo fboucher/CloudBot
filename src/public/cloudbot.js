@@ -297,26 +297,8 @@ ParseMessage = function(message)
 
 DisplayNotification = function(title, message)
 {
-    toastr.options = {
-        "closeButton": false,
-        "debug": false,
-        "newestOnTop": false,
-        "progressBar": true,
-        "positionClass": "toast-top-full-width",
-        "preventDuplicates": false,
-        "onclick": null,
-        "showDuration": "300",
-        "hideDuration": "1000",
-        "timeOut": "5000",
-        "extendedTimeOut": "1000",
-        "showEasing": "swing",
-        "hideEasing": "linear",
-        "showMethod": "fadeIn",
-        "hideMethod": "fadeOut",
-        "allowHtml": true
-    };
-    console.log( "... toasting: " + message);
-    toastr.info(message, title);
+    console.log( "... displaying notification: " + message);
+    displayAnnouncement(title, message, 'theme-cb');
 }
 
 
@@ -440,6 +422,27 @@ addTodo = function(description)
 
     _streamSession.Todos.push(new Todo(cntTodos + 1, description, TodoStatusEnum.new));
     RefreshTodosArea();
+}
+
+
+SetTodoVisibility = function(isVisible)
+{
+    const todoArea = document.getElementById("todoArea");
+    if(!todoArea){
+        return;
+    }
+
+    todoArea.style.display = isVisible ? "block" : "none";
+}
+
+ShowTodoArea = function()
+{
+    SetTodoVisibility(true);
+}
+
+HideTodoArea = function()
+{
+    SetTodoVisibility(false);
 }
 
 
@@ -698,13 +701,33 @@ StreamNoteStart = async function(projectName)
     LoadFromFile(projectName, false, function(projectName){
         //console.log('.. the project name: ', projectName);
         //console.log('.. streamSession before : ', _streamSession);
-        if(_streamSession.id == undefined || _streamSession.id == null || _streamSession.id == 0){
-            _streamSession.Id = Math.floor((Math.random() * 100));
-        }
-        _streamSession.Project = projectName;
-        _streamSession.DateTimeStart = new Date();
-        //_streamSession.Reminders.push(new Reminder("time", "What are we working on? Should I update the TimeLog of ToDos?"));
-        console.log('.. streamSession just after : ', _streamSession);
+        
+        // Get the current stream counter and increment it
+        fetch('/incrementstreamcounter', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(response => response.json())
+        .then(counterData => {
+            _streamSession.Id = counterData.currentStreamNumber;
+            _streamSession.Project = projectName;
+            _streamSession.DateTimeStart = new Date();
+            console.log('.. streamSession just after : ', _streamSession);
+            // Display banner immediately when project is set
+            showProjectBanner();
+        })
+        .catch(error => {
+            console.error('Error loading stream counter:', error);
+            // Fallback to random if counter fails
+            if(_streamSession.id == undefined || _streamSession.id == null || _streamSession.id == 0){
+                _streamSession.Id = Math.floor((Math.random() * 100));
+            }
+            _streamSession.Project = projectName;
+            _streamSession.DateTimeStart = new Date();
+            console.log('.. streamSession just after (fallback): ', _streamSession);
+            // Display banner immediately when project is set
+            showProjectBanner();
+        });
     });
 
 }
@@ -750,10 +773,10 @@ Generate_streamSession = function()
 GenerateStreamNotetHeader = function()
 {
     let today = new Date().toISOString().split('T')[0];
-    let headerSection = "---\nlayout: post\ntitle: _____ (stream 222)\n";
+    let headerSection = "---\nlayout: post\ntitle: _____ (stream " + _streamSession.Id + ")\n";
     headerSection += "featured-image: https://img.youtube.com/vi/_________/hqdefault.jpg\n";
     headerSection += "date: " + today + "  06:30 -0500\n";
-    headerSection += "categories:  " + _streamSession.Project + "\n---\n\n";
+    headerSection += "categories:  " + _streamSession.Project + "\n---\n\n## Summary\n\n\n\n📺 - Twitch archive - stream no. " + _streamSession.Id + "\n\n";
     headerSection += "\n## Replay\n\n{% include youtube.html id=\"_________\" %}\n\n";
     headerSection += "<br/><!--more-->\n";
 
@@ -1103,3 +1126,334 @@ makeItRain = function() {
     $('.rain.front-row').append(drops);
     $('.rain.back-row').append(backDrops);
   }
+
+
+// Project Banner Functions
+let bannerTimer = null;
+let githubCache = {};
+const GITHUB_OWNER = 'fboucher'; // Default GitHub owner
+
+const bannerVariants = [
+    { name: 'pixel', className: 'banner-pixel', image: 'public/medias/CB-Yeah.gif', alt: 'CloudBot Yeah', pixelate: false, useMarquee: true },
+    { name: 'cb', className: 'banner-cb', image: 'public/medias/CB-Thumbs-up.gif', alt: 'CloudBot thumbs up', pixelate: false, useMarquee: true },
+    { name: 'retro', className: 'banner-retro', image: 'public/medias/CB-Wow.gif', alt: 'CloudBot Wow', pixelate: false, useMarquee: true }
+];
+let bannerVariantIndex = -1;
+
+showProjectBanner = async function() {
+    const projectName = _streamSession.Project;
+    
+    // Check if project is not set or null
+    if (!projectName || projectName === "" || projectName === null) {
+        console.log("Project not set, calling !attention");
+        Attention("CloudBot", "Project is not set! Please set a project name.");
+        return;
+    }
+
+    const banner = document.getElementById('projectBanner');
+    const nameEl = document.getElementById('bannerProjectName');
+    const urlEl = document.getElementById('bannerGithubUrl');
+    const descEl = document.getElementById('bannerDescription');
+    const imageEl = document.getElementById('bannerImage');
+
+    if (!banner || !nameEl || !urlEl || !descEl || !imageEl) {
+        return;
+    }
+
+    // Cycle through visual variants
+    bannerVariantIndex = (bannerVariantIndex + 1) % bannerVariants.length;
+    const variant = bannerVariants[bannerVariantIndex];
+    banner.className = 'banner-base';
+    banner.classList.add(variant.className);
+
+    // Set project name
+    nameEl.textContent = projectName;
+
+    // Try to extract GitHub URL pattern from project name
+    let githubUrl = '';
+    let description = '';
+
+    // Check if project name contains github URL pattern or owner/repo format
+    if (projectName.includes('github.com/')) {
+        githubUrl = projectName.includes('http') ? projectName : 'https://github.com/' + projectName.split('github.com/')[1];
+    } else if (projectName.includes('/')) {
+        // Assume format is owner/repo
+        githubUrl = `https://github.com/${projectName}`;
+    } else {
+        // Just a project name, prepend default owner
+        githubUrl = `https://github.com/${GITHUB_OWNER}/${projectName}`;
+    }
+
+    // Fetch description from GitHub API if we have a URL
+    if (githubUrl) {
+        try {
+            const repoPath = githubUrl.replace('https://github.com/', '');
+            
+            // Check cache first
+            if (githubCache[repoPath]) {
+                description = githubCache[repoPath];
+            } else {
+                const apiUrl = `https://api.github.com/repos/${repoPath}`;
+                const response = await fetch(apiUrl);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    description = data.description || '';
+                    githubCache[repoPath] = description; // Cache it
+                } else {
+                    console.log('GitHub API response not ok:', response.status);
+                    Attention("CloudBot", `Could not fetch project info from GitHub (status: ${response.status})`);
+                }
+            }
+        } catch (error) {
+            console.log('Could not fetch GitHub description:', error);
+            Attention("CloudBot", `Error fetching project info: ${error.message || 'Network error'}`);
+        }
+    }
+
+    // Update banner content
+    if (!description || description.trim() === '') {
+        // If description is empty, hide URL and show custom message
+        urlEl.innerHTML = '';
+        descEl.textContent = "Looks like it's a new project, ask Frank about it!";
+    } else {
+        // Normal display with URL and description
+        urlEl.innerHTML = githubUrl ? `<span class="banner-github-icon">🔗</span>${githubUrl}` : '';
+        descEl.textContent = description;
+    }
+    // For side-by-side, ensure both are visible in the same row (handled by HTML/CSS)
+
+    // Apply image and pixelation
+    imageEl.src = variant.image;
+    imageEl.alt = variant.alt;
+    imageEl.classList.toggle('pixelate', !!variant.pixelate);
+
+    // Show banner with animation
+    banner.classList.add('show');
+
+    // Hide banner after 60 seconds
+    setTimeout(() => {
+        banner.classList.remove('show');
+    }, 60000);
+}
+
+hideProjectBanner = function() {
+    const banner = document.getElementById('projectBanner');
+    banner.classList.remove('show');
+}
+
+startBannerTimer = function() {
+    // Show banner immediately on start
+    setTimeout(() => {
+        showProjectBanner();
+    }, 5000); // Wait 5 seconds after page load
+
+    // Then show every 15 minutes (900000 ms)
+    bannerTimer = setInterval(() => {
+        showProjectBanner();
+    }, 900000);
+}
+
+// Auto-start banner timer when page loads
+if (typeof window !== 'undefined') {
+    window.addEventListener('DOMContentLoaded', () => {
+        startBannerTimer();
+    });
+}
+
+// ===== ANNOUNCEMENT SYSTEM =====
+// Fresh announcement system with themed pop-ups
+const announcementThemes = ['theme-pixel', 'theme-cb', 'theme-retro', 'theme-social', 'theme-sponsor'];
+
+const announcements = [
+    // Follow/Subscribe messages
+    {
+        title: "🎉 Join Behind My Cloud!",
+        message: "Follow on Twitch (twitch.tv/fboucheros) or Subscribe on YouTube (@behindmycloud)!",
+        themes: ['theme-pixel', 'theme-cb', 'theme-retro']
+    },
+    {
+        title: "📺 Behind My Cloud",
+        message: "Watch live coding, demos prep, and open source projects!",
+        themes: ['theme-cb', 'theme-retro']
+    },
+    {
+        title: "🤖 Hey! It's CeeBee!",
+        message: "Subscribe to Behind My Cloud and join the cloud crew!",
+        themes: ['theme-pixel', 'theme-social']
+    },
+    {
+        title: "☁️ Cloud Power!",
+        message: "Loving the stream? Follow to catch more live coding action!",
+        themes: ['theme-cb', 'theme-retro', 'theme-social']
+    },
+    
+    // GitHub Sponsor messages
+    {
+        title: "💖 Support Frank's Work",
+        message: "Become a GitHub Sponsor at github.com/sponsors/fboucher",
+        themes: ['theme-sponsor']
+    },
+    {
+        title: "❤️ Love the content?",
+        message: "Consider sponsoring on GitHub! Every bit helps create more!",
+        themes: ['theme-sponsor', 'theme-cb']
+    },
+    {
+        title: "⭐ Support Open Source",
+        message: "Help Frank continue creating amazing open source projects!",
+        themes: ['theme-sponsor', 'theme-retro']
+    },
+    
+    // Social media messages
+    {
+        title: "📱 Find Frank Online",
+        message: "I'm @fboucheros everywhere! YouTube, Twitch, Twitter, LinkedIn...",
+        themes: ['theme-social']
+    },
+    {
+        title: "👨‍💻 Follow on GitHub",
+        message: "Check out Frank's projects at github.com/fboucher (@fboucher)",
+        themes: ['theme-social', 'theme-retro']
+    },
+    {
+        title: "🌐 Connect With Frank",
+        message: "@fboucheros on social media | @fboucher on GitHub",
+        themes: ['theme-social', 'theme-pixel']
+    },
+    {
+        title: "🔗 More Projects",
+        message: "Visit github.com/fboucher for all the cool stuff we're building!",
+        themes: ['theme-social', 'theme-cb']
+    },
+    
+    // Channel description
+    {
+        title: "☁️ Behind My Cloud",
+        message: "Technical content creation behind the scenes - Join the journey!",
+        themes: ['theme-pixel', 'theme-cb']
+    },
+    {
+        title: "💡 Awesome Stream!",
+        message: "Thanks for hanging out! More exciting projects coming soon!",
+        themes: ['theme-cb', 'theme-social']
+    },
+    {
+        title: "🚀 Innovation Hub",
+        message: "Live coding, demos, and open source development - all in one place!",
+        themes: ['theme-retro', 'theme-pixel']
+    }
+];
+
+let announcementTimer = null;
+const announcementQueue = [];
+let isDisplayingAnnouncement = false;
+
+displayAnnouncement = function(title, message, themeClass) {
+    const container = document.getElementById('announcementContainer');
+    if (!container) return;
+
+    // Randomize which side the announcement appears on
+    const fromLeft = Math.random() < 0.5;
+    const directionClass = fromLeft ? 'from-left' : 'from-right';
+
+    const announcement = document.createElement('div');
+    announcement.className = `announcement ${themeClass} ${directionClass}`;
+    announcement.innerHTML = `
+        <div class="ann-title">${title}</div>
+        <div class="ann-message">${message}</div>
+    `;
+
+    container.appendChild(announcement);
+    console.log(`... displaying announcement: "${title}" with theme: ${themeClass} on ${directionClass}`);
+
+    // Make it clickable to dismiss
+    announcement.style.cursor = 'pointer';
+    announcement.addEventListener('click', () => {
+        announcement.classList.add('removing');
+        setTimeout(() => {
+            announcement.remove();
+            processNextAnnouncement();
+        }, 400);
+    });
+
+    // Auto-dismiss after 7 seconds
+    const dismissTimeout = setTimeout(() => {
+        if (announcement.parentElement) {
+            announcement.classList.add('removing');
+            setTimeout(() => {
+                if (announcement.parentElement) {
+                    announcement.remove();
+                    processNextAnnouncement();
+                }
+            }, 400);
+        }
+    }, 7000);
+
+    announcement.dismissTimeout = dismissTimeout;
+}
+
+showRandomAnnouncement = function() {
+    // Pick a random announcement
+    const randomAnnouncement = announcements[Math.floor(Math.random() * announcements.length)];
+    
+    // Pick a random theme from the announcement's allowed themes
+    const randomTheme = randomAnnouncement.themes[Math.floor(Math.random() * randomAnnouncement.themes.length)];
+    
+    displayAnnouncement(randomAnnouncement.title, randomAnnouncement.message, randomTheme);
+}
+
+queueAnnouncement = function(title, message, themeClass) {
+    announcementQueue.push({ title, message, themeClass });
+    processNextAnnouncement();
+}
+
+processNextAnnouncement = function() {
+    if (announcementQueue.length > 0 && !isDisplayingAnnouncement) {
+        isDisplayingAnnouncement = true;
+        const ann = announcementQueue.shift();
+        displayAnnouncement(ann.title, ann.message, ann.themeClass);
+        setTimeout(() => {
+            isDisplayingAnnouncement = false;
+        }, 7500);
+    }
+}
+
+startAnnouncementTimer = function() {
+    // Show first announcement after 3 minutes
+    setTimeout(() => {
+        showRandomAnnouncement();
+    }, 180000);
+    
+    // Then show a random announcement every 20 minutes
+    announcementTimer = setInterval(() => {
+        showRandomAnnouncement();
+    }, 1200000);
+}
+
+stopAnnouncementTimer = function() {
+    if (announcementTimer) {
+        clearInterval(announcementTimer);
+        announcementTimer = null;
+    }
+}
+
+// Test function to visualize all announcement variants
+testAllAnnouncements = function() {
+    let delay = 0;
+    announcements.forEach((announcement, index) => {
+        announcement.themes.forEach(theme => {
+            setTimeout(() => {
+                displayAnnouncement(announcement.title, announcement.message, theme);
+            }, delay);
+            delay += 2000; // 2 seconds between each announcement
+        });
+    });
+}
+
+// Auto-start announcement timer when page loads
+if (typeof window !== 'undefined') {
+    window.addEventListener('DOMContentLoaded', () => {
+        startAnnouncementTimer();
+    });
+}
