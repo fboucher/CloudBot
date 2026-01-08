@@ -164,7 +164,7 @@ app.post('/genstreamnotes', (req, res) => {
     const filename = path.join(
         __dirname,
         'io',
-        `${dateFormat(new Date(), 'yyyy-mm-dd')} - ${req.body.id} - ${req.body.project}.md`
+        `${dateFormat(new Date(), 'yyyy-mm-dd')}-${req.body.id}-${req.body.project}.md`
     );
     console.log('..filename: ' + filename);
     const data = req.body.notes;
