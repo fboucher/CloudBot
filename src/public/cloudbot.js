@@ -1109,7 +1109,8 @@ getRndInt = function(min, max) {
 
 makeItRain = function() {
 
-    $('.rain').empty();
+    // Clear existing rain elements
+    document.querySelectorAll('.rain').forEach(el => el.innerHTML = '');
   
     var increment = 0;
     var drops = "";
@@ -1123,8 +1124,10 @@ makeItRain = function() {
       backDrops += '<div class="drop" style="right: ' + increment + '%; bottom: ' + (randoFiver + randoFiver - 1 + 100) + '%; animation-delay: 0.' + randoHundo + 's; animation-duration: 0.5' + randoHundo + 's;"><div class="stem" style="animation-delay: 0.' + randoHundo + 's; animation-duration: 0.5' + randoHundo + 's;"></div><div class="splat" style="animation-delay: 0.' + randoHundo + 's; animation-duration: 0.5' + randoHundo + 's;"></div></div>';
     }
   
-    $('.rain.front-row').append(drops);
-    $('.rain.back-row').append(backDrops);
+    const frontRow = document.querySelector('.rain.front-row');
+    const backRow = document.querySelector('.rain.back-row');
+    if (frontRow) frontRow.innerHTML += drops;
+    if (backRow) backRow.innerHTML += backDrops;
   }
 
 
@@ -1377,7 +1380,7 @@ displayAnnouncement = function(title, message, themeClass) {
         }, 400);
     });
 
-    // Auto-dismiss after 7 seconds
+    // Auto-dismiss after 30 seconds
     const dismissTimeout = setTimeout(() => {
         if (announcement.parentElement) {
             announcement.classList.add('removing');
@@ -1388,7 +1391,7 @@ displayAnnouncement = function(title, message, themeClass) {
                 }
             }, 400);
         }
-    }, 7000);
+    }, 30000);
 
     announcement.dismissTimeout = dismissTimeout;
 }

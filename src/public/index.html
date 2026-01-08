@@ -784,7 +784,7 @@
             }
 
             //-- Clouds ---------
-            else if (flags.broadcaster && command === "rain") {
+            else if (command === "rain") {
                 console.log("!rain was typed in chat");
                 document.getElementById("sky").className = "darkcloud";
 
@@ -794,9 +794,9 @@
                 }, 5000);
 
             }
-            else if (flags.broadcaster && command === "sun") {
+            else if (command === "sun") {
                 console.log("!sun was typed in chat");
-                $('.rain').empty();
+                document.querySelectorAll('.rain').forEach(el => el.innerHTML = '');
                 stopSound("rain", SoundEnum.rain, true);
                 document.getElementById("sky").className = "lightcloud";
             }
