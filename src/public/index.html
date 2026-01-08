@@ -796,7 +796,7 @@
             }
             else if (command === "sun") {
                 console.log("!sun was typed in chat");
-                $('.rain').empty();
+                document.querySelectorAll('.rain').forEach(el => el.innerHTML = '');
                 stopSound("rain", SoundEnum.rain, true);
                 document.getElementById("sky").className = "lightcloud";
             }
