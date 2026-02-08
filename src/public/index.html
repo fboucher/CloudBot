@@ -719,10 +719,43 @@
         let _streamSession = new StreamSession();
         _streamSession.Id = Math.floor((Math.random() * 100));
 
+        function extractBracketCommand(message) {
+            if (!message) {
+                return null;
+            }
+            const trimmed = message.trim();
+            if (!trimmed.startsWith('[')) {
+                return null;
+            }
+            const closingIndex = trimmed.indexOf(']');
+            if (closingIndex === -1) {
+                return null;
+            }
+            const afterBracket = trimmed.slice(closingIndex + 1).trimStart();
+            if (!afterBracket.startsWith('!')) {
+                return null;
+            }
+            const payload = afterBracket.slice(1);
+            if (!payload) {
+                return null;
+            }
+            const firstSpaceIndex = payload.indexOf(' ');
+            const rawCommand = firstSpaceIndex === -1 ? payload : payload.slice(0, firstSpaceIndex);
+            const command = rawCommand.toLowerCase();
+            const args = firstSpaceIndex === -1 ? '' : payload.slice(firstSpaceIndex + 1).trim();
+            return { command, message: args };
+        }
+
         //Add Default Reminders
         //_streamSession.Reminders.push(new Reminder("project", "Did you assign a project yet?"));
 
         ComfyJS.onCommand = async (user, command, message, flags, extra) => {
+
+            const bracketCommand = extractBracketCommand(message);
+            if (bracketCommand) {
+                command = bracketCommand.command;
+                message = bracketCommand.message;
+            }
 
             user = user.toLowerCase();
 
