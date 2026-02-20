@@ -769,6 +769,13 @@
             if (closingIndex === -1) {
                 return null;
             }
+            const bracketContent = trimmed.slice(1, closingIndex);
+            const colonIndex = bracketContent.indexOf(':');
+            const atIndex = bracketContent.indexOf('@');
+            const bracketChannel = colonIndex === -1 ? null : bracketContent.slice(0, colonIndex).trim();
+            const bracketUser = (atIndex === -1 || atIndex + 1 >= bracketContent.length)
+                ? null
+                : bracketContent.slice(atIndex + 1).trim().toLowerCase();
             const afterBracket = trimmed.slice(closingIndex + 1).trimStart();
             if (!afterBracket.startsWith('!')) {
                 return null;
@@ -781,7 +788,7 @@
             const rawCommand = firstSpaceIndex === -1 ? payload : payload.slice(0, firstSpaceIndex);
             const command = rawCommand.toLowerCase();
             const args = firstSpaceIndex === -1 ? '' : payload.slice(firstSpaceIndex + 1).trim();
-            return { command, message: args };
+            return { command, message: args, user: bracketUser, channel: bracketChannel };
         }
 
         function escapeHtml(text) {
@@ -1058,7 +1065,7 @@
 
             const bracketCommand = extractBracketCommand(message);
             if (bracketCommand) {
-                ComfyJS.onCommand(user, bracketCommand.command, bracketCommand.message, flags, self, extra);
+                ComfyJS.onCommand(bracketCommand.user, bracketCommand.command, bracketCommand.message, flags, self, extra);
             }
 
             if (flags.broadcaster) {
