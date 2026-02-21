@@ -139,3 +139,5 @@ src/public/medias/generated/
 src/io/secret.js
 src/io/streamSession_[0-9]*.json
 src/io/*.md
+
+src/io/streamCounter.json

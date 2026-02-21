@@ -1428,10 +1428,10 @@ startAnnouncementTimer = function() {
         showRandomAnnouncement();
     }, 180000);
     
-    // Then show a random announcement every 20 minutes
+    // Then show a random announcement every 10 minutes
     announcementTimer = setInterval(() => {
         showRandomAnnouncement();
-    }, 1200000);
+    }, 600000);
 }
 
 stopAnnouncementTimer = function() {
@@ -1441,18 +1441,6 @@ stopAnnouncementTimer = function() {
     }
 }
 
-// Test function to visualize all announcement variants
-testAllAnnouncements = function() {
-    let delay = 0;
-    announcements.forEach((announcement, index) => {
-        announcement.themes.forEach(theme => {
-            setTimeout(() => {
-                displayAnnouncement(announcement.title, announcement.message, theme);
-            }, delay);
-            delay += 2000; // 2 seconds between each announcement
-        });
-    });
-}
 
 // Auto-start announcement timer when page loads
 if (typeof window !== 'undefined') {
