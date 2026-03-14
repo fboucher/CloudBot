@@ -1,26 +1,30 @@
-// index.js - Main server file for CloudBot
-// Provides API endpoints for chat bot features, file storage, and image generation
-// Uses Express.js and Node.js best practices for stability and reliability
-
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const dateFormat = require('dateformat');
-const text2png = require('text2png');
+let text2png;
+try {
+    text2png = require('text2png');
+} catch (e) {
+    console.warn('text2png not available, image generation disabled');
+}
+const db = require('./db');
+
 const app = express();
 const port = 3000;
 
-// Serve static files
 app.use('/public', express.static(path.join(__dirname, 'public')));
 app.use('/io', express.static(path.join(__dirname, 'io')));
 app.use(express.json());
 
-// Root route: serve main HTML page
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, './public/', 'index.html'));
 });
 
-// POST /Hello: Generate a hello image for a user
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, './public/', 'admin.html'));
+});
+
 app.post('/Hello', (req, res) => {
     if (req.body && req.body.user) {
         const user = req.body.user;
@@ -39,7 +43,6 @@ app.post('/Hello', (req, res) => {
     }
 });
 
-// POST /Attention: Generate an attention image for a user message
 app.post('/Attention', (req, res) => {
     if (req.body && req.body.user && req.body.message) {
         const user = req.body.user;
@@ -59,105 +62,103 @@ app.post('/Attention', (req, res) => {
     }
 });
 
-// POST /savetofile: Save stream session data to a file
-app.post('/savetofile', (req, res) => {
-    console.log('..s.');
+app.post('/savetofile', async (req, res) => {
+    console.log('..saving to database..');
     if (req.body && req.body.streamSession) {
-        const data = JSON.stringify(req.body.streamSession, null, 2);
-        const filename = path.join(__dirname, 'io', `streamSession_${req.body.streamSession.Id}.json`);
-        fs.writeFile(filename, data, (err) => {
-            if (err) {
-                console.error('Error saving JSON:', err);
-                return res.status(500).json({ error: 'Failed to save data.' });
+        try {
+            const sessionId = req.body.streamSession.Id;
+            if (sessionId) {
+                await db.saveSessionData(sessionId, req.body.streamSession);
             }
-            console.log('JSON data is saved.');
+            const data = JSON.stringify(req.body.streamSession, null, 2);
+            const filename = path.join(__dirname, 'io', `streamSession_${sessionId}.json`);
+            fs.writeFile(filename, data, (err) => {
+                if (err) {
+                    console.error('Error saving JSON to file:', err);
+                }
+            });
+            console.log('Session data saved to database.');
             res.json({ msg: 'Data is saved.' });
-        });
+        } catch (err) {
+            console.error('Error saving to database:', err);
+            res.status(500).json({ error: 'Failed to save data.' });
+        }
     } else {
         res.status(400).json({ error: 'No data.' });
     }
 });
 
-// GET /loadfromfile: Load stream session data from a file
-app.get('/loadfromfile', (req, res) => {
-    console.log('..loading from file..');
-    const filename = path.join(__dirname, 'io', 'streamSession.json');
-    fs.readFile(filename, 'utf-8', (err, data) => {
-        if (err) {
-            console.error('Error loading JSON:', err);
-            return res.status(500).json({ error: 'Failed to load data.' });
-        }
-        try {
-            const streamSession = JSON.parse(data);
-            console.log('JSON data is load.');
-            res.json(streamSession);
-        } catch (parseErr) {
-            console.error('Error parsing JSON:', parseErr);
-            res.status(500).json({ error: 'Corrupted data file.' });
-        }
-    });
-});
-
-// GET /getstreamcounter: Get the current stream counter
-app.get('/getstreamcounter', (req, res) => {
-    console.log('..getting stream counter..');
-    const filename = path.join(__dirname, 'io', 'streamCounter.json');
-    fs.readFile(filename, 'utf-8', (err, data) => {
-        if (err) {
-            console.error('Error loading counter:', err);
-            return res.status(500).json({ error: 'Failed to load counter.' });
-        }
-        try {
-            const counter = JSON.parse(data);
-            console.log('Stream counter loaded:', counter);
-            res.json(counter);
-        } catch (parseErr) {
-            console.error('Error parsing counter JSON:', parseErr);
-            res.status(500).json({ error: 'Corrupted counter file.' });
-        }
-    });
-});
-
-// POST /incrementstreamcounter: Increment and save the stream counter
-app.post('/incrementstreamcounter', (req, res) => {
-    console.log('..incrementing stream counter..');
-    const filename = path.join(__dirname, 'io', 'streamCounter.json');
-    
-    // Read current counter
-    fs.readFile(filename, 'utf-8', (err, data) => {
-        let counter;
-        if (err) {
-            // If file doesn't exist, create with default values
-            console.log('Counter file not found, creating new one');
-            counter = { currentStreamNumber: 1, lastStreamDate: new Date().toISOString().split('T')[0] };
+app.get('/loadfromfile', async (req, res) => {
+    console.log('..loading from database..');
+    try {
+        const activeSession = await db.getActiveSession();
+        if (activeSession) {
+            const sessionData = await db.loadSessionData(activeSession.id);
+            console.log('Session data loaded from database:', activeSession.id);
+            res.json(sessionData);
         } else {
-            try {
-                counter = JSON.parse(data);
-            } catch (parseErr) {
-                console.error('Error parsing counter:', parseErr);
-                return res.status(500).json({ error: 'Corrupted counter file.' });
+            const filename = path.join(__dirname, 'io', 'streamSession.json');
+            if (fs.existsSync(filename)) {
+                const data = fs.readFileSync(filename, 'utf-8');
+                const streamSession = JSON.parse(data);
+                console.log('No active session, loaded from file.');
+                res.json(streamSession);
+            } else {
+                res.json({
+                    Project: "",
+                    Id: 0,
+                    DateTimeStart: "",
+                    DateTimeEnd: "",
+                    Notes: [],
+                    UserSession: [],
+                    NewFollowers: [],
+                    Raiders: [],
+                    Subscribers: [],
+                    Hosts: [],
+                    Cheerers: [],
+                    TimeLogs: [],
+                    Todos: [],
+                    Reminders: []
+                });
             }
         }
-        
-        // Increment the counter
-        counter.currentStreamNumber++;
-        counter.lastStreamDate = new Date().toISOString().split('T')[0];
-        
-        // Save back to file
-        fs.writeFile(filename, JSON.stringify(counter, null, 2), (writeErr) => {
-            if (writeErr) {
-                console.error('Error saving counter:', writeErr);
-                return res.status(500).json({ error: 'Failed to save counter.' });
-            }
-            console.log('Stream counter incremented to:', counter.currentStreamNumber);
-            res.json(counter);
-        });
-    });
+    } catch (err) {
+        console.error('Error loading from database:', err);
+        res.status(500).json({ error: 'Failed to load data.' });
+    }
 });
 
-// POST /genstreamnotes: Save stream notes to a markdown file
+app.get('/getstreamcounter', async (req, res) => {
+    console.log('..getting stream counter from database..');
+    try {
+        const counter = await db.getStreamCounter();
+        res.json({
+            currentStreamNumber: counter.current_stream_number,
+            lastStreamDate: counter.last_stream_date
+        });
+    } catch (err) {
+        console.error('Error loading counter:', err);
+        res.status(500).json({ error: 'Failed to load counter.' });
+    }
+});
+
+app.post('/incrementstreamcounter', async (req, res) => {
+    console.log('..incrementing stream counter in database..');
+    try {
+        const counter = await db.incrementStreamCounter();
+        console.log('Stream counter incremented to:', counter.currentStreamNumber);
+        res.json({
+            currentStreamNumber: counter.currentStreamNumber,
+            lastStreamDate: counter.lastStreamDate
+        });
+    } catch (err) {
+        console.error('Error incrementing counter:', err);
+        res.status(500).json({ error: 'Failed to increment counter.' });
+    }
+});
+
 app.post('/genstreamnotes', (req, res) => {
-    console.log('..g.');
+    console.log('..generating stream notes..');
     if (!req.body || !req.body.project || !req.body.id || !req.body.notes) {
         return res.status(400).json({ error: 'Missing project, id, or notes.' });
     }
@@ -179,17 +180,100 @@ app.post('/genstreamnotes', (req, res) => {
     });
 });
 
-// Start the server
-app.listen(port, () => {
-    console.log(`CloudBot app listening at http://localhost:${port}`);
+app.post('/startstream', async (req, res) => {
+    console.log('..starting new stream session..');
+    if (!req.body || !req.body.project) {
+        return res.status(400).json({ error: 'Missing project name.' });
+    }
+    try {
+        const sessionId = await db.startStreamSession(req.body.project);
+        const counter = await db.incrementStreamCounter();
+        console.log(`Stream session started: ${sessionId}, stream #${counter.currentStreamNumber}`);
+        res.json({ sessionId, streamNumber: counter.currentStreamNumber });
+    } catch (err) {
+        console.error('Error starting stream:', err);
+        res.status(500).json({ error: 'Failed to start stream.' });
+    }
 });
 
-/**
- * createImage - Generates a PNG image with the given message and saves it to disk
- * @param {string} imageName - The filename for the image
- * @param {string} message - The text to render in the image
- */
+app.post('/endstream', async (req, res) => {
+    console.log('..ending stream session..');
+    if (!req.body || !req.body.sessionId) {
+        return res.status(400).json({ error: 'Missing sessionId.' });
+    }
+    try {
+        await db.endStreamSession(req.body.sessionId);
+        console.log(`Stream session ended: ${req.body.sessionId}`);
+        res.json({ msg: 'Stream ended.' });
+    } catch (err) {
+        console.error('Error ending stream:', err);
+        res.status(500).json({ error: 'Failed to end stream.' });
+    }
+});
+
+app.get('/api/session', async (req, res) => {
+    console.log('..getting active session..');
+    try {
+        const session = await db.getActiveSession();
+        if (session) {
+            const sessionData = await db.loadSessionData(session.id);
+            res.json({ ...session, data: sessionData });
+        } else {
+            res.json({ active: false });
+        }
+    } catch (err) {
+        console.error('Error getting session:', err);
+        res.status(500).json({ error: 'Failed to get session.' });
+    }
+});
+
+app.get('/api/sessions', async (req, res) => {
+    console.log('..getting all sessions..');
+    try {
+        const sessions = await db.getAllSessions();
+        res.json(sessions);
+    } catch (err) {
+        console.error('Error getting sessions:', err);
+        res.status(500).json({ error: 'Failed to get sessions.' });
+    }
+});
+
+app.get('/api/session/:id', async (req, res) => {
+    console.log('..getting session by id..');
+    try {
+        const session = await db.getSessionById(parseInt(req.params.id));
+        if (session) {
+            const sessionData = await db.loadSessionData(session.id);
+            res.json({ ...session, data: sessionData });
+        } else {
+            res.status(404).json({ error: 'Session not found.' });
+        }
+    } catch (err) {
+        console.error('Error getting session:', err);
+        res.status(500).json({ error: 'Failed to get session.' });
+    }
+});
+
+async function startServer() {
+    try {
+        await db.initDb();
+        console.log('Database initialized successfully.');
+        
+        app.listen(port, () => {
+            console.log(`CloudBot app listening at http://localhost:${port}`);
+            console.log(`Admin panel at http://localhost:${port}/admin`);
+        });
+    } catch (err) {
+        console.error('Failed to initialize database:', err);
+        process.exit(1);
+    }
+}
+
 function createImage(imageName, message) {
+    if (!text2png) {
+        console.warn('Image generation disabled');
+        return;
+    }
     const dir = path.join(__dirname, 'public', 'medias', 'generated');
     try {
         if (!fs.existsSync(dir)) {
@@ -207,14 +291,9 @@ function createImage(imageName, message) {
         );
     } catch (err) {
         console.error('Error in createImage:', err);
-        throw err;
     }
 }
 
-/**
- * CleanUpGeneratedImages - Deletes all files in the generated images directory
- * to keep the folder clean after notes are generated.
- */
 function CleanUpGeneratedImages() {
     const directory = path.join(__dirname, 'public', 'medias', 'generated');
     if (!fs.existsSync(directory)) {
@@ -227,7 +306,6 @@ function CleanUpGeneratedImages() {
             return;
         }
         for (const file of files) {
-            // Do not delete .gitkeep or empty.txt or other important files
             if (file === '.gitkeep' || file === 'empty.txt') continue;
             fs.unlink(path.join(directory, file), (err) => {
                 if (err) {
@@ -237,3 +315,5 @@ function CleanUpGeneratedImages() {
         }
     });
 }
+
+startServer();

@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/FBoucher/CloudBot#readme",
   "dependencies": {
+    "@libsql/client": "^0.6.0",
     "dateformat": "^3.0.3",
     "express": "^4.21.1",
     "text2png": "^2.3.0",
