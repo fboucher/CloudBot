@@ -27,4 +27,36 @@ CloudBot is a Twitch chatbot with stream tracking and an admin panel. It's trans
 
 ## Learnings
 
-_(empty — project just started)_
+### Commands Audit (2025-03-15)
+
+**Key Finding: No active Twitch IRC handler**  
+- All chat commands (!start, !stop, !note, !todo, !reminder, etc.) are **referenced in frontend JS** but have **no backend IRC listener**
+- Only admin panel buttons work (via REST endpoints like `/api/stream/start`, `/api/notes`, etc.)
+- Decision 6 acknowledged this gap — chat handler is deferred pending IRC integration
+
+**Database Status:**
+- ✅ Notes, Todos, Reminders: Fully DB-backed with proper REST endpoints and admin panels
+- ✅ Session start/stop: Proper transaction handling with DB + SSE broadcast
+- ⚠️  User scores: Still in-memory only (no DB persistence, no admin visibility)
+- ⚠️  Todos visibility toggle: State stored in-memory, not persisted
+
+**Legacy File I/O:**
+- `/savetofile` still writes `.json` files alongside DB — should remove file write, keep DB only
+- `/loadfromfile` falls back to JSON if no active session — OK for now, but JSON writes should cease
+- `/genstreamnotes` still generates `.md` files — correct, needed for report generation
+
+**Audit deliverable:** `.squad/planning/commands-audit.md` documents all commands with priorities and gaps
+
+### 2026-03-15 — Commands Audit Planning Finalized
+
+**Work:** Planning document completion (no code changes)
+
+**Planning document:** `.squad/planning/commands-audit.md`
+
+**Scope:** Documents commands audit including:
+- All chat commands with current status
+- Priorities for review and updates
+- Commands requiring deprecation or refactoring
+- Implementation timeline for future work
+
+**Status:** Ready for team reference and future implementation work

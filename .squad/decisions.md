@@ -51,7 +51,7 @@
 - **Show on stream:** Added per-note "Show" button calling `POST /api/stream/overlay`
 - Status: ✅ Implemented (all 15 bugs)
 
-### Session 2026-03-15 — Database Query Fix & UI Enhancements
+### Session 2026-03-15 — Database Query Fix, UI Enhancements, Session Completeness
 
 #### Romero — Overlay Todos Fix (Decision 7)
 
@@ -105,3 +105,56 @@
 ## Archived Decisions
 
 No archived decisions yet.
+
+#### Romero — Session Export & API Completeness (Decision 11–15)
+
+11. **Export endpoint at `GET /api/export`**
+    - New endpoint returns a markdown file of the active session as a browser download
+    - Uses `Content-Disposition: attachment; filename="session-YYYY-MM-DD.md"` and `Content-Type: text/markdown`
+    - Returns 404 `{ error: 'No active session' }` when no active session exists
+    - Markdown format: session header (project, title, started_at, ended_at), Notes, To-Do (with [ ]/[x] checkboxes), Reminders
+    - Queries notes/todos/reminders directly via `db.getNotes/getTodos/getReminders`
+    - Status: ✅ Implemented
+
+12. **`/api/session` returns flat notes/todos/reminders**
+    - Changed from returning `{ ...session, data: sessionData }` to returning a clean flat object:
+      `{ id, project_name, stream_title, started_at, ended_at, active, notes, todos, reminders }`
+    - `notes`, `todos`, `reminders` are direct arrays from their respective DB tables
+    - `active` is a boolean: `!session.ended_at`
+    - Status: ✅ Implemented
+
+13. **`/api/stream/status` returns full session object**
+    - When a session is active, now returns `{ active: true, session: { ...full session with notes/todos/reminders } }`
+    - When no session, still returns `{ active: false }`
+    - Status: ✅ Implemented
+
+14. **Chat commands wired to DB via REST API**
+    - `addTodo` in `cloudbot.js`: now calls `POST /api/todos { description }` in addition to in-memory update
+    - `addReminder` in `cloudbot.js`: now calls `POST /api/reminders { name, message, interval }` in addition to in-memory update
+    - `SavingNote` in `cloudbot.js`: now calls `POST /api/notes { text }` in addition to in-memory update
+    - In-memory updates kept for immediate overlay display; DB call persists data for admin panel polling
+    - Status: ✅ Implemented
+
+15. **Fixed legacy `c.execute()` calls in `index.js`**
+    - `/updatestreamtitle` and `/updateproject` still used old `c.execute({ sql, args })` pattern
+    - Migrated to `c.prepare(sql).run(...)` to match current `@tursodatabase/database` API
+    - Status: ✅ Implemented
+
+#### Darlene — UI Fixes & Auto-Polling (Decision 16–18)
+
+16. **Stream Control card button consolidation**
+    - Moved Save and Export buttons from separate locations into Stream Control card
+    - Improved visual organization and usability in admin panel
+    - Status: ✅ Implemented
+
+17. **Show/Hide Todo toggle fixes**
+    - Fixed inverted toggle logic in 3 locations of admin.html
+    - Toggle now correctly reflects and controls todo visibility state
+    - Status: ✅ Implemented
+
+18. **5-second auto-polling for session data**
+    - Added `setInterval(renderSessionNotes/Todos/Reminders, 5000)` in admin panel
+    - Lightweight: 3 GET requests every 5s when session active
+    - Render functions gracefully no-op when no session exists
+    - Keeps admin panel synchronized with chat-added items without manual refresh
+    - Status: ✅ Implemented

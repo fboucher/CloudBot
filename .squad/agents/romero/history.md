@@ -131,3 +131,79 @@ All 10 calls now use correct syntax: `c.execute({ sql, args })`
 3. Overlay renders todos via `RefreshTodosArea()` ✅
 
 **Todos visibility toggle independent:** `checkTodosVisibility()` polls `/gettodosvisibility` on separate 2-second interval. No changes needed there.
+
+### 2026-03-15 — Session Export, Session Completeness, Chat Commands DB Wiring
+
+**Endpoints fixed/added in `src/index.js`:**
+
+- **`GET /api/export`** (new): Generates a markdown file of the active session for browser download.
+  - Headers: `Content-Disposition: attachment; filename="session-YYYY-MM-DD.md"`, `Content-Type: text/markdown`
+  - Returns 404 `{ error: 'No active session' }` if no active session.
+  - Markdown format: `# Stream Session — ProjectName`, title/started/ended, `## Notes` (bullet list), `## To-Do` (`[ ]`/`[x]` checkboxes), `## Reminders` (name: message (interval: Xmin))
+  - Queries directly via `db.getNotes`, `db.getTodos`, `db.getReminders`
+
+- **`GET /api/session`** (fixed): Now returns flat object with `notes`, `todos`, `reminders` arrays:
+  `{ id, project_name, stream_title, started_at, ended_at, active, notes, todos, reminders }`
+  Previously returned `{ ...session, data: sessionData }` (nested, wrong shape).
+
+- **`GET /api/stream/status`** (fixed): Now returns `{ active: true, session: { full session + notes/todos/reminders } }` when active.
+  Previously only returned `{ active, sessionId, projectName, streamTitle, startedAt }`.
+
+- **`/updatestreamtitle` + `/updateproject`** (fixed): Migrated from old `c.execute({ sql, args })` to `c.prepare(sql).run(...)` — the only two remaining legacy patterns in `index.js`.
+
+**Frontend wiring in `src/public/cloudbot.js`:**
+
+- `addTodo()`: Now calls `POST /api/todos { description }` to persist to DB (in addition to in-memory update for overlay)
+- `addReminder()`: Now calls `POST /api/reminders { name, message, interval }` to persist to DB
+- `SavingNote()`: Now calls `POST /api/notes { text }` to persist to DB
+- ComfyJS handlers live in `index.html` (browser overlay), NOT in `src/index.js` — documented for future reference
+
+**Files modified:** `src/index.js`, `src/public/cloudbot.js`
+
+
+**What changed:**
+- Replaced `@libsql/client` with `@tursodatabase/database` (Rust-based in-process SQLite, local file only)
+- Removed `getDbUrl()` and `DATABASE_URL` env var support — pure local file path now
+- `initDb()` uses `const { connect } = await import('@tursodatabase/database')` (ESM via dynamic import in CJS)
+- All query methods migrated from `c.execute({ sql, args })` to `db.prepare(sql).run/get/all` pattern
+- `result.lastInsertId` → `result.lastInsertRowid`
+- `result.rows` → direct return from `.all()` / `.get()`
+
+**Critical discovery — API is fully async:**
+The task brief described the API as "sync-style" but the actual `@tursodatabase/database` package (`promise.js` variant) requires `await` on ALL calls: `db.exec()`, `db.prepare().run()`, `.get()`, `.all()`. Not awaiting caused deferred uncaught exceptions from the Rust engine's internal state machine. All calls in db.js now use `await`.
+
+**`db.exec()` in migrations:**
+The migration try/catch blocks use `await db.exec(...)` — errors are properly caught when a column already exists.
+
+**`getClient()` kept for backward compat:**
+`getClient()` still exported from `module.exports` and returns `db` — in case any external caller relies on it.
+
+**Files modified:**
+- `src/db.js` — full rewrite
+- `src/package.json` — swapped `@libsql/client` for `@tursodatabase/database`
+
+**Verified:**
+- Fresh DB creation works (all tables, stream_counter init)
+- Migration path works (ALTER TABLE no-ops on existing DB)
+- CRUD operations work: `startStreamSession`, `getActiveSession`, `addTodo`, `getTodos`, `endStreamSession`
+
+### 2026-03-15 — Session Export & API Completeness
+
+**Work:** Export endpoint, API enrichment, chat persistence, legacy fixes
+
+**Decisions (11–15):**
+- Decision 11: New `GET /api/export` endpoint generates markdown download of active session
+- Decision 12: `/api/session` returns flat object with nested notes/todos/reminders arrays
+- Decision 13: `/api/stream/status` returns full session object when active
+- Decision 14: Chat commands in `cloudbot.js` now persist via REST API (`POST /api/todos`, `/reminders`, `/notes`)
+- Decision 15: Fixed 2 legacy `c.execute()` calls in `/updatestreamtitle` and `/updateproject` routes
+
+**Files modified:**
+- `src/index.js` — added `GET /api/export` endpoint, updated `/api/session` and `/api/stream/status` response shape, migrated legacy execute calls
+- `src/public/cloudbot.js` — wired !todo, !note, !reminder commands to call POST endpoints
+
+**Verified:**
+- Export endpoint returns proper Content-Disposition and markdown formatting
+- `/api/session` and `/api/stream/status` return complete session state
+- Chat commands persist to database
+- Legacy routes work with new driver API

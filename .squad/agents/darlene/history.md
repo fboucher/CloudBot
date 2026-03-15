@@ -27,6 +27,35 @@ CloudBot is a Twitch chatbot with stream tracking and an admin panel. It's trans
 
 ## Learnings
 
+### Session: Three Frontend Fixes (admin.html)
+
+**Date:** 2026-03-15  
+**Files changed:** `src/public/admin.html`
+
+**What was fixed:**
+
+1. **Fix #1 — Save/Export into Stream Control card**
+   - Moved `saveSessionBtn` and `exportNotesBtn` from the "Quick Actions" card header into the "Stream Control" card body.
+   - Added a new `<div class="row mt-2">` with `col-12 d-flex gap-2` below the Stream #/Started row.
+   - Removed the `<div>` that held those buttons in the Quick Actions header; Quick Actions card now has no header buttons.
+   - Button IDs, event handlers (`saveCurrentSession`, `exportNotesBtn` click listener) unchanged.
+
+2. **Fix #2 — Show/Hide Todo toggle inversion corrected**
+   - Bug: when `todosVisibleOnStream = true` (todos visible), button showed "Show on Stream" — backwards.
+   - Fixed `toggleTodosVisibility()`: when `todosVisibleOnStream = true` → "Hide on Stream" (bi-eye-slash); when false → "Show on Stream" (bi-eye).
+   - Fixed `loadTodosVisibility()`: was only updating button on `!visible` case (and set wrong label). Now always updates button with correct label.
+   - Fixed initial button HTML from "Show on Stream" (bi-eye) to "Hide on Stream" (bi-eye-slash), matching `todosVisibleOnStream = true` default.
+
+3. **Fix #3 — Polling for notes/todos/reminders**
+   - `renderSessionNotes()`, `renderSessionTodos()`, `renderSessionReminders()` were only called when navigating to the Session page — not on a recurring timer.
+   - Added `setInterval(renderSessionNotes, 5000)`, `setInterval(renderSessionTodos, 5000)`, `setInterval(renderSessionReminders, 5000)` in the DOMContentLoaded handler alongside the existing `loadActiveSession` and `pollForEffects` intervals.
+   - Chat-added todos/notes/reminders now appear within 5 seconds without requiring page navigation.
+
+**Index.html overlay (Fix #3 investigation):**
+   - `cloudbot.js` already calls `setInterval(loadSessionFromDb, 5000)` which polls `/loadfromfile` every 5s and calls `RefreshTodosArea()`.
+   - The overlay IS polling. If todos added via chat don't appear in overlay, the root cause is the `/loadfromfile` endpoint or DB layer (backend concern, not frontend).
+   - No changes made to `index.html` or `cloudbot.js`.
+
 ### Session: Trenton's 15-Bug Audit (admin.html + index.html)
 
 **Date:** 2026-03-15  
@@ -104,3 +133,28 @@ The old `renderTodos()`/`renderReminders()`/`renderSessionTodos()`/`renderSessio
 - Added `.sidebar { position: relative; }` to anchor footer to sidebar container
 
 **Note:** Version hardcoded from `package.json`. Future enhancement: expose `/api/version` endpoint so footer auto-updates on deploy.
+
+### 2026-03-15 — UI Fixes & Auto-Polling
+
+**Work:** Button consolidation, toggle fixes, auto-polling implementation
+
+**Decisions (16–18):**
+- Decision 16: Moved Save/Export buttons into Stream Control card
+- Decision 17: Fixed inverted Show/Hide Todo toggle logic in 3 locations
+- Decision 18: Added 5-second auto-polling for notes, todos, reminders in admin panel
+
+**Files modified:**
+- `src/public/admin.html` — consolidated button placement, fixed toggle logic, added polling intervals
+
+**Details:**
+- `setInterval(renderSessionNotes, 5000)` fires every 5s regardless of active page
+- `setInterval(renderSessionTodos, 5000)` fires every 5s regardless of active page
+- `setInterval(renderSessionReminders, 5000)` fires every 5s regardless of active page
+- Render functions check `currentSession` and gracefully no-op if no session active
+- Toggle state now properly reflects expected user behavior across all instances
+
+**Verified:**
+- Buttons display in correct location
+- Toggle logic inverted correctly
+- Polling fires without console errors
+- Real-time updates visible when chat adds items
