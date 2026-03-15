@@ -64,27 +64,36 @@ app.post('/Attention', (req, res) => {
 
 app.post('/savetofile', async (req, res) => {
     console.log('..saving to database..');
-    if (req.body && req.body.streamSession) {
-        try {
+    try {
+        // If a legacy streamSession blob was sent, persist it to DB
+        if (req.body && req.body.streamSession) {
             const sessionId = req.body.streamSession.Id;
             if (sessionId) {
                 await db.saveSessionData(sessionId, req.body.streamSession);
             }
-            const data = JSON.stringify(req.body.streamSession, null, 2);
-            const filename = path.join(__dirname, 'io', `streamSession_${sessionId}.json`);
-            fs.writeFile(filename, data, (err) => {
-                if (err) {
-                    console.error('Error saving JSON to file:', err);
-                }
-            });
             console.log('Session data saved to database.');
-            res.json({ msg: 'Data is saved.' });
-        } catch (err) {
-            console.error('Error saving to database:', err);
-            res.status(500).json({ error: 'Failed to save data.' });
+            return res.json({ success: true });
         }
-    } else {
-        res.status(400).json({ error: 'No data.' });
+
+        // Preferred path: persist current project_name / stream_title for active session
+        const session = await db.getActiveSession();
+        if (!session) return res.status(404).json({ error: 'No active session.' });
+
+        const { project_name, stream_title } = req.body || {};
+        if (project_name !== undefined || stream_title !== undefined) {
+            const c = await db.getClient();
+            if (project_name !== undefined) {
+                await c.prepare("UPDATE stream_sessions SET project_name = ? WHERE id = ?").run(project_name, session.id);
+            }
+            if (stream_title !== undefined) {
+                await c.prepare("UPDATE stream_sessions SET stream_title = ? WHERE id = ?").run(stream_title, session.id);
+            }
+        }
+        console.log('Session saved to database.');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error saving to database:', err);
+        res.status(500).json({ error: 'Failed to save data.' });
     }
 });
 
@@ -97,31 +106,23 @@ app.get('/loadfromfile', async (req, res) => {
             console.log('Session data loaded from database:', activeSession.id);
             res.json(sessionData);
         } else {
-            const filename = path.join(__dirname, 'io', 'streamSession.json');
-            if (fs.existsSync(filename)) {
-                const data = fs.readFileSync(filename, 'utf-8');
-                const streamSession = JSON.parse(data);
-                console.log('No active session, loaded from file.');
-                res.json(streamSession);
-            } else {
-                res.json({
-                    Project: "",
-                    Title: "",
-                    Id: 0,
-                    DateTimeStart: "",
-                    DateTimeEnd: "",
-                    Notes: [],
-                    UserSession: [],
-                    NewFollowers: [],
-                    Raiders: [],
-                    Subscribers: [],
-                    Hosts: [],
-                    Cheerers: [],
-                    TimeLogs: [],
-                    Todos: [],
-                    Reminders: []
-                });
-            }
+            res.json({
+                Project: "",
+                Title: "",
+                Id: 0,
+                DateTimeStart: "",
+                DateTimeEnd: "",
+                Notes: [],
+                UserSession: [],
+                NewFollowers: [],
+                Raiders: [],
+                Subscribers: [],
+                Hosts: [],
+                Cheerers: [],
+                TimeLogs: [],
+                Todos: [],
+                Reminders: []
+            });
         }
     } catch (err) {
         console.error('Error loading from database:', err);
@@ -219,10 +220,7 @@ app.post('/updatestreamtitle', async (req, res) => {
     }
     try {
         const c = await db.getClient();
-        await c.execute({
-            sql: "UPDATE stream_sessions SET stream_title = ? WHERE id = ?",
-            args: [req.body.title, req.body.sessionId]
-        });
+        await c.prepare("UPDATE stream_sessions SET stream_title = ? WHERE id = ?").run(req.body.title, req.body.sessionId);
         console.log(`Stream title updated: ${req.body.title}`);
         res.json({ msg: 'Title updated.' });
     } catch (err) {
@@ -238,10 +236,7 @@ app.post('/updateproject', async (req, res) => {
     }
     try {
         const c = await db.getClient();
-        await c.execute({
-            sql: "UPDATE stream_sessions SET project_name = ? WHERE id = ?",
-            args: [req.body.project, req.body.sessionId]
-        });
+        await c.prepare("UPDATE stream_sessions SET project_name = ? WHERE id = ?").run(req.body.project, req.body.sessionId);
         console.log(`Project updated: ${req.body.project}`);
         res.json({ msg: 'Project updated.' });
     } catch (err) {
@@ -310,12 +305,21 @@ app.get('/api/session', async (req, res) => {
     try {
         const session = await db.getActiveSession();
         if (session) {
-            const sessionData = await db.loadSessionData(session.id);
-            res.json({ 
-                ...session, 
-                stream_title: session.stream_title || "",
+            const [notes, todos, reminders] = await Promise.all([
+                db.getNotes(session.id),
+                db.getTodos(session.id),
+                db.getReminders(session.id)
+            ]);
+            res.json({
+                id: session.id,
+                project_name: session.project_name,
+                stream_title: session.stream_title || '',
+                started_at: session.started_at,
+                ended_at: session.ended_at,
                 active: !session.ended_at,
-                data: sessionData 
+                notes,
+                todos,
+                reminders
             });
         } else {
             res.json({ active: false });
@@ -353,6 +357,30 @@ app.get('/api/session/:id', async (req, res) => {
     }
 });
 
+app.patch('/api/session/:id', async (req, res) => {
+    console.log('..updating session..');
+    const id = parseInt(req.params.id);
+    const { project_name, stream_title } = req.body || {};
+    if (project_name === undefined && stream_title === undefined) {
+        return res.status(400).json({ error: 'Provide project_name and/or stream_title to update.' });
+    }
+    try {
+        const c = await db.getClient();
+        if (project_name !== undefined) {
+            await c.prepare("UPDATE stream_sessions SET project_name = ? WHERE id = ?").run(project_name, id);
+        }
+        if (stream_title !== undefined) {
+            await c.prepare("UPDATE stream_sessions SET stream_title = ? WHERE id = ?").run(stream_title, id);
+        }
+        const session = await db.getSessionById(id);
+        console.log(`Session ${id} updated.`);
+        res.json({ success: true, session });
+    } catch (err) {
+        console.error('Error updating session:', err);
+        res.status(500).json({ error: 'Failed to update session.' });
+    }
+});
+
 app.post('/api/session/notes', async (req, res) => {
     console.log('..adding note..');
     try {
@@ -375,7 +403,7 @@ app.post('/api/session/todos', async (req, res) => {
         if (!session) return res.status(400).json({ error: 'No active session.' });
         
         const { description, status } = req.body;
-        await db.addTodo(session.id, description, status || 'pending');
+        await db.addTodo(session.id, description, status || 'new');
         res.json({ success: true });
     } catch (err) {
         console.error('Error adding todo:', err);
@@ -442,6 +470,65 @@ app.delete('/api/session/reminders/:id', async (req, res) => {
     }
 });
 
+app.get('/api/export', async (req, res) => {
+    try {
+        const session = await db.getActiveSession();
+        if (!session) return res.status(404).json({ error: 'No active session' });
+
+        const [notes, todos, reminders] = await Promise.all([
+            db.getNotes(session.id),
+            db.getTodos(session.id),
+            db.getReminders(session.id)
+        ]);
+
+        const endedDisplay = session.ended_at ? session.ended_at : 'In progress';
+        let md = `# Stream Session — ${session.project_name}\n\n`;
+        md += `**Title:** ${session.stream_title || ''}\n`;
+        md += `**Started:** ${session.started_at}\n`;
+        md += `**Ended:** ${endedDisplay}\n\n`;
+
+        md += `## Notes\n`;
+        if (notes.length === 0) {
+            md += `_No notes._\n`;
+        } else {
+            notes.forEach(n => { md += `- ${n.text}\n`; });
+        }
+        md += `\n`;
+
+        md += `## To-Do\n`;
+        if (todos.length === 0) {
+            md += `_No todos._\n`;
+        } else {
+            todos.forEach(t => {
+                if (t.status === 'cancel') {
+                    md += `- ~~${t.description}~~\n`;
+                } else {
+                    const check = t.status === 'done' ? 'x' : ' ';
+                    md += `- [${check}] ${t.description}\n`;
+                }
+            });
+        }
+        md += `\n`;
+
+        md += `## Reminders\n`;
+        if (reminders.length === 0) {
+            md += `_No reminders._\n`;
+        } else {
+            reminders.forEach(r => {
+                md += `- **${r.name}**: ${r.message}\n`;
+            });
+        }
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        res.setHeader('Content-Disposition', `attachment; filename="session-${dateStr}.md"`);
+        res.setHeader('Content-Type', 'text/markdown');
+        res.send(md);
+    } catch (err) {
+        console.error('Error exporting session:', err);
+        res.status(500).json({ error: 'Failed to export session.' });
+    }
+});
+
 // ─── Stream Start / Stop / Status ────────────────────────────────────────────
 
 app.post('/api/stream/start', async (req, res) => {
@@ -482,7 +569,25 @@ app.get('/api/stream/status', async (req, res) => {
     try {
         const session = await db.getActiveSession();
         if (session) {
-            res.json({ active: true, sessionId: session.id, projectName: session.project_name, streamTitle: session.stream_title || '', startedAt: session.started_at });
+            const [notes, todos, reminders] = await Promise.all([
+                db.getNotes(session.id),
+                db.getTodos(session.id),
+                db.getReminders(session.id)
+            ]);
+            res.json({
+                active: true,
+                session: {
+                    id: session.id,
+                    project_name: session.project_name,
+                    stream_title: session.stream_title || '',
+                    started_at: session.started_at,
+                    ended_at: session.ended_at,
+                    active: true,
+                    notes,
+                    todos,
+                    reminders
+                }
+            });
         } else {
             res.json({ active: false });
         }

@@ -207,3 +207,37 @@ The migration try/catch blocks use `await db.exec(...)` — errors are properly 
 - `/api/session` and `/api/stream/status` return complete session state
 - Chat commands persist to database
 - Legacy routes work with new driver API
+
+### 2026-03-16 — Export Fix, Persistence Bug, Save Button, Legacy JSON Cleanup
+
+**Root cause #1 — loadActiveSession() read wrong fields from /api/stream/status:**
+- `/api/stream/status` returns `{ active: true, session: { id, project_name, stream_title, started_at } }` (nested under `session`)
+- `loadActiveSession()` was reading `data.sessionId`, `data.projectName`, `data.streamTitle`, `data.startedAt` — ALL undefined
+- This caused `currentSession.id = undefined` → blur handlers for project/title called `/updateproject` and `/updatestreamtitle` with `sessionId: undefined` → WHERE clause never matched → nothing saved → "values vanished"
+- **Fix:** Updated `loadActiveSession()` to read from `data.session.*`
+
+**Root cause #2 — Save button guarded on streamSessionData (always null):**
+- `saveCurrentSession()` checked `if (!streamSessionData) return;` — early exit on every call
+- `streamSessionData` was populated via `legacyData.data` but `/api/session` no longer returns `.data`; it returns a flat object
+- So Save button always silently did nothing
+- **Fix:** Save button now guards on `currentSession`, reads input fields, calls `PATCH /api/session/:id`
+
+**Root cause #3 — Export button depended on streamSessionData too:**
+- Export button also guarded on `!streamSessionData` (old version) or used fragile fetch-blob pattern
+- **Fix:** Simplified to `window.location.href = '/api/export'` — native browser download via Content-Disposition header
+
+**Export endpoint format bugs fixed:**
+- Cancelled todos were rendered as `- [ ] description` instead of `- ~~description~~`
+- Reminders were rendered as `name: message (interval: Nmin)` instead of `**name**: message`
+
+**Legacy JSON file I/O removed (Phase 2):**
+- `/savetofile`: Removed `fs.writeFile()` JSON dump. Now persists to DB only.
+- `/loadfromfile`: Removed `fs.existsSync`/`fs.readFileSync` JSON fallback. Returns empty default structure when no active session.
+- `/genstreamnotes` untouched — intentionally still writes `.md` report files.
+
+**New endpoint added:**
+- `PATCH /api/session/:id` — updates `project_name` and/or `stream_title` on any session; returns `{ success, session }`
+
+**Files modified:**
+- `src/index.js` — `/savetofile` (remove JSON write), `/loadfromfile` (remove JSON fallback), `/api/export` (fix todo/reminder format), `PATCH /api/session/:id` (new)
+- `src/public/admin.html` — `loadActiveSession()` (fix field names), `saveCurrentSession()` (use PATCH endpoint), Export button handler (simplify)

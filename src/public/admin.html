@@ -25,6 +25,7 @@
             background-color: var(--cb-secondary);
             min-height: 100vh;
             padding: 20px;
+            position: relative;
         }
         
         .sidebar .nav-link {
@@ -42,6 +43,19 @@
         
         .sidebar .nav-link i {
             margin-right: 10px;
+        }
+
+        .version-footer {
+            position: absolute;
+            bottom: 16px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.3);
+            letter-spacing: 0.03em;
+            pointer-events: none;
+            user-select: none;
         }
         
         .main-content {
@@ -174,7 +188,28 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            color: #e9ecef;
         }
+
+        .todo-item span, .reminder-item span {
+            color: #e9ecef;
+        }
+
+        .todo-status-badge {
+            display: inline-block;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 4px;
+            margin-right: 8px;
+            vertical-align: middle;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .todo-status-badge.new      { background-color: #4a90d9; color: #fff; }
+        .todo-status-badge.inProgress { background-color: #fd7e14; color: #fff; }
+        .todo-status-badge.done     { background-color: #28a745; color: #fff; }
+        .todo-status-badge.cancel   { background-color: #6c757d; color: #fff; }
         
         .todo-item.done {
             opacity: 0.5;
@@ -247,6 +282,7 @@
                         </a>
                     </li>
                 </ul>
+                <div class="version-footer">v1.0.0 · build 2026-03-15</div>
             </nav>
 
             <main class="col-md-10 main-content">
@@ -331,6 +367,16 @@
                                     <strong>Started:</strong> <span id="currentStartTime">-</span>
                                 </div>
                             </div>
+                            <div class="row mt-2">
+                                <div class="col-12 d-flex gap-2">
+                                    <button class="btn btn-cb btn-cb-success btn-sm" id="saveSessionBtn">
+                                        <i class="bi bi-save"></i> Save
+                                    </button>
+                                    <button class="btn btn-cb btn-cb-danger btn-sm" id="exportNotesBtn">
+                                        <i class="bi bi-file-earmark-markdown"></i> Export
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -338,14 +384,6 @@
                     <div class="card mb-3">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <span class="card-title">Quick Actions</span>
-                            <div>
-                                <button class="btn btn-cb btn-cb-success btn-sm" id="saveSessionBtn">
-                                    <i class="bi bi-save"></i> Save
-                                </button>
-                                <button class="btn btn-cb btn-cb-danger btn-sm" id="exportNotesBtn">
-                                    <i class="bi bi-file-earmark-markdown"></i> Export
-                                </button>
-                            </div>
                         </div>
                         <div class="card-body">
                             <div class="mb-3">
@@ -388,7 +426,7 @@
                             <span class="card-title">Todos</span>
                             <div>
                                 <button class="btn btn-cb btn-sm" id="toggleTodosStreamBtn" onclick="toggleTodosVisibility()">
-                                    <i class="bi bi-eye"></i> Show on Stream
+                                    <i class="bi bi-eye-slash"></i> Hide on Stream
                                 </button>
                                 <button class="btn btn-cb btn-sm" data-bs-toggle="modal" data-bs-target="#addTodoModal">
                                     <i class="bi bi-plus"></i> Add Todo
@@ -534,6 +572,9 @@
             setupNavigation();
             setInterval(loadActiveSession, 5000);
             setInterval(pollForEffects, 2000);
+            setInterval(renderSessionNotes, 5000);
+            setInterval(renderSessionTodos, 5000);
+            setInterval(renderSessionReminders, 5000);
         });
 
         // Poll for effects from stream view
@@ -603,20 +644,23 @@
                 const data = await response.json();
 
                 if (data.active) {
+                    const s = data.session || {};
                     currentSession = {
-                        id: data.sessionId,
-                        project_name: data.projectName,
-                        stream_title: data.streamTitle,
-                        started_at: data.startedAt
+                        id: s.id,
+                        project_name: s.project_name,
+                        stream_title: s.stream_title,
+                        started_at: s.started_at
                     };
-                    updateStreamStatus(true, data.projectName);
+                    updateStreamStatus(true, s.project_name);
 
                     document.getElementById('sessionStartBtn').disabled = true;
                     document.getElementById('sessionStopBtn').disabled = false;
-                    setInputIfNotFocused('sessionProjectInput', data.projectName || '');
-                    setInputIfNotFocused('sessionTitleInput', data.streamTitle || '');
-                    document.getElementById('currentStreamNumber').textContent = data.sessionId;
-                    document.getElementById('currentStartTime').textContent = data.startedAt ? new Date(data.startedAt).toLocaleString() : '-';
+                    document.getElementById('sessionProjectInput').disabled = true;
+                    document.getElementById('sessionTitleInput').disabled = true;
+                    setInputIfNotFocused('sessionProjectInput', s.project_name || '');
+                    setInputIfNotFocused('sessionTitleInput', s.stream_title || '');
+                    document.getElementById('currentStreamNumber').textContent = s.id;
+                    document.getElementById('currentStartTime').textContent = s.started_at ? new Date(s.started_at).toLocaleString() : '-';
 
                     updateSessionInfo();
 
@@ -635,6 +679,8 @@
 
                     updateStartBtnState();
                     document.getElementById('sessionStopBtn').disabled = true;
+                    document.getElementById('sessionProjectInput').disabled = false;
+                    document.getElementById('sessionTitleInput').disabled = false;
                     document.getElementById('sessionProjectInput').value = '';
                     document.getElementById('sessionTitleInput').value = '';
                     document.getElementById('currentStreamNumber').textContent = '-';
@@ -723,9 +769,9 @@
                 
                 const btn = document.getElementById('toggleTodosStreamBtn');
                 if (todosVisibleOnStream) {
-                    btn.innerHTML = '<i class="bi bi-eye"></i> Show on Stream';
-                } else {
                     btn.innerHTML = '<i class="bi bi-eye-slash"></i> Hide on Stream';
+                } else {
+                    btn.innerHTML = '<i class="bi bi-eye"></i> Show on Stream';
                 }
                 
                 showFeedback(`Todos ${todosVisibleOnStream ? 'shown' : 'hidden'} on stream`);
@@ -740,8 +786,10 @@
                 const result = await response.json();
                 todosVisibleOnStream = result.visible;
                 const btn = document.getElementById('toggleTodosStreamBtn');
-                if (!todosVisibleOnStream) {
+                if (todosVisibleOnStream) {
                     btn.innerHTML = '<i class="bi bi-eye-slash"></i> Hide on Stream';
+                } else {
+                    btn.innerHTML = '<i class="bi bi-eye"></i> Show on Stream';
                 }
             } catch (err) {
                 console.error('Error loading todos visibility:', err);
@@ -1000,7 +1048,7 @@
                 }
                 container.innerHTML = todos.map(t => `
                     <div class="todo-item ${t.status || ''}">
-                        <span>${t.id}. ${escapeHtml(t.description)}</span>
+                        <span><span class="todo-status-badge ${t.status || 'new'}">${t.status || 'new'}</span>${t.id}. ${escapeHtml(t.description)}</span>
                         <div>
                             <button class="btn btn-sm btn-cb" onclick="setSessionTodoStatus(${t.id}, 'new')">New</button>
                             <button class="btn btn-sm btn-cb" onclick="setSessionTodoStatus(${t.id}, 'inProgress')">In Progress</button>
@@ -1125,13 +1173,16 @@
         }
 
         async function saveCurrentSession() {
-            if (!streamSessionData) return;
+            if (!currentSession) return;
             try {
-                await fetch('/savetofile', {
-                    method: 'POST',
+                const project_name = document.getElementById('sessionProjectInput').value.trim();
+                const stream_title = document.getElementById('sessionTitleInput').value.trim();
+                const response = await fetch(`/api/session/${currentSession.id}`, {
+                    method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ streamSession: streamSessionData })
+                    body: JSON.stringify({ project_name, stream_title })
                 });
+                if (response.ok) showFeedback('Session saved!');
             } catch (err) {
                 console.error('Error saving session:', err);
             }
@@ -1140,16 +1191,25 @@
         document.getElementById('saveSessionBtn').addEventListener('click', saveCurrentSession);
 
         document.getElementById('exportNotesBtn').addEventListener('click', async () => {
-            if (!streamSessionData) return;
-            
-            const notes = generateMarkdownNotes(streamSessionData);
-            const blob = new Blob([notes], { type: 'text/markdown' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `stream-${streamSessionData.Id}-notes.md`;
-            a.click();
-            URL.revokeObjectURL(url);
+            try {
+                const response = await fetch('/api/export');
+                if (!response.ok) {
+                    showFeedback('Export failed: ' + response.statusText);
+                    return;
+                }
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'session-export.md';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+            } catch (err) {
+                console.error('Export error:', err);
+                showFeedback('Export failed');
+            }
         });
 
         function generateMarkdownNotes(data) {
