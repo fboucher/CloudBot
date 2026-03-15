@@ -94,9 +94,15 @@ class StreamSession
         this.Id = value;
     }
 
+    Title = function(value)
+    {
+        this.Title = value;
+    }
+
     Init = function(){
         this.Id = 0;
         this.Project = "";
+        this.Title = "";
         this.DateTimeStart = "";
         this.DateTimeEnd = "";
         this.Notes = [];
@@ -114,6 +120,7 @@ class StreamSession
     constructor() {
         this.Id = 0;
         this.Project = "";
+        this.Title = "";
         this.DateTimeStart = "";
         this.DateTimeEnd = "";
         this.Notes = [];
@@ -137,7 +144,7 @@ const SoundEnum = {
     badFeeling : "public/medias/badfeeling.mp3",
     doorknock: "public/medias/knocking-on-door.mp3",
     hmmhmm: "public/medias/hmmhmm.mp3",
-    rain: "public/medias/rain.mp4",
+    rain: "public/medias/rain.mp3",
     rainUmbrella: "public/medias/Rain-On-Umbrella.com.mp3",
     previously: "public/medias/previously.mp3"
 };
@@ -611,7 +618,7 @@ LoadStreamSession = function(data, projectName, isReload, callback)
 
         if(data.Reminders.length > 0){
             _streamSession.Reminders = data.Reminders.map((o) => { 
-                const newReminder = new Todo(); 
+                const newReminder = new Reminder(); 
                 for (const [key, value] of Object.entries(o)) 
                 { 
                     newReminder[key] = value; 
@@ -655,9 +662,14 @@ playSound = function(name, fileName)
 
 playSound = function(name, fileName, inLoop)
 {
-    let cbAudio = getCloudAudio(name, fileName, inLoop);
-    cbAudio.play();
-
+    try {
+        let cbAudio = getCloudAudio(name, fileName, inLoop);
+        cbAudio.play().catch(err => {
+            console.log('Audio play failed:', err.message);
+        });
+    } catch (err) {
+        console.log('Audio error:', err.message);
+    }
 }
 
 stopSound = function(name, fileName, inLoop)
@@ -773,7 +785,10 @@ Generate_streamSession = function()
 GenerateStreamNotetHeader = function()
 {
     let today = new Date().toISOString().split('T')[0];
-    let headerSection = "---\nlayout: post\ntitle: _____ (stream " + _streamSession.Id + ")\n";
+    let title = _streamSession.Title && _streamSession.Title.trim() 
+        ? _streamSession.Title 
+        : "_____ (stream " + _streamSession.Id + ")";
+    let headerSection = "---\nlayout: post\ntitle: " + title + "\n";
     headerSection += "featured-image: https://img.youtube.com/vi/_________/hqdefault.jpg\n";
     headerSection += "date: " + today + "  06:30 -0500\n";
     headerSection += "categories:  " + _streamSession.Project + "\n---\n\n## Summary\n\n\n\n📺 - Twitch archive - stream no. " + _streamSession.Id + "\n\n";
@@ -1447,4 +1462,150 @@ if (typeof window !== 'undefined') {
     window.addEventListener('DOMContentLoaded', () => {
         startAnnouncementTimer();
     });
+}
+
+// ===== EFFECT SYSTEM - Poll for effects from admin panel =====
+let lastEffectTimestamp = 0;
+
+async function checkForEffects() {
+    try {
+        const response = await fetch('/currenteffect');
+        const effect = await response.json();
+        
+        if (effect && effect.timestamp && effect.timestamp > lastEffectTimestamp) {
+            lastEffectTimestamp = effect.timestamp;
+            console.log('New effect detected:', effect.type);
+            handleEffect(effect);
+        }
+    } catch (err) {
+        // Silent fail - effect polling should not spam console
+    }
+}
+
+function handleEffect(effect) {
+    console.log('Handling effect:', effect.type);
+    
+    // Clear the effect on server after handling
+    fetch('/cleareffect', { method: 'POST' }).catch(() => {});
+    
+    switch (effect.type) {
+        case 'hello':
+            if (effect.image) {
+                ChatBotShow('Thumbs-up', effect.image);
+            } else {
+                cloud('Thumbs-up');
+            }
+            playSound('yeah', SoundEnum.yeah);
+            break;
+            
+        case 'attention':
+            if (effect.image) {
+                ChatBotShow('Thumbs-up', effect.image);
+            }
+            playSound('hmmhmm', SoundEnum.hmmhmm);
+            break;
+            
+        case 'drop':
+            cloud('Wow');
+            playSound('yeah', SoundEnum.yeah);
+            break;
+            
+        case 'rain':
+            {
+                const sky = document.getElementById('sky');
+                if (sky) sky.className = 'darkcloud';
+                setTimeout(() => {
+                    makeItRain();
+                    playSound('rain', SoundEnum.rain, true);
+                }, 5000);
+            }
+            break;
+            
+        case 'sun':
+            {
+                document.querySelectorAll('.rain').forEach(el => el.innerHTML = '');
+                stopSound('rain', SoundEnum.rain, true);
+                const sky = document.getElementById('sky');
+                if (sky) sky.className = 'lightcloud';
+                cloud('Yeah');
+            }
+            break;
+            
+        case 'startproject':
+            if (effect.project) {
+                _streamSession.Project = effect.project;
+                StreamNoteStart(effect.project);
+            }
+            break;
+            
+        case 'stopproject':
+            {
+                document.getElementById('streamNotesPanel').style.display = 'block';
+                let streamNotes = Generate_streamSession();
+                const content = document.getElementById('streamNotesContent');
+                content.innerHTML = markdownToHtml(streamNotes);
+                startStreamNotesScroll();
+            }
+            break;
+            
+        case 'tododone':
+            {
+                cloud('Yeah');
+                playSound('yeah', SoundEnum.yeah);
+            }
+            break;
+    }
+}
+
+// Poll for effects and session data every 2 seconds
+if (typeof window !== 'undefined') {
+    window.addEventListener('DOMContentLoaded', () => {
+        setInterval(checkForEffects, 2000);
+        setInterval(checkTodosVisibility, 2000);
+        setInterval(loadSessionFromDb, 5000);
+    });
+}
+
+async function loadSessionFromDb() {
+    try {
+        const response = await fetch('/loadfromfile');
+        const data = await response.json();
+        
+        if (data.Todos) {
+            _streamSession.Todos = data.Todos.map((o) => { 
+                const newTodo = new Todo(); 
+                for (const [key, value] of Object.entries(o)) 
+                { 
+                    newTodo[key] = value; 
+                } return newTodo; 
+            });
+            RefreshTodosArea();
+        }
+        
+        if (data.Reminders) {
+            _streamSession.Reminders = data.Reminders.map((o) => { 
+                const newReminder = new Reminder(); 
+                for (const [key, value] of Object.entries(o)) 
+                { 
+                    newReminder[key] = value; 
+                } return newReminder; 
+            });
+        }
+        
+        if (data.Notes) {
+            _streamSession.Notes = data.Notes;
+        }
+    } catch (err) {
+        // Silent fail
+    }
+}
+
+async function checkTodosVisibility() {
+    try {
+        const response = await fetch('/gettodosvisibility');
+        const result = await response.json();
+        SetTodoVisibility(result.visible);
+    } catch (err) {
+        // Silent fail
+    }
 }

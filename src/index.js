@@ -106,6 +106,7 @@ app.get('/loadfromfile', async (req, res) => {
             } else {
                 res.json({
                     Project: "",
+                    Title: "",
                     Id: 0,
                     DateTimeStart: "",
                     DateTimeEnd: "",
@@ -186,7 +187,7 @@ app.post('/startstream', async (req, res) => {
         return res.status(400).json({ error: 'Missing project name.' });
     }
     try {
-        const sessionId = await db.startStreamSession(req.body.project);
+        const sessionId = await db.startStreamSession(req.body.project, req.body.title || "");
         const counter = await db.incrementStreamCounter();
         console.log(`Stream session started: ${sessionId}, stream #${counter.currentStreamNumber}`);
         res.json({ sessionId, streamNumber: counter.currentStreamNumber });
@@ -211,13 +212,100 @@ app.post('/endstream', async (req, res) => {
     }
 });
 
+app.post('/updatestreamtitle', async (req, res) => {
+    console.log('..updating stream title..');
+    if (!req.body || !req.body.sessionId || req.body.title === undefined) {
+        return res.status(400).json({ error: 'Missing sessionId or title.' });
+    }
+    try {
+        const c = await db.getClient();
+        await c.execute({
+            sql: "UPDATE stream_sessions SET stream_title = ? WHERE id = ?",
+            args: [req.body.title, req.body.sessionId]
+        });
+        console.log(`Stream title updated: ${req.body.title}`);
+        res.json({ msg: 'Title updated.' });
+    } catch (err) {
+        console.error('Error updating title:', err);
+        res.status(500).json({ error: 'Failed to update title.' });
+    }
+});
+
+app.post('/updateproject', async (req, res) => {
+    console.log('..updating project name..');
+    if (!req.body || !req.body.sessionId || !req.body.project) {
+        return res.status(400).json({ error: 'Missing sessionId or project.' });
+    }
+    try {
+        const c = await db.getClient();
+        await c.execute({
+            sql: "UPDATE stream_sessions SET project_name = ? WHERE id = ?",
+            args: [req.body.project, req.body.sessionId]
+        });
+        console.log(`Project updated: ${req.body.project}`);
+        res.json({ msg: 'Project updated.' });
+    } catch (err) {
+        console.error('Error updating project:', err);
+        res.status(500).json({ error: 'Failed to update project.' });
+    }
+});
+
+let currentEffect = { type: null, user: null, message: null, image: null, timestamp: null };
+
+app.post('/triggereffect', async (req, res) => {
+    console.log('..triggering effect..', req.body);
+    if (!req.body || !req.body.effectType) {
+        return res.status(400).json({ error: 'Missing effectType.' });
+    }
+    
+    currentEffect = {
+        type: req.body.effectType,
+        user: req.body.user || 'Admin',
+        message: req.body.message || '',
+        image: req.body.image || null,
+        timestamp: Date.now()
+    };
+    
+    console.log(`Effect triggered: ${currentEffect.type} by ${currentEffect.user}`);
+    res.json({ msg: 'Effect triggered.', effect: currentEffect });
+});
+
+app.get('/currenteffect', (req, res) => {
+    res.json(currentEffect);
+});
+
+app.post('/cleareffect', (req, res) => {
+    currentEffect = { type: null, user: null, message: null, image: null, timestamp: null };
+    res.json({ msg: 'Effect cleared' });
+});
+
+let todosVisibility = { visible: true };
+
+app.post('/settodosvisibility', (req, res) => {
+    if (req.body && req.body.visible !== undefined) {
+        todosVisibility.visible = req.body.visible;
+        console.log(`Todos visibility set to: ${todosVisibility.visible}`);
+        res.json({ visible: todosVisibility.visible });
+    } else {
+        res.status(400).json({ error: 'Missing visible parameter.' });
+    }
+});
+
+app.get('/gettodosvisibility', (req, res) => {
+    res.json(todosVisibility);
+});
+
 app.get('/api/session', async (req, res) => {
     console.log('..getting active session..');
     try {
         const session = await db.getActiveSession();
         if (session) {
             const sessionData = await db.loadSessionData(session.id);
-            res.json({ ...session, data: sessionData });
+            res.json({ 
+                ...session, 
+                stream_title: session.stream_title || "",
+                data: sessionData 
+            });
         } else {
             res.json({ active: false });
         }
@@ -251,6 +339,95 @@ app.get('/api/session/:id', async (req, res) => {
     } catch (err) {
         console.error('Error getting session:', err);
         res.status(500).json({ error: 'Failed to get session.' });
+    }
+});
+
+app.post('/api/session/notes', async (req, res) => {
+    console.log('..adding note..');
+    try {
+        const session = await db.getActiveSession();
+        if (!session) return res.status(400).json({ error: 'No active session.' });
+        
+        const { notes } = req.body;
+        await db.updateNotes(session.id, notes);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error adding note:', err);
+        res.status(500).json({ error: 'Failed to add note.' });
+    }
+});
+
+app.post('/api/session/todos', async (req, res) => {
+    console.log('..adding todo..');
+    try {
+        const session = await db.getActiveSession();
+        if (!session) return res.status(400).json({ error: 'No active session.' });
+        
+        const { description, status } = req.body;
+        await db.addTodo(session.id, description, status || 'pending');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error adding todo:', err);
+        res.status(500).json({ error: 'Failed to add todo.' });
+    }
+});
+
+app.put('/api/session/todos/:id', async (req, res) => {
+    console.log('..updating todo..');
+    try {
+        await db.updateTodoStatus(parseInt(req.params.id), req.body.status);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating todo:', err);
+        res.status(500).json({ error: 'Failed to update todo.' });
+    }
+});
+
+app.delete('/api/session/todos/:id', async (req, res) => {
+    console.log('..deleting todo..');
+    try {
+        await db.deleteTodo(parseInt(req.params.id));
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting todo:', err);
+        res.status(500).json({ error: 'Failed to delete todo.' });
+    }
+});
+
+app.post('/api/session/reminders', async (req, res) => {
+    console.log('..adding reminder..');
+    try {
+        const session = await db.getActiveSession();
+        if (!session) return res.status(400).json({ error: 'No active session.' });
+        
+        const { name, message, status } = req.body;
+        await db.addReminder(session.id, name, message, status || 'active');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error adding reminder:', err);
+        res.status(500).json({ error: 'Failed to add reminder.' });
+    }
+});
+
+app.put('/api/session/reminders/:id', async (req, res) => {
+    console.log('..updating reminder..');
+    try {
+        await db.updateReminderStatus(parseInt(req.params.id), req.body.status);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating reminder:', err);
+        res.status(500).json({ error: 'Failed to update reminder.' });
+    }
+});
+
+app.delete('/api/session/reminders/:id', async (req, res) => {
+    console.log('..deleting reminder..');
+    try {
+        await db.deleteReminder(parseInt(req.params.id));
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting reminder:', err);
+        res.status(500).json({ error: 'Failed to delete reminder.' });
     }
 });
 

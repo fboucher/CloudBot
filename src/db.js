@@ -29,6 +29,7 @@ async function createTables() {
     `CREATE TABLE IF NOT EXISTS stream_sessions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       project_name TEXT,
+      stream_title TEXT DEFAULT '',
       started_at TEXT,
       ended_at TEXT,
       notes TEXT DEFAULT '[]',
@@ -99,6 +100,14 @@ async function createTables() {
     }
     console.log("Database tables initialized");
 
+    // Migration: Add stream_title column if it doesn't exist
+    try {
+      await client.execute("ALTER TABLE stream_sessions ADD COLUMN stream_title TEXT DEFAULT ''");
+      console.log("Migration: Added stream_title column");
+    } catch (e) {
+      // Column probably already exists, ignore
+    }
+
     const counterResult = await client.execute("SELECT * FROM stream_counter WHERE id = 1");
     if (counterResult.rows.length === 0) {
       await client.execute("INSERT INTO stream_counter (id, current_stream_number, last_stream_date) VALUES (1, 0, '')");
@@ -117,13 +126,13 @@ async function getClient() {
   return client;
 }
 
-async function startStreamSession(projectName) {
+async function startStreamSession(projectName, streamTitle = "") {
   const c = await getClient();
   const startedAt = new Date().toISOString();
 
   const result = await c.execute({
-    sql: "INSERT INTO stream_sessions (project_name, started_at, notes) VALUES (?, ?, '[]')",
-    args: [projectName, startedAt]
+    sql: "INSERT INTO stream_sessions (project_name, stream_title, started_at, notes) VALUES (?, ?, ?, '[]')",
+    args: [projectName, streamTitle, startedAt]
   });
 
   return result.lastInsertId;
@@ -254,6 +263,7 @@ async function loadSessionData(sessionId) {
 
   const data = {
     Project: "",
+    Title: "",
     Id: sessionId,
     DateTimeStart: "",
     DateTimeEnd: "",
@@ -272,6 +282,7 @@ async function loadSessionData(sessionId) {
   const session = await getSessionById(sessionId);
   if (session) {
     data.Project = session.project_name;
+    data.Title = session.stream_title || "";
     data.DateTimeStart = session.started_at;
     data.DateTimeEnd = session.ended_at;
     data.Notes = JSON.parse(session.notes || '[]');
@@ -296,6 +307,7 @@ async function loadSessionData(sessionId) {
 
   const remindersResult = await c.execute("SELECT * FROM reminders WHERE session_id = ?", [sessionId]);
   data.Reminders = remindersResult.rows.map(r => ({
+    id: r.id,
     Name: r.name,
     Message: r.message,
     Status: r.status,
@@ -364,6 +376,54 @@ async function updateNotes(sessionId, notes) {
   });
 }
 
+async function addTodo(sessionId, description, status = 'pending') {
+  const c = await getClient();
+  await c.execute({
+    sql: "INSERT INTO todos (session_id, description, status) VALUES (?, ?, ?)",
+    args: [sessionId, description, status]
+  });
+}
+
+async function updateTodoStatus(todoId, status) {
+  const c = await getClient();
+  await c.execute({
+    sql: "UPDATE todos SET status = ? WHERE id = ?",
+    args: [status, todoId]
+  });
+}
+
+async function deleteTodo(todoId) {
+  const c = await getClient();
+  await c.execute({
+    sql: "DELETE FROM todos WHERE id = ?",
+    args: [todoId]
+  });
+}
+
+async function addReminder(sessionId, name, message, status = 'active') {
+  const c = await getClient();
+  await c.execute({
+    sql: "INSERT INTO reminders (session_id, name, message, status) VALUES (?, ?, ?, ?)",
+    args: [sessionId, name, message, status]
+  });
+}
+
+async function updateReminderStatus(reminderId, status) {
+  const c = await getClient();
+  await c.execute({
+    sql: "UPDATE reminders SET status = ? WHERE id = ?",
+    args: [status, reminderId]
+  });
+}
+
+async function deleteReminder(reminderId) {
+  const c = await getClient();
+  await c.execute({
+    sql: "DELETE FROM reminders WHERE id = ?",
+    args: [reminderId]
+  });
+}
+
 module.exports = {
   initDb,
   getClient,
@@ -376,5 +436,11 @@ module.exports = {
   loadSessionData,
   getStreamCounter,
   incrementStreamCounter,
-  updateNotes
+  updateNotes,
+  addTodo,
+  updateTodoStatus,
+  deleteTodo,
+  addReminder,
+  updateReminderStatus,
+  deleteReminder
 };

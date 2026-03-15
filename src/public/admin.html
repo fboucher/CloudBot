@@ -237,16 +237,6 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#" data-page="todos">
-                            <i class="bi bi-check2-square"></i> Todos
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#" data-page="reminders">
-                            <i class="bi bi-bell"></i> Reminders
-                        </a>
-                    </li>
-                    <li class="nav-item">
                         <a class="nav-link" href="#" data-page="users">
                             <i class="bi bi-people"></i> User Stats
                         </a>
@@ -297,30 +287,6 @@
                     </div>
 
                     <div class="card mt-4">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <span class="card-title">Stream Control</span>
-                        </div>
-                        <div class="card-body">
-                            <div class="row align-items-end">
-                                <div class="col-md-6">
-                                    <label class="form-label">Project Name</label>
-                                    <input type="text" class="form-control" id="projectInput" placeholder="Enter project name">
-                                </div>
-                                <div class="col-md-3">
-                                    <button class="btn btn-cb btn-cb-success w-100" id="startStreamBtn">
-                                        <i class="bi bi-play-fill"></i> Start Stream
-                                    </button>
-                                </div>
-                                <div class="col-md-3">
-                                    <button class="btn btn-cb btn-cb-danger w-100" id="endStreamBtn" disabled>
-                                        <i class="bi bi-stop-fill"></i> End Stream
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card mt-4">
                         <div class="card-header">
                             <span class="card-title">Recent Events</span>
                         </div>
@@ -331,37 +297,57 @@
                 </div>
 
                 <div id="sessionPage" style="display: none;">
-                    <div class="card">
+                    <!-- Stream Start/Stop -->
+                    <div class="card mb-3">
                         <div class="card-header d-flex justify-content-between align-items-center">
-                            <span class="card-title">Current Session</span>
+                            <span class="card-title">Stream Control</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="row align-items-end">
+                                <div class="col-md-4">
+                                    <label class="form-label">Project Name</label>
+                                    <input type="text" class="form-control" id="sessionProjectInput" placeholder="Enter project name">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Stream Title</label>
+                                    <input type="text" class="form-control" id="sessionTitleInput" placeholder="Enter stream title">
+                                </div>
+                                <div class="col-md-2">
+                                    <button class="btn btn-cb btn-cb-success w-100" id="sessionStartBtn">
+                                        <i class="bi bi-play-fill"></i> Start
+                                    </button>
+                                </div>
+                                <div class="col-md-2">
+                                    <button class="btn btn-cb btn-cb-danger w-100" id="sessionStopBtn" disabled>
+                                        <i class="bi bi-stop-fill"></i> Stop
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-md-6">
+                                    <strong>Stream #:</strong> <span id="currentStreamNumber">-</span>
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Started:</strong> <span id="currentStartTime">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Session Info -->
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="card-title">Quick Actions</span>
                             <div>
                                 <button class="btn btn-cb btn-cb-success btn-sm" id="saveSessionBtn">
                                     <i class="bi bi-save"></i> Save
                                 </button>
                                 <button class="btn btn-cb btn-cb-danger btn-sm" id="exportNotesBtn">
-                                    <i class="bi bi-file-earmark-markdown"></i> Export Notes
+                                    <i class="bi bi-file-earmark-markdown"></i> Export
                                 </button>
                             </div>
                         </div>
                         <div class="card-body">
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <strong>Project:</strong> <span id="currentProject">-</span>
-                                </div>
-                                <div class="col-md-6">
-                                    <strong>Stream #:</strong> <span id="currentStreamNumber">-</span>
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <strong>Started:</strong> <span id="currentStartTime">-</span>
-                                </div>
-                                <div class="col-md-6">
-                                    <strong>Duration:</strong> <span id="currentDuration">-</span>
-                                </div>
-                            </div>
-                            <hr>
-                            <h5>Quick Actions</h5>
                             <div class="mb-3">
                                 <button class="btn btn-cb btn-sm" onclick="showAttentionPrompt()">
                                     <i class="bi bi-exclamation-triangle"></i> Attention
@@ -369,10 +355,61 @@
                                 <button class="btn btn-cb btn-sm" onclick="showHelloPrompt()">
                                     <i class="bi bi-emoji-smile"></i> Hello
                                 </button>
-                                <button class="btn btn-cb btn-sm" onclick="playSound('yeah')">
-                                    <i class="bi bi-volume-up"></i> Yeah!
+                                <button class="btn btn-cb btn-sm" onclick="triggerDrop()">
+                                    <i class="bi bi-arrow-down-circle"></i> Drop
+                                </button>
+                                <button class="btn btn-cb btn-sm" onclick="triggerRain()">
+                                    <i class="bi bi-cloud-rain"></i> Rain
+                                </button>
+                                <button class="btn btn-cb btn-sm" onclick="triggerSun()">
+                                    <i class="bi bi-sun"></i> Sun
                                 </button>
                             </div>
+                            <div id="actionFeedback" class="mt-2 text-muted small"></div>
+                        </div>
+                    </div>
+
+                    <!-- Notes Section -->
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="card-title">Notes</span>
+                            <button class="btn btn-cb btn-sm" data-bs-toggle="modal" data-bs-target="#addNoteModal">
+                                <i class="bi bi-plus"></i> Add Note
+                            </button>
+                        </div>
+                        <div class="card-body" id="sessionNotesList">
+                            <p class="text-muted">No notes yet</p>
+                        </div>
+                    </div>
+
+                    <!-- Todos Section -->
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="card-title">Todos</span>
+                            <div>
+                                <button class="btn btn-cb btn-sm" id="toggleTodosStreamBtn" onclick="toggleTodosVisibility()">
+                                    <i class="bi bi-eye"></i> Show on Stream
+                                </button>
+                                <button class="btn btn-cb btn-sm" data-bs-toggle="modal" data-bs-target="#addTodoModal">
+                                    <i class="bi bi-plus"></i> Add Todo
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body" id="sessionTodosList">
+                            <p class="text-muted">No todos yet</p>
+                        </div>
+                    </div>
+
+                    <!-- Reminders Section -->
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="card-title">Reminders</span>
+                            <button class="btn btn-cb btn-sm" data-bs-toggle="modal" data-bs-target="#addReminderModal">
+                                <i class="bi bi-plus"></i> Add Reminder
+                            </button>
+                        </div>
+                        <div class="card-body" id="sessionRemindersList">
+                            <p class="text-muted">No reminders yet</p>
                         </div>
                     </div>
                 </div>
@@ -400,34 +437,6 @@
                     </div>
                 </div>
 
-                <div id="todosPage" style="display: none;">
-                    <div class="card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <span class="card-title">Todos</span>
-                            <button class="btn btn-cb btn-sm" data-bs-toggle="modal" data-bs-target="#addTodoModal">
-                                <i class="bi bi-plus"></i> Add Todo
-                            </button>
-                        </div>
-                        <div class="card-body" id="todosList">
-                            <p class="text-muted">No todos yet</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="remindersPage" style="display: none;">
-                    <div class="card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <span class="card-title">Reminders</span>
-                            <button class="btn btn-cb btn-sm" data-bs-toggle="modal" data-bs-target="#addReminderModal">
-                                <i class="bi bi-plus"></i> Add Reminder
-                            </button>
-                        </div>
-                        <div class="card-body" id="remindersList">
-                            <p class="text-muted">No reminders yet</p>
-                        </div>
-                    </div>
-                </div>
-
                 <div id="usersPage" style="display: none;">
                     <div class="card">
                         <div class="card-header">
@@ -451,6 +460,24 @@
                     </div>
                 </div>
             </main>
+        </div>
+    </div>
+
+    <div class="modal fade" id="addNoteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Note</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" class="form-control" id="newNoteText" placeholder="Enter note">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-cb" onclick="addNote()">Add</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -505,8 +532,22 @@
         document.addEventListener('DOMContentLoaded', async () => {
             await loadActiveSession();
             setupNavigation();
-            setInterval(loadActiveSession, 30000);
+            setInterval(loadActiveSession, 5000);
+            setInterval(pollForEffects, 2000);
         });
+
+        // Poll for effects from stream view
+        async function pollForEffects() {
+            try {
+                const response = await fetch('/currenteffect');
+                const effect = await response.json();
+                if (effect && effect.timestamp) {
+                    // Effects are handled by the stream view, just clear them here
+                }
+            } catch (err) {
+                // Silent fail
+            }
+        }
 
         function setupNavigation() {
             document.querySelectorAll('.sidebar .nav-link').forEach(link => {
@@ -527,8 +568,6 @@
             document.getElementById('dashboardPage').style.display = 'none';
             document.getElementById('sessionPage').style.display = 'none';
             document.getElementById('historyPage').style.display = 'none';
-            document.getElementById('todosPage').style.display = 'none';
-            document.getElementById('remindersPage').style.display = 'none';
             document.getElementById('usersPage').style.display = 'none';
 
             document.getElementById(pageName + 'Page').style.display = 'block';
@@ -537,14 +576,24 @@
                 dashboard: 'Dashboard',
                 session: 'Current Session',
                 history: 'Session History',
-                todos: 'Todos',
-                reminders: 'Reminders',
                 users: 'User Statistics'
             };
             document.getElementById('pageTitle').textContent = titles[pageName] || pageName;
 
             if (pageName === 'history') loadSessions();
             if (pageName === 'users') loadUsers();
+            if (pageName === 'session') {
+                renderSessionNotes();
+                renderSessionTodos();
+                renderSessionReminders();
+            }
+        }
+
+        function setInputIfNotFocused(id, value) {
+            const el = document.getElementById(id);
+            if (el && document.activeElement !== el) {
+                el.value = value;
+            }
         }
 
         async function loadActiveSession() {
@@ -556,12 +605,27 @@
                     currentSession = data;
                     streamSessionData = data.data;
                     updateStreamStatus(true, data.project_name);
+                    
+                    // Stream Control page
                     document.getElementById('startStreamBtn').disabled = true;
                     document.getElementById('endStreamBtn').disabled = false;
-                    document.getElementById('projectInput').value = data.project_name;
+                    setInputIfNotFocused('projectInput', data.project_name);
+                    setInputIfNotFocused('streamTitleInput', data.stream_title || '');
+                    
+                    // Current Session page
+                    document.getElementById('sessionStartBtn').disabled = true;
+                    document.getElementById('sessionStopBtn').disabled = false;
+                    setInputIfNotFocused('sessionProjectInput', data.project_name || '');
+                    setInputIfNotFocused('sessionTitleInput', data.stream_title || '');
+                    document.getElementById('currentStreamNumber').textContent = data.id;
+                    document.getElementById('currentStartTime').textContent = data.started_at ? new Date(data.started_at).toLocaleString() : '-';
+                    
                     updateSessionInfo();
                     renderTodos();
                     renderReminders();
+                    renderSessionNotes();
+                    renderSessionTodos();
+                    renderSessionReminders();
                     loadRecentEvents();
                 } else {
                     currentSession = null;
@@ -569,6 +633,14 @@
                     updateStreamStatus(false);
                     document.getElementById('startStreamBtn').disabled = false;
                     document.getElementById('endStreamBtn').disabled = true;
+                    
+                    // Current Session page
+                    document.getElementById('sessionStartBtn').disabled = false;
+                    document.getElementById('sessionStopBtn').disabled = true;
+                    document.getElementById('sessionProjectInput').value = '';
+                    document.getElementById('sessionTitleInput').value = '';
+                    document.getElementById('currentStreamNumber').textContent = '-';
+                    document.getElementById('currentStartTime').textContent = '-';
                 }
 
                 await loadDashboardStats();
@@ -618,6 +690,7 @@
 
             document.getElementById('currentProject').textContent = currentSession.project_name;
             document.getElementById('currentStreamNumber').textContent = currentSession.id;
+            document.getElementById('currentTitle').textContent = currentSession.stream_title || '(No title)';
             document.getElementById('currentStartTime').textContent = new Date(currentSession.started_at).toLocaleString();
 
             const start = new Date(currentSession.started_at);
@@ -627,6 +700,64 @@
             const minutes = Math.floor((duration % 3600) / 60);
             document.getElementById('currentDuration').textContent = `${hours}h ${minutes}m`;
         }
+
+        document.getElementById('streamTitleInput').addEventListener('change', async () => {
+            if (!currentSession) return;
+            const title = document.getElementById('streamTitleInput').value.trim();
+            try {
+                await fetch('/updatestreamtitle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId: currentSession.id, title })
+                });
+                showFeedback('Title saved');
+            } catch (err) {
+                console.error('Error saving title:', err);
+            }
+        });
+
+        let todosVisibleOnStream = true;
+
+        async function toggleTodosVisibility() {
+            try {
+                const response = await fetch('/settodosvisibility', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ visible: !todosVisibleOnStream })
+                });
+                const result = await response.json();
+                todosVisibleOnStream = result.visible;
+                
+                const btn = document.getElementById('toggleTodosStreamBtn');
+                if (todosVisibleOnStream) {
+                    btn.innerHTML = '<i class="bi bi-eye"></i> Show on Stream';
+                } else {
+                    btn.innerHTML = '<i class="bi bi-eye-slash"></i> Hide on Stream';
+                }
+                
+                showFeedback(`Todos ${todosVisibleOnStream ? 'shown' : 'hidden'} on stream`);
+            } catch (err) {
+                console.error('Error toggling todos visibility:', err);
+            }
+        }
+
+        async function loadTodosVisibility() {
+            try {
+                const response = await fetch('/gettodosvisibility');
+                const result = await response.json();
+                todosVisibleOnStream = result.visible;
+                const btn = document.getElementById('toggleTodosStreamBtn');
+                if (!todosVisibleOnStream) {
+                    btn.innerHTML = '<i class="bi bi-eye-slash"></i> Hide on Stream';
+                }
+            } catch (err) {
+                console.error('Error loading todos visibility:', err);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTodosVisibility();
+        });
 
         async function loadRecentEvents() {
             if (!currentSession || !streamSessionData) return;
@@ -659,6 +790,7 @@
 
         document.getElementById('startStreamBtn').addEventListener('click', async () => {
             const project = document.getElementById('projectInput').value.trim();
+            const title = document.getElementById('streamTitleInput').value.trim();
             if (!project) {
                 alert('Please enter a project name');
                 return;
@@ -668,10 +800,21 @@
                 const response = await fetch('/startstream', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ project })
+                    body: JSON.stringify({ project, title })
                 });
                 const data = await response.json();
                 console.log('Stream started:', data);
+                
+                // Trigger project animation on stream view
+                await fetch('/triggereffect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        effectType: 'startproject', 
+                        project: project
+                    })
+                });
+                
                 await loadActiveSession();
             } catch (err) {
                 console.error('Error starting stream:', err);
@@ -751,7 +894,7 @@
                         <button class="btn btn-sm btn-cb" onclick="setTodoStatus(${t.id}, 'new')">New</button>
                         <button class="btn btn-sm btn-cb" onclick="setTodoStatus(${t.id}, 'inProgress')">In Progress</button>
                         <button class="btn btn-sm btn-cb-success" onclick="setTodoStatus(${t.id}, 'done')">Done</button>
-                        <button class="btn btn-sm btn-cb-danger" onclick="setTodoStatus(${t.id}, 'cancel')">Cancel</button>
+                        <button class="btn btn-sm btn-cb-danger" onclick="deleteTodo(${t.id})">Delete</button>
                     </div>
                 </div>
             `).join('');
@@ -759,25 +902,44 @@
 
         function setTodoStatus(id, status) {
             if (!streamSessionData) return;
-            const todo = streamSessionData.Todos.find(t => t.id === id);
-            if (todo) {
-                todo.status = status;
-                renderTodos();
-                saveCurrentSession();
-            }
+            
+            fetch(`/api/session/todos/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            }).then(() => loadActiveSession());
+        }
+
+        function deleteTodo(id) {
+            if (!streamSessionData || !streamSessionData.Todos) return;
+            fetch(`/api/session/todos/${id}`, {
+                method: 'DELETE'
+            }).then(() => loadActiveSession());
         }
 
         function addTodo() {
             const text = document.getElementById('newTodoText').value.trim();
-            if (!text || !streamSessionData) return;
+            if (!text || !streamSessionData) {
+                const modal = document.getElementById('addTodoModal');
+                const bsModal = bootstrap.Modal.getInstance(modal);
+                if (bsModal) bsModal.hide();
+                else document.getElementById('addTodoModal').style.display = 'none';
+                return;
+            }
 
-            const id = (streamSessionData.Todos?.length || 0) + 1;
-            streamSessionData.Todos = streamSessionData.Todos || [];
-            streamSessionData.Todos.push({ id, description: text, status: 'new' });
+            fetch('/api/session/todos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ description: text, status: 'new' })
+            }).then(() => {
+                loadActiveSession();
+                renderTodos();
+            });
             
-            renderTodos();
-            saveCurrentSession();
-            bootstrap.Modal.getInstance(document.getElementById('addTodoModal')).hide();
+            const modal = document.getElementById('addTodoModal');
+            const bsModal = bootstrap.Modal.getInstance(modal);
+            if (bsModal) bsModal.hide();
+            else modal.style.display = 'none';
             document.getElementById('newTodoText').value = '';
         }
 
@@ -792,41 +954,283 @@
                 <div class="reminder-item ${r.Status === 'inactive' ? 'inactive' : ''}">
                     <span><strong>${r.Name}</strong>: ${r.Message}</span>
                     <div>
-                        <button class="btn btn-sm btn-cb" onclick="setReminderStatus('${r.Name}', 'active')">Activate</button>
-                        <button class="btn btn-sm btn-cb-danger" onclick="setReminderStatus('${r.Name}', 'inactive')">Pause</button>
+                        <button class="btn btn-sm btn-cb" onclick="setReminderStatus(${r.id}, 'active')">Activate</button>
+                        <button class="btn btn-sm btn-cb-danger" onclick="setReminderStatus(${r.id}, 'inactive')">Pause</button>
                     </div>
                 </div>
             `).join('');
         }
 
-        function setReminderStatus(name, status) {
+        function setReminderStatus(id, status) {
             if (!streamSessionData) return;
-            const reminder = streamSessionData.Reminders.find(r => r.Name === name);
-            if (reminder) {
-                reminder.Status = status;
-                renderReminders();
-                saveCurrentSession();
-            }
+            
+            fetch(`/api/session/reminders/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            }).then(() => loadActiveSession());
         }
 
         function addReminder() {
             const name = document.getElementById('newReminderName').value.trim();
             const message = document.getElementById('newReminderMessage').value.trim();
-            if (!name || !message || !streamSessionData) return;
+            if (!name || !message || !streamSessionData) {
+                const modal = document.getElementById('addReminderModal');
+                const bsModal = bootstrap.Modal.getInstance(modal);
+                if (bsModal) bsModal.hide();
+                else modal.style.display = 'none';
+                return;
+            }
 
-            streamSessionData.Reminders = streamSessionData.Reminders || [];
-            streamSessionData.Reminders.push({
-                Name: name,
-                Message: message,
-                Status: 'active',
-                LastCheck: new Date().toISOString()
+            fetch('/api/session/reminders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, message, status: 'active' })
+            }).then(() => {
+                loadActiveSession();
+                renderReminders();
             });
-
-            renderReminders();
-            saveCurrentSession();
-            bootstrap.Modal.getInstance(document.getElementById('addReminderModal')).hide();
+            
+            const modal = document.getElementById('addReminderModal');
+            const bsModal = bootstrap.Modal.getInstance(modal);
+            if (bsModal) bsModal.hide();
+            else modal.style.display = 'none';
             document.getElementById('newReminderName').value = '';
             document.getElementById('newReminderMessage').value = '';
+        }
+
+        // Session page - Start/Stop buttons
+        document.getElementById('sessionStartBtn').addEventListener('click', async () => {
+            const project = document.getElementById('sessionProjectInput').value.trim();
+            const title = document.getElementById('sessionTitleInput').value.trim();
+            if (!project) {
+                alert('Please enter a project name');
+                return;
+            }
+
+            try {
+                const response = await fetch('/startstream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ project, title })
+                });
+                const data = await response.json();
+                console.log('Stream started:', data);
+                
+                // Trigger project animation on stream view
+                await fetch('/triggereffect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        effectType: 'startproject', 
+                        project: project
+                    })
+                });
+                
+                await loadActiveSession();
+            } catch (err) {
+                console.error('Error starting stream:', err);
+                alert('Failed to start stream');
+            }
+        });
+
+        document.getElementById('sessionStopBtn').addEventListener('click', async () => {
+            if (!currentSession) return;
+
+            if (!confirm('Are you sure you want to stop the stream?')) return;
+
+            try {
+                await fetch('/savetofile', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ streamSession: streamSessionData })
+                });
+
+                const response = await fetch('/endstream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId: currentSession.id })
+                });
+                
+                // Trigger stop effect on stream view
+                await fetch('/triggereffect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ effectType: 'stopproject' })
+                });
+                
+                await loadActiveSession();
+            } catch (err) {
+                console.error('Error stopping stream:', err);
+                alert('Failed to stop stream');
+            }
+        });
+
+        // Session page - Save project/title changes
+        document.getElementById('sessionProjectInput').addEventListener('change', async () => {
+            if (!currentSession) return;
+            const project = document.getElementById('sessionProjectInput').value.trim();
+            try {
+                await fetch('/updateproject', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId: currentSession.id, project })
+                });
+                showFeedback('Project saved');
+            } catch (err) {
+                console.error('Error saving project:', err);
+            }
+        });
+
+        document.getElementById('sessionTitleInput').addEventListener('change', async () => {
+            if (!currentSession) return;
+            const title = document.getElementById('sessionTitleInput').value.trim();
+            try {
+                await fetch('/updatestreamtitle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId: currentSession.id, title })
+                });
+                showFeedback('Title saved');
+            } catch (err) {
+                console.error('Error saving title:', err);
+            }
+        });
+
+        // Session page - Notes functions
+        function renderSessionNotes() {
+            const container = document.getElementById('sessionNotesList');
+            if (!streamSessionData || !streamSessionData.Notes || streamSessionData.Notes.length === 0) {
+                container.innerHTML = '<p class="text-muted">No notes yet</p>';
+                return;
+            }
+            container.innerHTML = streamSessionData.Notes.map((n, i) => `
+                <div class="todo-item">
+                    <span>${i + 1}. ${n}</span>
+                    <button class="btn btn-sm btn-cb-danger" onclick="deleteNote(${i})">Delete</button>
+                </div>
+            `).join('');
+        }
+
+        function addNote() {
+            const text = document.getElementById('newNoteText').value.trim();
+            if (!text || !streamSessionData) {
+                const modal = document.getElementById('addNoteModal');
+                const bsModal = bootstrap.Modal.getInstance(modal);
+                if (bsModal) bsModal.hide();
+                else modal.style.display = 'none';
+                return;
+            }
+
+            const notes = streamSessionData.Notes || [];
+            notes.push(text);
+            
+            fetch('/api/session/notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notes })
+            }).then(() => loadActiveSession());
+            
+            renderSessionNotes();
+            
+            const modal = document.getElementById('addNoteModal');
+            const bsModal = bootstrap.Modal.getInstance(modal);
+            if (bsModal) bsModal.hide();
+            else modal.style.display = 'none';
+            document.getElementById('newNoteText').value = '';
+        }
+
+        function deleteNote(index) {
+            if (!streamSessionData || !streamSessionData.Notes) return;
+            const notes = [...streamSessionData.Notes];
+            notes.splice(index, 1);
+            fetch('/api/session/notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notes })
+            }).then(() => loadActiveSession());
+            renderSessionNotes();
+        }
+
+        // Session page - Todos functions
+        function renderSessionTodos() {
+            const container = document.getElementById('sessionTodosList');
+            if (!streamSessionData || !streamSessionData.Todos || streamSessionData.Todos.length === 0) {
+                container.innerHTML = '<p class="text-muted">No todos yet</p>';
+                return;
+            }
+            container.innerHTML = streamSessionData.Todos.map(t => `
+                <div class="todo-item ${t.status}">
+                    <span>${t.id}. ${t.description}</span>
+                    <div>
+                        <button class="btn btn-sm btn-cb" onclick="setSessionTodoStatus(${t.id}, 'new')">New</button>
+                        <button class="btn btn-sm btn-cb" onclick="setSessionTodoStatus(${t.id}, 'inProgress')">In Progress</button>
+                        <button class="btn btn-sm btn-cb-success" onclick="setSessionTodoStatus(${t.id}, 'done')">Done</button>
+                        <button class="btn btn-sm btn-cb-danger" onclick="deleteSessionTodo(${t.id})">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function setSessionTodoStatus(id, status) {
+            if (!streamSessionData) return;
+            
+            fetch(`/api/session/todos/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            }).then(() => loadActiveSession());
+
+            if (status === 'done') {
+                fetch('/triggereffect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ effectType: 'tododone' })
+                });
+            }
+        }
+
+        function deleteSessionTodo(id) {
+            if (!streamSessionData || !streamSessionData.Todos) return;
+            fetch(`/api/session/todos/${id}`, {
+                method: 'DELETE'
+            }).then(() => loadActiveSession());
+        }
+
+        // Session page - Reminders functions
+        function renderSessionReminders() {
+            const container = document.getElementById('sessionRemindersList');
+            if (!streamSessionData || !streamSessionData.Reminders || streamSessionData.Reminders.length === 0) {
+                container.innerHTML = '<p class="text-muted">No reminders yet</p>';
+                return;
+            }
+            container.innerHTML = streamSessionData.Reminders.map(r => `
+                <div class="reminder-item ${r.Status === 'inactive' ? 'inactive' : ''}">
+                    <span><strong>${r.Name}</strong>: ${r.Message}</span>
+                    <div>
+                        <button class="btn btn-sm btn-cb" onclick="setSessionReminderStatus(${r.id}, 'active')">Activate</button>
+                        <button class="btn btn-sm btn-cb-danger" onclick="setSessionReminderStatus(${r.id}, 'inactive')">Pause</button>
+                        <button class="btn btn-sm btn-cb-danger" onclick="deleteSessionReminder(${r.id})">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function setSessionReminderStatus(id, status) {
+            if (!streamSessionData) return;
+            
+            fetch(`/api/session/reminders/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            }).then(() => loadActiveSession());
+        }
+
+        function deleteSessionReminder(id) {
+            if (!streamSessionData || !streamSessionData.Reminders) return;
+            fetch(`/api/session/reminders/${id}`, {
+                method: 'DELETE'
+            }).then(() => loadActiveSession());
         }
 
         async function loadUsers() {
@@ -876,7 +1280,10 @@
         });
 
         function generateMarkdownNotes(data) {
-            let notes = `---\nlayout: post\ntitle: _____ (stream ${data.Id})\n`;
+            const title = data.Title && data.Title.trim() 
+                ? data.Title 
+                : `_____ (stream ${data.Id})`;
+            let notes = `---\nlayout: post\ntitle: ${title}\n`;
             notes += `date: ${new Date().toISOString().split('T')[0]}\n`;
             notes += `categories: ${data.Project}\n---\n\n## Summary\n\n`;
             notes += `## Project\n\n${data.Project}\n\n`;
@@ -901,31 +1308,127 @@
             return notes;
         }
 
+        function showFeedback(msg) {
+            const el = document.getElementById('actionFeedback');
+            el.textContent = msg;
+            setTimeout(() => { el.textContent = ''; }, 3000);
+        }
+
         async function showAttentionPrompt() {
             const msg = prompt('Enter attention message:');
             if (msg) {
-                await fetch('/Attention', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user: 'Admin', message: msg })
-                });
+                try {
+                    const response = await fetch('/Attention', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ user: 'Admin', message: msg })
+                    });
+                    const result = await response.json();
+                    
+                    await fetch('/triggereffect', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            effectType: 'attention', 
+                            user: 'Admin', 
+                            message: msg,
+                            image: result.msg
+                        })
+                    });
+                    
+                    showFeedback(`Attention triggered: ${msg}`);
+                } catch (err) {
+                    console.error('Error:', err);
+                    showFeedback('Error: ' + err.message);
+                }
             }
         }
 
         async function showHelloPrompt() {
             const user = prompt('Enter username:');
             if (user) {
-                await fetch('/Hello', {
+                try {
+                    const response = await fetch('/Hello', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ user })
+                    });
+                    const result = await response.json();
+                    
+                    await fetch('/triggereffect', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            effectType: 'hello', 
+                            user: user,
+                            image: result.msg
+                        })
+                    });
+                    
+                    showFeedback(`Hello triggered for ${user}`);
+                } catch (err) {
+                    console.error('Error:', err);
+                    showFeedback('Error: ' + err.message);
+                }
+            }
+        }
+
+        async function triggerDrop() {
+            try {
+                await fetch('/triggereffect', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user })
+                    body: JSON.stringify({ 
+                        effectType: 'drop', 
+                        user: 'Admin'
+                    })
                 });
+                showFeedback('Drop triggered!');
+            } catch (err) {
+                console.error('Error:', err);
+                showFeedback('Error: ' + err.message);
+            }
+        }
+
+        async function triggerRain() {
+            try {
+                await fetch('/triggereffect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        effectType: 'rain', 
+                        user: 'Admin'
+                    })
+                });
+                showFeedback('Rain triggered!');
+            } catch (err) {
+                console.error('Error:', err);
+                showFeedback('Error: ' + err.message);
+            }
+        }
+
+        async function triggerSun() {
+            try {
+                await fetch('/triggereffect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        effectType: 'sun', 
+                        user: 'Admin'
+                    })
+                });
+                showFeedback('Sun triggered!');
+            } catch (err) {
+                console.error('Error:', err);
+                showFeedback('Error: ' + err.message);
             }
         }
 
         function playSound(name) {
             const audio = new Audio(`/public/medias/${name}.mp3`);
-            audio.play();
+            audio.play().catch(err => {
+                console.log('Audio play failed:', err);
+            });
         }
 
         const db = {
