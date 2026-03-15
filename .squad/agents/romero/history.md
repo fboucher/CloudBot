@@ -83,3 +83,51 @@ CloudBot is a Twitch chatbot with stream tracking and an admin panel. It's trans
 - Admin panel now correctly detects active sessions
 - All Darlene's frontend fixes (15 bugs) now working with proper backend contract
 - Source of truth confirmed: SQLite database via REST endpoints
+
+### 2026-03-15 — Overlay Todos Fix + DB .gitignore
+
+**Root cause identified: `@libsql/client` two-arg execute bug**
+- `c.execute(sql, args)` (two-arg JS call) is NOT valid for `@libsql/client` — the library's `execute(stmt)` method only accepts ONE argument (`string` or `{ sql, args }` object). The second JS arg is silently dropped.
+- This caused all parameterized queries in `getSessionById` and `loadSessionData` to run with unbound `?` parameters, making `better-sqlite3` throw at runtime.
+- As a result, `/loadfromfile` returned HTTP 500 on every call → the stream overlay's `loadSessionFromDb()` polled but got errors → todos (and all session data) never rendered.
+
+**Files modified:**
+- `src/db.js` — Converted 10 two-arg `c.execute(sql, [args])` calls to proper `c.execute({ sql, args })` object form in `getSessionById`, `saveSessionData`, and `loadSessionData`.
+- `.gitignore` — Added `*.db`, `*.db-shm`, `*.db-wal`, `src/io/cloudbot.db` to prevent SQLite DB from being committed.
+
+**Data flow (verified correct after fix):**
+1. Admin creates todo via `POST /api/todos` → `db.addTodo()` (always used object form, always worked)
+2. Overlay polls `GET /loadfromfile` → `db.loadSessionData(id)` → now correctly queries `todos` table → returns `Todos: [{ id, description, status }]`
+3. `cloudbot.js` `loadSessionFromDb()` maps `data.Todos` into `Todo` objects and calls `RefreshTodosArea()`
+4. `checkTodosVisibility()` polls `GET /gettodosvisibility` separately (unchanged, still works)
+
+**`todosVisibility` flag still works:**
+- `SetTodoVisibility` is called from `checkTodosVisibility` every 2s (separate from data polling)
+- No changes needed there; the visibility toggle is independent of the data load path
+
+### 2026-03-15 — Follow-up: @libsql/client Query Bug Fix + Gitignore
+
+**Files modified:** `src/db.js`, `.gitignore`
+
+**Root cause:** `@libsql/client` does NOT support two-argument execute: `c.execute(sql, args)`. The library's `execute()` method only accepts a single argument: `string` (for no params) or `{ sql, args }` (for parameterized). When called with two args, the second arg is silently ignored.
+
+**Impact:** All parameterized queries in `getSessionById()`, `saveSessionData()`, and `loadSessionData()` were running with unbound `?` placeholders, causing `better-sqlite3` to throw at runtime. This broke `/loadfromfile` endpoint (HTTP 500), which prevented the overlay from ever loading todos, notes, or reminders.
+
+**Fixes applied:**
+- `getSessionById()`: Fixed 2 parameterized queries
+- `saveSessionData()`: Fixed 4 parameterized queries (notes, todos, reminders bulk operations)
+- `loadSessionData()`: Fixed 4 parameterized queries (data retrieval)
+
+All 10 calls now use correct syntax: `c.execute({ sql, args })`
+
+**Gitignore updates:**
+- Added `*.db`, `*.db-shm`, `*.db-wal` (SQLite WAL files)
+- Added `src/io/cloudbot.db` (project database)
+- Reason: Prevent accidental commits of local database state
+
+**Data flow now working:**
+1. Admin creates todo → `db.addTodo()` ✅ (was always correct)
+2. Overlay polls `/loadfromfile` → `db.loadSessionData()` ✅ (NOW FIXED)
+3. Overlay renders todos via `RefreshTodosArea()` ✅
+
+**Todos visibility toggle independent:** `checkTodosVisibility()` polls `/gettodosvisibility` on separate 2-second interval. No changes needed there.

@@ -51,6 +51,37 @@
 - **Show on stream:** Added per-note "Show" button calling `POST /api/stream/overlay`
 - Status: ✅ Implemented (all 15 bugs)
 
+### Session 2026-03-15 — Database Query Fix & UI Enhancements
+
+#### Romero — Overlay Todos Fix (Decision 7)
+
+7. **Fixed `@libsql/client` parameterized query bug**
+   - Root cause: `c.execute(sql, args)` two-arg form invalid; library only accepts `c.execute({ sql, args })` object form
+   - Fixed 10 calls across `getSessionById`, `saveSessionData`, `loadSessionData` in `src/db.js`
+   - Impact: `/loadfromfile` endpoint now returns correct session data including todos
+   - Data flow: Admin creates todo → DB saved → Overlay polls `/loadfromfile` → todos render in `RefreshTodosArea()`
+   - Status: ✅ Implemented
+
+8. **Database files excluded from git**
+   - Added `*.db`, `*.db-shm`, `*.db-wal`, `src/io/cloudbot.db` to `.gitignore`
+   - Prevents accidental commits of local SQLite state
+   - Status: ✅ Implemented
+
+#### Darlene — UI Enhancements (Decision 9)
+
+9. **Version/build footer in admin panel sidebar**
+   - Added `.version-footer` div at bottom of sidebar showing `v1.0.0 · build 2026-03-15`
+   - Styling: 11px, muted color (rgba(255,255,255,0.3)), absolute positioned, non-interactive
+   - Version sourced from `package.json`, build date is ISO date stamp
+   - Status: ✅ Implemented
+   - Future: Consider exposing `/api/version` endpoint for live version auto-update on deploy
+
+#### Stop Button Verification
+
+- **Stop button state:** Already correct — properly disabled when no session active, enabled during stream
+- No changes required
+- Status: ✅ Verified
+
 ## Governance
 
 - All meaningful changes require team consensus

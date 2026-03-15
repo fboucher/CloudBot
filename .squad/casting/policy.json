@@ -1,0 +1,7 @@
+{
+  "version": "1.0",
+  "universe_allowlist": ["mr-robot"],
+  "selected_universe": "mr-robot",
+  "max_agents": 10,
+  "overflow_policy": "diegetic_expansion"
+}

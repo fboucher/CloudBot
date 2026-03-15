@@ -70,3 +70,37 @@ The old `renderTodos()`/`renderReminders()`/`renderSessionTodos()`/`renderSessio
 - `GET /api/reminders` returns `[{ id, name, message, status, interval, session_id }]`
 - Valid todo statuses: `'new'`, `'inProgress'`, `'done'`, `'cancel'` (not `'pending'`)
 
+
+### Session: Version Footer in Admin Panel
+
+**Date:** 2026-03-15  
+**Files changed:** `src/public/admin.html`
+
+**What was added:**
+
+- Added a `.version-footer` div at the bottom of the sidebar `<nav>`, just after the `<ul>` nav list.
+- Shows `v1.0.0 · build 2026-03-15` — version from `src/package.json`, date as build stamp.
+- Added `.version-footer` CSS: `font-size: 11px`, `color: rgba(255,255,255,0.3)`, `position: absolute; bottom: 16px`, centered. `pointer-events: none` so it never interferes with clicks.
+- Added `position: relative` to `.sidebar` so the absolute-positioned footer anchors to the sidebar, not the viewport.
+
+**Decision logged for Romero:** A `/api/version` endpoint would let the frontend always show the live version (auto-updated from `package.json` on each deploy) without hardcoding. Worth adding as a lightweight endpoint.
+
+### Session: Stop Button State Verification & Version Footer
+
+**Date:** 2026-03-15  
+**Files changed:** `src/public/admin.html` (add), no JS changes  
+
+**What was verified:**
+
+- **Stop Button State:** Reviewed `sessionStopBtn` behavior in admin panel. Confirmed button is correctly disabled when no session is active, and enabled when stream is running. No bugs found. Implementation already correct.
+
+**What was added:**
+
+- **Version Footer:** Added `.version-footer` div to sidebar `<nav>` element, positioned absolutely at bottom (16px from bottom). Displays `v1.0.0 · build 2026-03-15`. Styled with:
+  - `font-size: 11px`
+  - `color: rgba(255,255,255,0.3)` (muted)
+  - `position: absolute; bottom: 16px; width: 100%; text-align: center`
+  - `pointer-events: none` (never interferes with clicks)
+- Added `.sidebar { position: relative; }` to anchor footer to sidebar container
+
+**Note:** Version hardcoded from `package.json`. Future enhancement: expose `/api/version` endpoint so footer auto-updates on deploy.
