@@ -483,17 +483,18 @@ app.get('/api/export', async (req, res) => {
         const session = await db.getActiveSession();
         if (!session) return res.status(404).json({ error: 'No active session' });
 
-        const [notes, todos, reminders] = await Promise.all([
+        const [notes, todos, reminders, users] = await Promise.all([
             db.getNotes(session.id),
             db.getTodos(session.id),
-            db.getReminders(session.id)
+            db.getReminders(session.id),
+            db.getSessionUsers(session.id)
         ]);
 
-        const endedDisplay = session.ended_at ? session.ended_at : 'In progress';
-        let md = `# Stream Session — ${session.project_name}\n\n`;
-        md += `**Title:** ${session.stream_title || ''}\n`;
-        md += `**Started:** ${session.started_at}\n`;
-        md += `**Ended:** ${endedDisplay}\n\n`;
+        const dateFormatted = session.started_at ? session.started_at.split('T')[0] : new Date().toISOString().split('T')[0];
+        
+        let md = `# Stream Notes — ${session.project_name}\n\n`;
+        md += `**Stream Title:** ${session.stream_title || ''}\n`;
+        md += `**Date:** ${dateFormatted}\n\n`;
 
         md += `## Notes\n`;
         if (notes.length === 0) {
@@ -503,7 +504,7 @@ app.get('/api/export', async (req, res) => {
         }
         md += `\n`;
 
-        md += `## To-Do\n`;
+        md += `## To-Dos\n`;
         if (todos.length === 0) {
             md += `_No todos._\n`;
         } else {
@@ -512,7 +513,7 @@ app.get('/api/export', async (req, res) => {
                     md += `- ~~${t.description}~~\n`;
                 } else {
                     const check = t.status === 'done' ? 'x' : ' ';
-                    md += `- [${check}] ${t.description}\n`;
+                    md += `- [${check}] ${t.description} (${t.status})\n`;
                 }
             });
         }
@@ -523,12 +524,29 @@ app.get('/api/export', async (req, res) => {
             md += `_No reminders._\n`;
         } else {
             reminders.forEach(r => {
-                md += `- **${r.name}**: ${r.message}\n`;
+                md += `- ${r.name}: ${r.message}\n`;
+            });
+        }
+        md += `\n`;
+
+        md += `## Scores / Leaderboard\n`;
+        if (users.length === 0) {
+            md += `_No scores recorded._\n`;
+        } else {
+            md += `| Username | High Score | Best Score | Drops |\n`;
+            md += `|----------|-----------|------------|-------|\n`;
+            users.forEach(u => {
+                md += `| ${u.username} | ${u.high_score} | ${u.best_high_score} | ${u.drop_count} |\n`;
             });
         }
 
-        const dateStr = new Date().toISOString().split('T')[0];
-        res.setHeader('Content-Disposition', `attachment; filename="session-${dateStr}.md"`);
+        const filename = `show-notes-${session.id}.md`;
+        const filepath = path.join(__dirname, 'io', filename);
+        
+        fs.writeFileSync(filepath, md, 'utf8');
+        console.log(`Export saved to ${filepath}`);
+
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.setHeader('Content-Type', 'text/markdown');
         res.send(md);
     } catch (err) {

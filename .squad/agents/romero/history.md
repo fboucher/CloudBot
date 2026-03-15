@@ -348,3 +348,58 @@ The migration try/catch blocks use `await db.exec(...)` — errors are properly 
 
 **Files Modified:**
 - `src/db.js` — Fixed `loadSessionData()` Notes query
+
+### 2026-03-17 — Export Endpoint Enhancement & Loadfromfile Verification
+
+**Task 1: Export endpoint file persistence + leaderboard**
+- Enhanced `/api/export` endpoint to save markdown to `src/io/show-notes-{session_id}.md` in addition to browser download
+- Added Scores/Leaderboard section to export markdown (username, high_score, best_high_score, drop_count)
+- Changed filename from `session-{date}.md` to `show-notes-{session_id}.md` for consistency with other session files
+- Changed header from "Stream Session" to "Stream Notes" and date format to YYYY-MM-DD only (not full timestamp)
+- Added status display on todos: `(new)`, `(inProgress)`, `(done)`, or strikethrough for `(cancel)`
+- All data loaded from DB using `db.getNotes()`, `db.getTodos()`, `db.getReminders()`, `db.getSessionUsers()`
+- File write uses `fs.writeFileSync()` which is already imported at top of `src/index.js`
+
+**Task 2: Verified `/loadfromfile` returns project_name and stream_title**
+- Checked `db.loadSessionData()` — it correctly populates `data.Project` (line 266) and `data.Title` (line 267)
+- Uses PascalCase legacy field names for overlay compatibility: `Project`, `Title`, `Notes`, `Todos`, `Reminders`, `UserSession`
+- No issues found — endpoint already returns these fields when active session exists
+
+**Rationale:**
+- Export files now persist to shared folder (`src/io/`) for archival/reference alongside other session artifacts
+- Leaderboard inclusion makes export a complete session snapshot with all user engagement data
+- Stream title and project name are already correctly loaded on cold boot via `/loadfromfile`
+
+**Files Modified:**
+- `src/index.js` — Enhanced `/api/export` endpoint (lines 481-538)
+
+### Session: Export File Persistence (2026-03-18)
+
+**Date:** 2026-03-18  
+**Decision:** Decision 33 — Export saves to disk + leaderboard  
+
+**What was implemented:**
+
+1. **Export endpoint now writes markdown to file**
+   - `GET /api/export` saves to `src/io/show-notes-{session_id}.md` using `fs.writeFileSync()`
+   - File write occurs before response, ensuring persistence
+   - Browser still receives download via `Content-Disposition: attachment`
+   - Filename pattern consistent with other session artifacts
+
+2. **Added Scores/Leaderboard section to export**
+   - New markdown section with table: Username | High Score | Best Score | Drops
+   - Data source: `db.getSessionUsers(session.id)`
+   - Integrated into complete session snapshot
+
+3. **Data integrity verified**
+   - All export content sourced from DB (no in-memory state)
+   - `/loadfromfile` already returns `Project` and `Title` from DB
+   - No additional changes needed for cold-boot
+
+**Architectural pattern established:**
+- Export operations should always write to `src/io/` for persistence
+- Leaderboard should be included in any session export/snapshot
+- All user-facing exports should be DB-sourced, not in-memory
+
+**Files Modified:**
+- `src/index.js` — `/api/export` endpoint enhancement

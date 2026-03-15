@@ -340,16 +340,19 @@
                         </div>
                         <div class="card-body">
                             <div class="row align-items-end">
-                                <div class="col-md-4">
-                                    <label class="form-label">Project Name</label>
-                                    <input type="text" class="form-control" id="sessionProjectInput" placeholder="Enter project name">
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">Stream Title</label>
-                                    <input type="text" class="form-control" id="sessionTitleInput" placeholder="Enter stream title">
+                                <div class="col-md-6">
+                                    <label class="form-label">Session Info</label>
+                                    <div id="sessionInfoDisplay" class="form-control bg-dark text-light border-secondary" style="min-height: 38px;">
+                                        <span class="text-muted">No session configured</span>
+                                    </div>
                                 </div>
                                 <div class="col-md-2">
-                                    <button class="btn btn-cb btn-cb-success w-100" id="sessionStartBtn">
+                                    <button class="btn btn-outline-secondary btn-sm w-100" id="configureSessionBtn">
+                                        <i class="bi bi-gear"></i> Configure
+                                    </button>
+                                </div>
+                                <div class="col-md-2">
+                                    <button class="btn btn-cb btn-cb-success w-100" id="sessionStartBtn" disabled>
                                         <i class="bi bi-play-fill"></i> Start
                                     </button>
                                 </div>
@@ -547,6 +550,32 @@
         </div>
     </div>
 
+    <!-- Session Config Modal -->
+    <div class="modal fade" id="sessionConfigModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Configure Session</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Project Name</label>
+                        <input type="text" class="form-control bg-dark text-light border-secondary" id="modalProjectInput" placeholder="Project name…">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Stream Title</label>
+                        <input type="text" class="form-control bg-dark text-light border-secondary" id="modalTitleInput" placeholder="Stream title…">
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveSessionConfigBtn">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="addReminderModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -576,11 +605,15 @@
     <script>
         let currentSession = null;
         let streamSessionData = null;
+        let sessionProjectName = '';
+        let sessionStreamTitle = '';
+        let sessionConfigModal = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
             await loadActiveSession();
             setupNavigation();
             loadVersion();
+            setupSessionConfigModal();
             setInterval(loadActiveSession, 5000);
             setInterval(pollForEffects, 2000);
             setInterval(renderSessionNotes, 5000);
@@ -644,10 +677,38 @@
             }
         }
 
-        function setInputIfNotFocused(id, value) {
-            const el = document.getElementById(id);
-            if (el && document.activeElement !== el) {
-                el.value = value;
+        function setupSessionConfigModal() {
+            sessionConfigModal = new bootstrap.Modal(document.getElementById('sessionConfigModal'));
+            
+            document.getElementById('configureSessionBtn').addEventListener('click', () => {
+                document.getElementById('modalProjectInput').value = sessionProjectName;
+                document.getElementById('modalTitleInput').value = sessionStreamTitle;
+                sessionConfigModal.show();
+            });
+
+            document.getElementById('saveSessionConfigBtn').addEventListener('click', () => {
+                const project = document.getElementById('modalProjectInput').value.trim();
+                const title = document.getElementById('modalTitleInput').value.trim();
+                
+                if (!project || !title) {
+                    alert('Both project name and stream title are required');
+                    return;
+                }
+                
+                sessionProjectName = project;
+                sessionStreamTitle = title;
+                updateSessionInfoDisplay();
+                updateStartBtnState();
+                sessionConfigModal.hide();
+            });
+        }
+
+        function updateSessionInfoDisplay() {
+            const display = document.getElementById('sessionInfoDisplay');
+            if (sessionProjectName && sessionStreamTitle) {
+                display.innerHTML = `<strong>${sessionProjectName}</strong> — ${sessionStreamTitle}`;
+            } else {
+                display.innerHTML = '<span class="text-muted">No session configured</span>';
             }
         }
 
@@ -665,14 +726,15 @@
                         stream_title: s.stream_title,
                         started_at: s.started_at
                     };
+                    
+                    sessionProjectName = s.project_name || '';
+                    sessionStreamTitle = s.stream_title || '';
+                    updateSessionInfoDisplay();
                     updateStreamStatus(true, s.project_name);
 
                     document.getElementById('sessionStartBtn').disabled = true;
                     document.getElementById('sessionStopBtn').disabled = false;
-                    document.getElementById('sessionProjectInput').disabled = true;
-                    document.getElementById('sessionTitleInput').disabled = true;
-                    setInputIfNotFocused('sessionProjectInput', s.project_name || '');
-                    setInputIfNotFocused('sessionTitleInput', s.stream_title || '');
+                    document.getElementById('configureSessionBtn').disabled = true;
                     document.getElementById('currentStreamNumber').textContent = s.id;
                     document.getElementById('currentStartTime').textContent = s.started_at ? new Date(s.started_at).toLocaleString() : '-';
 
@@ -701,10 +763,7 @@
 
                     updateStartBtnState();
                     document.getElementById('sessionStopBtn').disabled = true;
-                    document.getElementById('sessionProjectInput').disabled = false;
-                    document.getElementById('sessionTitleInput').disabled = false;
-                    document.getElementById('sessionProjectInput').value = '';
-                    document.getElementById('sessionTitleInput').value = '';
+                    document.getElementById('configureSessionBtn').disabled = false;
                     document.getElementById('currentStreamNumber').textContent = '-';
                     document.getElementById('currentStartTime').textContent = '-';
                 }
@@ -715,11 +774,9 @@
             }
         }
 
-        // FIX #5: disable Start unless both inputs are filled
         function updateStartBtnState() {
-            const project = document.getElementById('sessionProjectInput').value.trim();
-            const title = document.getElementById('sessionTitleInput').value.trim();
-            document.getElementById('sessionStartBtn').disabled = !(project && title);
+            const hasConfig = sessionProjectName && sessionStreamTitle;
+            document.getElementById('sessionStartBtn').disabled = !hasConfig;
         }
 
         function updateStreamStatus(isLive, projectName = '') {
@@ -888,28 +945,26 @@
 
         // FIX #5: Start/Stop buttons use new API endpoints
         document.getElementById('sessionStartBtn').addEventListener('click', async () => {
-            const project = document.getElementById('sessionProjectInput').value.trim();
-            const title = document.getElementById('sessionTitleInput').value.trim();
-            if (!project || !title) return;
+            if (!sessionProjectName || !sessionStreamTitle) return;
 
             document.getElementById('sessionStartBtn').disabled = true;
             try {
                 const response = await fetch('/api/stream/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ projectName: project, streamTitle: title })
+                    body: JSON.stringify({ projectName: sessionProjectName, streamTitle: sessionStreamTitle })
                 });
                 const data = await response.json();
                 if (data.error) throw new Error(data.error);
 
                 document.getElementById('sessionStopBtn').disabled = false;
-                updateStreamStatus(true, project);
+                updateStreamStatus(true, sessionProjectName);
                 showFeedback('Stream started!');
 
                 await fetch('/triggereffect', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ effectType: 'startproject', project })
+                    body: JSON.stringify({ effectType: 'startproject', project: sessionProjectName })
                 });
 
                 await loadActiveSession();
@@ -946,41 +1001,6 @@
                 console.error('Error stopping stream:', err);
                 alert('Failed to stop stream: ' + err.message);
                 document.getElementById('sessionStopBtn').disabled = false;
-            }
-        });
-
-        // FIX #5: enforce Start button disabled unless both inputs are filled
-        document.getElementById('sessionProjectInput').addEventListener('input', updateStartBtnState);
-        document.getElementById('sessionTitleInput').addEventListener('input', updateStartBtnState);
-
-        // Session page - Save project/title changes on blur
-        document.getElementById('sessionProjectInput').addEventListener('change', async () => {
-            if (!currentSession) return;
-            const project = document.getElementById('sessionProjectInput').value.trim();
-            try {
-                await fetch('/updateproject', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sessionId: currentSession.id, project })
-                });
-                showFeedback('Project saved');
-            } catch (err) {
-                console.error('Error saving project:', err);
-            }
-        });
-
-        document.getElementById('sessionTitleInput').addEventListener('change', async () => {
-            if (!currentSession) return;
-            const title = document.getElementById('sessionTitleInput').value.trim();
-            try {
-                await fetch('/updatestreamtitle', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sessionId: currentSession.id, title })
-                });
-                showFeedback('Title saved');
-            } catch (err) {
-                console.error('Error saving title:', err);
             }
         });
 
@@ -1240,12 +1260,10 @@
         async function saveCurrentSession() {
             if (!currentSession) return;
             try {
-                const project_name = document.getElementById('sessionProjectInput').value.trim();
-                const stream_title = document.getElementById('sessionTitleInput').value.trim();
                 const response = await fetch(`/api/session/${currentSession.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ project_name, stream_title })
+                    body: JSON.stringify({ project_name: sessionProjectName, stream_title: sessionStreamTitle })
                 });
                 if (response.ok) showFeedback('Session saved!');
             } catch (err) {

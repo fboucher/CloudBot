@@ -441,15 +441,17 @@ Attention = function(user, message)
 
 addTodo = function(description)
 {
-    const cntTodos = _streamSession.Todos.length;
-    _streamSession.Todos.push(new Todo(cntTodos + 1, description, TodoStatusEnum.new));
-    RefreshTodosArea();
-
+    // API call first - the 5s polling will pick up the todo from DB and render it
     fetch('/api/todos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description })
-    }).catch(err => console.error('Error saving todo to DB:', err));
+    })
+    .then(() => {
+        // Force an immediate refresh from DB to show the new todo
+        loadSessionFromDb();
+    })
+    .catch(err => console.error('Error saving todo to DB:', err));
 }
 
 

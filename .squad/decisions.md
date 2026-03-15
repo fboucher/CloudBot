@@ -128,6 +128,48 @@
 - Document architectural decisions here
 - Keep history focused on work, decisions focused on direction
 
+### Session 2026-03-18 — Export File Persistence & Session Config Modal
+
+#### Romero — Export File Persistence (Decision 33)
+
+33. **Export endpoint saves markdown to `src/io/show-notes-{id}.md` AND sends browser download**
+    - Enhanced `GET /api/export` to write markdown file to disk using `fs.writeFileSync()`
+    - Filename pattern: `show-notes-{session_id}.md` (consistent with other session artifacts)
+    - File write happens before response, ensuring persistence even if browser doesn't fetch
+    - Browser still receives `Content-Disposition: attachment` for native download experience
+    - Markdown includes new **Scores/Leaderboard** section: Username, High Score, Best Score, Drops
+    - All data sourced directly from DB: `db.getNotes()`, `db.getTodos()`, `db.getReminders()`, `db.getSessionUsers()`
+    - Structure: Header (project, title, date), Notes, To-Dos, Reminders, Scores/Leaderboard
+    - Returns 404 if no active session
+    - Status: ✅ Implemented
+    - Note: `/loadfromfile` already returns Project/Title correctly from DB; no changes needed
+
+#### Darlene — Session Config Modal & Double Todo Fix (Decisions 34–35)
+
+34. **Replace inline project/title inputs with Bootstrap modal**
+    - Removed two always-visible text inputs from Stream Control card that were overwritten by polling
+    - Replaced with read-only display area (`#sessionInfoDisplay`) showing "**Project** — Title" format
+    - Added "Configure Session" button opening Bootstrap modal with project/title input fields
+    - Modal Save button validates non-empty fields, updates JS state variables, enables Start button if both set
+    - When session ACTIVE: display area shows configured values, Configure button disabled (prevents mid-stream changes)
+    - When session inactive: display shows placeholder "No session configured", Configure button enabled
+    - Eliminated polling race condition that caused user input to vanish mid-typing
+    - Status: ✅ Implemented
+
+35. **Fix double todo insertion from chat commands**
+    - **Root cause:** `addTodo()` was pushing to local array AND calling API, creating race with 5s polling
+    - **Fix:** Removed local `_streamSession.Todos.push()` and `RefreshTodosArea()` calls from `addTodo()`
+    - Now uses API-call-then-DB-refresh pattern: `POST /api/todos` → `loadSessionFromDb()` → single render from DB
+    - Result: Single source of truth (database), todos appear once in overlay
+    - Cold-boot verified: `loadActiveSession()` sets `sessionProjectName`/`sessionStreamTitle` from API and populates display
+    - Status: ✅ Implemented
+
+## Governance
+
+- All meaningful changes require team consensus
+- Document architectural decisions here
+- Keep history focused on work, decisions focused on direction
+
 ## Archived Decisions
 
 No archived decisions yet.
