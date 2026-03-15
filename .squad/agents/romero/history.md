@@ -241,3 +241,25 @@ The migration try/catch blocks use `await db.exec(...)` — errors are properly 
 **Files modified:**
 - `src/index.js` — `/savetofile` (remove JSON write), `/loadfromfile` (remove JSON fallback), `/api/export` (fix todo/reminder format), `PATCH /api/session/:id` (new)
 - `src/public/admin.html` — `loadActiveSession()` (fix field names), `saveCurrentSession()` (use PATCH endpoint), Export button handler (simplify)
+
+### 2026-03-16 — Session Export, Persistence & Session Completeness (Phase 2)
+
+**Work:** Export/persistence bug fixes, markdown format corrections, legacy JSON removal
+
+**Decisions (19–24):**
+- Decision 19: Fixed `loadActiveSession()` field path bug — now reads from `data.session.*` instead of non-existent flat fields
+- Decision 20: Added `PATCH /api/session/:id` endpoint for RESTful project/title updates
+- Decision 21: Rewired Save button to use PATCH endpoint and `currentSession` state (was silently no-oping due to null guard on `streamSessionData`)
+- Decision 22: Simplified Export button to use native `window.location.href = '/api/export'` with server-side Content-Disposition header
+- Decision 23: Fixed export markdown format (cancelled todos as `~~text~~`, reminders as `**name**: message`)
+- Decision 24: Removed JSON file I/O from `/savetofile` and `/loadfromfile` (fully DB-only now)
+
+**Files modified:**
+- `src/index.js` — Added `PATCH /api/session/:id`, fixed `/api/export` format, removed JSON I/O from legacy endpoints
+- `src/public/admin.html` — Fixed `loadActiveSession()` field mapping, updated `saveCurrentSession()` to call PATCH
+
+**Impact:**
+- Admin panel now correctly loads/saves session metadata
+- Export button generates downloadable markdown with correct syntax
+- Form fields stay populated and disabled during active session
+- No more JSON file writes for ephemeral session data (DB-only persistence)

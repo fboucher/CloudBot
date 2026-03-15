@@ -158,3 +158,61 @@ The old `renderTodos()`/`renderReminders()`/`renderSessionTodos()`/`renderSessio
 - Toggle logic inverted correctly
 - Polling fires without console errors
 - Real-time updates visible when chat adds items
+
+### Session: Readability, Form State, Export, and Command Wiring
+
+**Date:** 2026-03-15
+**Files changed:** `src/public/admin.html`, `src/public/cloudbot.js`
+
+**What was fixed:**
+
+1. **Task 1 — Readability fix for notes/todos/reminders list items**
+   - Added `color: #e9ecef` to `.todo-item, .reminder-item` CSS rule — the items were inheriting a potentially-dark color in some environments.
+   - Added explicit `color: #e9ecef` on `.todo-item span, .reminder-item span` for belt-and-suspenders.
+   - Added `.todo-status-badge` CSS with per-status colors: `new` = blue, `inProgress` = orange, `done` = green, `cancel` = muted grey.
+   - Added status badge `<span class="todo-status-badge ${t.status}">` to the start of each todo's `<span>` in `renderSessionTodos()` template.
+
+2. **Task 2 — Project name / stream title form behavior**
+   - In `loadActiveSession()`: when session is active, added `disabled = true` on both `sessionProjectInput` and `sessionTitleInput`. When inactive, added `disabled = false` and clear (values already cleared before, but now explicitly re-enabled).
+   - Fields are now kept populated (showing project/title) and disabled while a session is live.
+   - After stop: fields clear and re-enable for next session via the existing `loadActiveSession()` inactive branch.
+   - No separate "Edit" mechanism added — keeping disabled after start is sufficient per task spec.
+
+3. **Task 3 — Export button wired to `/api/export`**
+   - Replaced the old `exportNotesBtn` handler (which depended on `streamSessionData` being loaded in memory) with a proper `fetch('/api/export')` call.
+   - Uses `response.blob()` → `URL.createObjectURL` → dynamic `<a>` click download pattern.
+   - File is downloaded as `session-export.md`.
+   - Error handling shows `showFeedback()` on failure.
+   - Save button (`/savetofile`) left unchanged — Romero is preserving that endpoint.
+
+4. **Task 4 — Wire `StreamNoteStart` / `StreamNoteStop` to API**
+   - `addTodo`, `addReminder`, `SavingNote` already had API calls added in a prior session — no changes needed.
+   - Added `fetch('/api/stream/start', ...)` inside `StreamNoteStart()` after the in-memory + counter logic. Uses `projectName` and `_streamSession.Title || ''` for `streamTitle`.
+   - Added `fetch('/api/stream/stop', ...)` at end of `StreamNoteStop()`.
+   - Both additions are fire-and-forget (`.catch` logging only) — existing in-memory logic untouched.
+
+**API field name reminder:**
+- `POST /api/stream/start` expects `{ projectName, streamTitle }` (camelCase, no underscores)
+- `GET /api/stream/status` returns `{ active, sessionId, projectName, streamTitle, startedAt }`
+
+### 2026-03-16 — UI Readability, Form State, Export, and Command Wiring
+
+**Work:** Text contrast fixes, status badges, form field states, export/command wiring
+
+**Decisions (25–29):**
+- Decision 25: Set explicit `color: #e9ecef` on `.todo-item` and `.reminder-item` list items (prevents readability issues in dark-card contexts)
+- Decision 26: Added color-coded `.todo-status-badge` pills to render before todo description text (new=blue, inProgress=orange, done=green, cancel=grey)
+- Decision 27: Form fields now stay populated and disabled during active session, cleared and enabled when inactive (prevents "field vanishing" confusion)
+- Decision 28: Export button calls `GET /api/export` for server-rendered markdown download (native browser download via Content-Disposition header)
+- Decision 29: Wired `StreamNoteStart()` and `StreamNoteStop()` in cloudbot.js to call `POST /api/stream/start` and `/api/stream/stop` REST endpoints (fire-and-forget, preserve existing in-memory logic)
+
+**Files modified:**
+- `src/public/admin.html` — Fixed color inheritance on list items, added status badges, updated form field disabled state logic
+- `src/public/cloudbot.js` — Added `fetch()` calls to `StreamNoteStart()` and `StreamNoteStop()` for API persistence
+
+**Impact:**
+- Todo/reminder items now readable in dark-card contexts
+- Todo status visually indicated via inline colored badge
+- Form fields provide clear visual state during stream (disabled) and between streams (enabled, cleared)
+- Overlay !start/!stop commands now persist session state to database instead of memory-only
+- Export button generates proper downloadable file with correct markdown syntax

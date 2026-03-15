@@ -158,3 +158,75 @@ No archived decisions yet.
     - Render functions gracefully no-op when no session exists
     - Keeps admin panel synchronized with chat-added items without manual refresh
     - Status: ✅ Implemented
+
+### Session 2026-03-15 — Export, Persistence & Session Completeness (Phase 2)
+
+#### Romero — Export, Persistence, Legacy Cleanup (Decision 19–24)
+
+19. **Fixed `/api/stream/status` field consumption in `loadActiveSession()`**
+    - **Problem:** `loadActiveSession()` read flat fields (`data.sessionId`, `data.projectName`) that never existed in the API response. Response shape is `{ active: true, session: { id, project_name, stream_title, started_at } }`
+    - **Fix:** Updated to destructure `data.session` and map to `currentSession` with correct field names
+    - **Impact:** Saved `currentSession.id` is now defined; blur handlers and Save button function correctly
+    - Status: ✅ Implemented
+
+20. **`PATCH /api/session/:id` endpoint added**
+    - New RESTful endpoint to update `project_name` / `stream_title` on existing session
+    - Body accepts `{ project_name?, stream_title? }`, updates only provided fields
+    - Returns `{ success: true, session }`
+    - Legacy `/updateproject` and `/updatestreamtitle` kept for backward-compat
+    - Status: ✅ Implemented
+
+21. **Save button wired to `PATCH /api/session/:id`**
+    - **Problem:** Save button called `saveCurrentSession()` which guarded on `!streamSessionData` (always null after API shape change)
+    - **Fix:** Now guards on `!currentSession`, reads input values, calls `PATCH /api/session/:id`, shows success feedback
+    - Status: ✅ Implemented
+
+22. **Export button wired to `GET /api/export`**
+    - **Problem:** Export button had fragile client-side markdown generation and hardcoded filename
+    - **Fix:** Simplified to `window.location.href = '/api/export'`. Server sends `Content-Disposition: attachment; filename="session-YYYY-MM-DD.md"` for native browser download
+    - Status: ✅ Implemented
+
+23. **Export markdown format corrected**
+    - Cancelled todos now render as `- ~~description~~` instead of `- [ ] description`
+    - Reminders now render as `- **name**: message` (bold name, no interval suffix)
+    - Status: ✅ Implemented
+
+24. **Legacy JSON file I/O removed (Phase 2)**
+    - `/savetofile`: Removed `fs.writeFile()` call to `src/io/streamSession_<id>.json`. Now fully DB-only
+    - `/loadfromfile`: Removed `fs.existsSync()` / `fs.readFileSync()` JSON fallback. Returns safe empty default if no active DB session
+    - Note: `/genstreamnotes` intentionally still writes `.md` files (user-facing report generation)
+    - Status: ✅ Implemented
+
+#### Darlene — Readability, Form State, Export, Commands (Decision 25–29)
+
+25. **Explicit light text color on list items**
+    - Set `color: #e9ecef` directly on `.todo-item`, `.reminder-item` and their child `span` elements
+    - Prevents contrast issues depending on browser/OS defaults
+    - Do not rely on inheritance from `body { color }` for nested list items
+    - Status: ✅ Implemented
+
+26. **Status badge on todos (visible in admin panel)**
+    - Added `.todo-status-badge` pill before todo description text
+    - Color-coded by status: new=blue, inProgress=orange, done=green, cancel=grey
+    - Badge renders inline in `renderSessionTodos()` template
+    - Status: ✅ Implemented
+
+27. **Fields disabled (not cleared) after session start**
+    - When session **active**: project/title fields populated and set to `disabled = true`
+    - When session **inactive**: fields cleared and set to `disabled = false`
+    - Prevents unexpected "field vanishing" behavior
+    - Status: ✅ Implemented
+
+28. **Export button uses `/api/export` (server-rendered markdown)**
+    - Export calls `GET /api/export` (server generates markdown file)
+    - Uses standard `URL.createObjectURL()` + dynamic anchor tag for native browser download
+    - Server sends `Content-Disposition: attachment` for filename
+    - Error shown via `showFeedback()` if session not active
+    - Status: ✅ Implemented
+
+29. **Chat commands (`!start`, `!stop`) call REST API**
+    - Modified `StreamNoteStart()` to call `POST /api/stream/start` after in-memory updates
+    - Modified `StreamNoteStop()` to call `POST /api/stream/stop` before cleanup
+    - Preserves existing in-memory logic; API calls are fire-and-forget additions
+    - Persists session state to DB instead of relying only on overlay memory
+    - Status: ✅ Implemented
