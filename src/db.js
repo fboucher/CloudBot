@@ -59,8 +59,16 @@ async function createTables() {
       session_id INTEGER,
       name TEXT,
       message TEXT,
+      interval INTEGER DEFAULT 0,
       status TEXT DEFAULT 'active',
       last_check TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (session_id) REFERENCES stream_sessions(id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id INTEGER,
+      text TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (session_id) REFERENCES stream_sessions(id)
     )`,
@@ -91,7 +99,8 @@ async function createTables() {
     `CREATE INDEX IF NOT EXISTS idx_todos_session ON todos(session_id)`,
     `CREATE INDEX IF NOT EXISTS idx_reminders_session ON reminders(session_id)`,
     `CREATE INDEX IF NOT EXISTS idx_time_logs_session ON time_logs(session_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_stream_events_session ON stream_events(session_id)`
+    `CREATE INDEX IF NOT EXISTS idx_stream_events_session ON stream_events(session_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_notes_session ON notes(session_id)`
   ];
 
   try {
@@ -104,6 +113,14 @@ async function createTables() {
     try {
       await client.execute("ALTER TABLE stream_sessions ADD COLUMN stream_title TEXT DEFAULT ''");
       console.log("Migration: Added stream_title column");
+    } catch (e) {
+      // Column probably already exists, ignore
+    }
+
+    // Migration: Add interval column to reminders if it doesn't exist
+    try {
+      await client.execute("ALTER TABLE reminders ADD COLUMN interval INTEGER DEFAULT 0");
+      console.log("Migration: Added interval column to reminders");
     } catch (e) {
       // Column probably already exists, ignore
     }
@@ -156,7 +173,7 @@ async function getActiveSession() {
 
 async function getSessionById(sessionId) {
   const c = await getClient();
-  const result = await c.execute("SELECT * FROM stream_sessions WHERE id = ?", [sessionId]);
+  const result = await c.execute({ sql: "SELECT * FROM stream_sessions WHERE id = ?", args: [sessionId] });
   return result.rows[0] || null;
 }
 
@@ -170,7 +187,7 @@ async function saveSessionData(sessionId, data) {
   const c = await getClient();
 
   if (data.UserSession) {
-    await c.execute("DELETE FROM users WHERE session_id = ?", [sessionId]);
+    await c.execute({ sql: "DELETE FROM users WHERE session_id = ?", args: [sessionId] });
     for (const user of data.UserSession) {
       await c.execute({
         sql: `INSERT INTO users (session_id, username, drop_count, landed_count, high_score, best_high_score, last_update)
@@ -181,7 +198,7 @@ async function saveSessionData(sessionId, data) {
   }
 
   if (data.Todos) {
-    await c.execute("DELETE FROM todos WHERE session_id = ?", [sessionId]);
+    await c.execute({ sql: "DELETE FROM todos WHERE session_id = ?", args: [sessionId] });
     for (const todo of data.Todos) {
       await c.execute({
         sql: "INSERT INTO todos (session_id, description, status) VALUES (?, ?, ?)",
@@ -191,7 +208,7 @@ async function saveSessionData(sessionId, data) {
   }
 
   if (data.Reminders) {
-    await c.execute("DELETE FROM reminders WHERE session_id = ?", [sessionId]);
+    await c.execute({ sql: "DELETE FROM reminders WHERE session_id = ?", args: [sessionId] });
     for (const reminder of data.Reminders) {
       await c.execute({
         sql: "INSERT INTO reminders (session_id, name, message, status, last_check) VALUES (?, ?, ?, ?, ?)",
@@ -201,7 +218,7 @@ async function saveSessionData(sessionId, data) {
   }
 
   if (data.TimeLogs) {
-    await c.execute("DELETE FROM time_logs WHERE session_id = ?", [sessionId]);
+    await c.execute({ sql: "DELETE FROM time_logs WHERE session_id = ?", args: [sessionId] });
     for (const log of data.TimeLogs) {
       await c.execute({
         sql: "INSERT INTO time_logs (session_id, username, message, timestamp) VALUES (?, ?, ?, ?)",
@@ -288,7 +305,7 @@ async function loadSessionData(sessionId) {
     data.Notes = JSON.parse(session.notes || '[]');
   }
 
-  const usersResult = await c.execute("SELECT * FROM users WHERE session_id = ?", [sessionId]);
+  const usersResult = await c.execute({ sql: "SELECT * FROM users WHERE session_id = ?", args: [sessionId] });
   data.UserSession = usersResult.rows.map(u => ({
     user: u.username,
     dropCount: u.drop_count,
@@ -298,14 +315,14 @@ async function loadSessionData(sessionId) {
     lastUpdate: u.last_update
   }));
 
-  const todosResult = await c.execute("SELECT * FROM todos WHERE session_id = ?", [sessionId]);
+  const todosResult = await c.execute({ sql: "SELECT * FROM todos WHERE session_id = ?", args: [sessionId] });
   data.Todos = todosResult.rows.map(t => ({
     id: t.id,
     description: t.description,
     status: t.status
   }));
 
-  const remindersResult = await c.execute("SELECT * FROM reminders WHERE session_id = ?", [sessionId]);
+  const remindersResult = await c.execute({ sql: "SELECT * FROM reminders WHERE session_id = ?", args: [sessionId] });
   data.Reminders = remindersResult.rows.map(r => ({
     id: r.id,
     Name: r.name,
@@ -314,14 +331,14 @@ async function loadSessionData(sessionId) {
     LastCheck: r.last_check
   }));
 
-  const timeLogsResult = await c.execute("SELECT * FROM time_logs WHERE session_id = ?", [sessionId]);
+  const timeLogsResult = await c.execute({ sql: "SELECT * FROM time_logs WHERE session_id = ?", args: [sessionId] });
   data.TimeLogs = timeLogsResult.rows.map(l => ({
     user: l.username,
     message: l.message,
     time: l.timestamp
   }));
 
-  const eventsResult = await c.execute("SELECT * FROM stream_events WHERE session_id = ?", [sessionId]);
+  const eventsResult = await c.execute({ sql: "SELECT * FROM stream_events WHERE session_id = ?", args: [sessionId] });
   for (const event of eventsResult.rows) {
     switch (event.event_type) {
       case 'follow':
@@ -376,12 +393,17 @@ async function updateNotes(sessionId, notes) {
   });
 }
 
-async function addTodo(sessionId, description, status = 'pending') {
+async function addTodo(sessionId, description, status = 'new') {
   const c = await getClient();
-  await c.execute({
+  const result = await c.execute({
     sql: "INSERT INTO todos (session_id, description, status) VALUES (?, ?, ?)",
     args: [sessionId, description, status]
   });
+  const newTodo = await c.execute({
+    sql: "SELECT * FROM todos WHERE id = ?",
+    args: [result.lastInsertId]
+  });
+  return newTodo.rows[0];
 }
 
 async function updateTodoStatus(todoId, status) {
@@ -400,12 +422,17 @@ async function deleteTodo(todoId) {
   });
 }
 
-async function addReminder(sessionId, name, message, status = 'active') {
+async function addReminder(sessionId, name, message, status = 'active', interval = 0) {
   const c = await getClient();
-  await c.execute({
-    sql: "INSERT INTO reminders (session_id, name, message, status) VALUES (?, ?, ?, ?)",
-    args: [sessionId, name, message, status]
+  const result = await c.execute({
+    sql: "INSERT INTO reminders (session_id, name, message, status, interval) VALUES (?, ?, ?, ?, ?)",
+    args: [sessionId, name, message, status, interval]
   });
+  const newReminder = await c.execute({
+    sql: "SELECT * FROM reminders WHERE id = ?",
+    args: [result.lastInsertId]
+  });
+  return newReminder.rows[0];
 }
 
 async function updateReminderStatus(reminderId, status) {
@@ -424,6 +451,54 @@ async function deleteReminder(reminderId) {
   });
 }
 
+async function addNote(sessionId, text) {
+  const c = await getClient();
+  const result = await c.execute({
+    sql: "INSERT INTO notes (session_id, text) VALUES (?, ?)",
+    args: [sessionId, text]
+  });
+  const newNote = await c.execute({
+    sql: "SELECT * FROM notes WHERE id = ?",
+    args: [result.lastInsertId]
+  });
+  return newNote.rows[0];
+}
+
+async function getNotes(sessionId) {
+  const c = await getClient();
+  const result = await c.execute({
+    sql: "SELECT * FROM notes WHERE session_id = ? ORDER BY created_at ASC",
+    args: [sessionId]
+  });
+  return result.rows;
+}
+
+async function deleteNote(noteId) {
+  const c = await getClient();
+  await c.execute({
+    sql: "DELETE FROM notes WHERE id = ?",
+    args: [noteId]
+  });
+}
+
+async function getTodos(sessionId) {
+  const c = await getClient();
+  const result = await c.execute({
+    sql: "SELECT * FROM todos WHERE session_id = ? ORDER BY created_at ASC",
+    args: [sessionId]
+  });
+  return result.rows;
+}
+
+async function getReminders(sessionId) {
+  const c = await getClient();
+  const result = await c.execute({
+    sql: "SELECT * FROM reminders WHERE session_id = ? ORDER BY created_at ASC",
+    args: [sessionId]
+  });
+  return result.rows;
+}
+
 module.exports = {
   initDb,
   getClient,
@@ -437,10 +512,15 @@ module.exports = {
   getStreamCounter,
   incrementStreamCounter,
   updateNotes,
+  addNote,
+  getNotes,
+  deleteNote,
   addTodo,
+  getTodos,
   updateTodoStatus,
   deleteTodo,
   addReminder,
+  getReminders,
   updateReminderStatus,
   deleteReminder
 };
