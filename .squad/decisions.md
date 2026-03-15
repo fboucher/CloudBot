@@ -170,6 +170,66 @@
 - Document architectural decisions here
 - Keep history focused on work, decisions focused on direction
 
+### Session 2026-03-18 — Export File Persistence & Session Config Modal (Continued)
+
+#### Romero — Export File Persistence (Decision 36)
+
+36. **Export endpoint saves markdown to `src/io/show-notes-{id}.md` AND sends browser download**
+    - Enhanced `GET /api/export` to write markdown file to disk using `fs.writeFileSync()`
+    - Directory creation: `fs.mkdirSync(ioDir, { recursive: true })` — guarantees `src/io/` exists before write
+    - Error handling: File write wrapped in try/catch with `console.error` — failures now visible in server logs
+    - File write happens BEFORE HTTP response, ensuring persistence even if browser doesn't fetch
+    - Browser still receives `Content-Disposition: attachment` for native download experience
+    - Markdown includes **Stream Title** and **Project URL** sections when present
+    - All data sourced directly from DB: `db.getNotes()`, `db.getTodos()`, `db.getReminders()`, `db.getSessionUsers()`
+    - Structure: Header (project, title, date), Notes, To-Dos, Reminders, Scores/Leaderboard
+    - Returns 404 if no active session
+    - Status: ✅ Implemented
+    - Code: `src/index.js` lines 481-556, `src/db.js` lines 106-112
+
+#### Romero — Database Schema & API (Decision 37)
+
+37. **Added `project_url` column to `stream_sessions` table**
+    - Migration: `ALTER TABLE stream_sessions ADD COLUMN project_url TEXT`
+    - Wrapped in try/catch to handle "column already exists" gracefully
+    - Added to `createTables()` function in `src/db.js`
+    - Status: ✅ Implemented
+    - Code: `src/db.js` line 106-112
+
+38. **API endpoints accept and persist `project_url`**
+    - `POST /api/stream/start` — accepts `projectUrl` from request body
+    - `PATCH /api/session/:id` — accepts `project_url` for updates
+    - `GET /api/stream/status` — returns `project_url` in session object
+    - `GET /loadfromfile` — returns `ProjectUrl` (PascalCase) for overlay compatibility
+    - Modified function: `startStreamSession(projectName, streamTitle, projectUrl)`
+    - Status: ✅ Implemented
+    - Code: `src/db.js` line 132; `src/index.js` lines 560-577, 368-390, 594-626
+
+#### Darlene — Session Config Modal (Decision 39)
+
+39. **Project URL input field in Configure Session modal**
+    - Added "GitHub URL" label + `<input type="url" id="modalProjectUrlInput">` below Stream Title input
+    - Field is optional (does not block Start button)
+    - JS state: `let sessionProjectUrl = '';` stores URL between modal edits and API calls
+    - Modal pre-fills input when opened (allows editing vs. re-typing)
+    - Status: ✅ Implemented
+    - Code: `src/public/admin.html`
+
+40. **Project URL API integration and display**
+    - `POST /api/stream/start` includes `projectUrl: sessionProjectUrl` in request body
+    - `PATCH /api/session/:id` includes `project_url: sessionProjectUrl` in request body
+    - `GET /api/stream/status (cold-boot)` reads `data.session.project_url` → sets `sessionProjectUrl`
+    - Display: `updateSessionInfoDisplay()` renders URL as clickable link when non-empty
+    - Format: `<a href="{url}" target="_blank">{url}</a>` (opens in new tab)
+    - Status: ✅ Implemented
+    - Code: `src/public/admin.html`
+
+## Governance
+
+- All meaningful changes require team consensus
+- Document architectural decisions here
+- Keep history focused on work, decisions focused on direction
+
 ## Archived Decisions
 
 No archived decisions yet.

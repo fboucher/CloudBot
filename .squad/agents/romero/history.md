@@ -403,3 +403,101 @@ The migration try/catch blocks use `await db.exec(...)` — errors are properly 
 
 **Files Modified:**
 - `src/index.js` — `/api/export` endpoint enhancement
+
+### Session: Export Fixes & Project URL Support (2026-03-18)
+
+**Date:** 2026-03-18  
+**Tasks:** Fix export file writing issues, add project_url to session schema, enhance export markdown template
+
+**What was implemented:**
+
+1. **Fixed export file persistence to `src/io/`**
+   - Added `fs.mkdirSync(ioDir, { recursive: true })` before write to guarantee directory exists
+   - Wrapped `fs.writeFileSync()` in try/catch with error logging for debugging
+   - File write happens before HTTP response, ensuring persistence even if browser doesn't fetch
+   - Path construction correct: `path.join(__dirname, 'io', filename)` — `__dirname` points to `src/`
+
+2. **Added `project_url` column to database**
+   - Migration added in `createTables()`: `ALTER TABLE stream_sessions ADD COLUMN project_url TEXT`
+   - Wrapped in try/catch (column already exists errors are swallowed)
+   - Updated `startStreamSession()` to accept and store `project_url` parameter
+   - Updated `loadSessionData()` to return `ProjectUrl` (PascalCase for overlay compatibility)
+
+3. **Wired project_url through API layer**
+   - `POST /api/stream/start` — accepts `projectUrl` from request body, passes to `db.startStreamSession()`
+   - `PATCH /api/session/:id` — accepts `project_url` in body, persists to database
+   - `GET /api/stream/status` — includes `project_url` in session response object
+   - `GET /loadfromfile` — returns `ProjectUrl` in overlay-compatible format
+
+4. **Enhanced export markdown template**
+   - Fixed missing stream title: now shows `**Stream Title:** {stream_title}`
+   - Added conditional project URL line: only appears if `project_url` is non-empty
+   - Format: `**Project:** All code for this project is available on GitHub: {project_url}`
+   - Date formatted as YYYY-MM-DD from `started_at`
+   - Changed empty state messages from italic to plain text (e.g., "No notes recorded.")
+   - Removed status suffix from To-Dos: now shows `[x]`/`[ ]` without `(status)` label
+   - Reminders now bold name: `**{name}**: {message}`
+
+**Files Modified:**
+- `src/db.js` — Added `project_url` column migration, updated `startStreamSession()` signature, added `project_url` to `loadSessionData()` response
+- `src/index.js` — Updated `/api/stream/start`, `/api/session/:id`, `/api/stream/status`, and `/api/export` endpoints; added directory creation and error handling for file writes
+
+**Syntax Verification:**
+- ✅ `node --check src/index.js` — passed
+- ✅ `node --check src/db.js` — passed
+
+**Impact:**
+- Export files now reliably save to `src/io/show-notes-{id}.md` with proper error handling
+- Session metadata includes GitHub project URL for attribution in show notes
+- Export markdown follows requested template with stream title, project URL, and improved formatting
+
+## 2026-03-18 — Export File Persistence & Project URL Support (Spawn Agent 29)
+
+**Date:** 2026-03-18  
+**Status:** ✅ Implemented
+
+### Summary
+
+Fixed export file persistence to reliably save to `src/io/` and added project URL support throughout the session schema and API.
+
+### Tasks Completed
+
+1. **Export File Persistence Fix**
+   - Added `fs.mkdirSync(ioDir, { recursive: true })` before write — guarantees directory exists
+   - Wrapped file write in try/catch with `console.error` — failures visible in logs
+   - File write happens BEFORE HTTP response
+
+2. **Database Schema Extension**
+   - Migration: `ALTER TABLE stream_sessions ADD COLUMN project_url TEXT`
+   - Wrapped in try/catch for idempotence
+
+3. **API Endpoints Updated**
+   - `POST /api/stream/start` — accepts `projectUrl` parameter
+   - `PATCH /api/session/:id` — accepts `project_url` parameter
+   - `GET /api/stream/status` — returns `project_url` in session object
+   - `GET /loadfromfile` — returns `ProjectUrl` (PascalCase) for overlay compatibility
+   - Updated `startStreamSession()` function signature to accept `projectUrl`
+
+4. **Export Markdown Enhancement**
+   - Added stream title: `**Stream Title:** {stream_title}`
+   - Added project URL (conditional): `**Project:** All code for this project is available on GitHub: {project_url}`
+   - Date formatted as YYYY-MM-DD only
+   - Improved formatting: bold reminder names, proper todo checkboxes
+
+### Files Modified
+
+- `src/db.js` — Schema migration, function signatures
+- `src/index.js` — API endpoints, export markdown template, file write safety
+
+### Verification
+
+✅ Syntax check passed for both files  
+✅ All endpoints properly wired  
+✅ Backward compatible — project_url is optional
+
+### Key Decisions
+
+- File write safety pattern: directory creation first, then try/catch on write
+- Database migration in try/catch pattern for idempotence
+- Export happens BEFORE response sent (guarantees persistence)
+- URL included in export only if non-empty (optional metadata)

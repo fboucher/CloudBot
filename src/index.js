@@ -368,9 +368,9 @@ app.get('/api/session/:id', async (req, res) => {
 app.patch('/api/session/:id', async (req, res) => {
     console.log('..updating session..');
     const id = parseInt(req.params.id);
-    const { project_name, stream_title } = req.body || {};
-    if (project_name === undefined && stream_title === undefined) {
-        return res.status(400).json({ error: 'Provide project_name and/or stream_title to update.' });
+    const { project_name, stream_title, project_url } = req.body || {};
+    if (project_name === undefined && stream_title === undefined && project_url === undefined) {
+        return res.status(400).json({ error: 'Provide project_name, stream_title, and/or project_url to update.' });
     }
     try {
         const c = await db.getClient();
@@ -379,6 +379,9 @@ app.patch('/api/session/:id', async (req, res) => {
         }
         if (stream_title !== undefined) {
             await c.prepare("UPDATE stream_sessions SET stream_title = ? WHERE id = ?").run(stream_title, id);
+        }
+        if (project_url !== undefined) {
+            await c.prepare("UPDATE stream_sessions SET project_url = ? WHERE id = ?").run(project_url, id);
         }
         const session = await db.getSessionById(id);
         console.log(`Session ${id} updated.`);
@@ -492,13 +495,17 @@ app.get('/api/export', async (req, res) => {
 
         const dateFormatted = session.started_at ? session.started_at.split('T')[0] : new Date().toISOString().split('T')[0];
         
-        let md = `# Stream Notes — ${session.project_name}\n\n`;
-        md += `**Stream Title:** ${session.stream_title || ''}\n`;
-        md += `**Date:** ${dateFormatted}\n\n`;
+        let md = `# Stream Notes — ${session.project_name || 'Untitled Project'}\n\n`;
+        md += `**Stream Title:** ${session.stream_title || 'No title'}\n`;
+        md += `**Date:** ${dateFormatted}\n`;
+        if (session.project_url && session.project_url.trim() !== '') {
+            md += `**Project:** All code for this project is available on GitHub: ${session.project_url}\n`;
+        }
+        md += `\n`;
 
         md += `## Notes\n`;
         if (notes.length === 0) {
-            md += `_No notes._\n`;
+            md += `No notes recorded.\n`;
         } else {
             notes.forEach(n => { md += `- ${n.text}\n`; });
         }
@@ -506,14 +513,14 @@ app.get('/api/export', async (req, res) => {
 
         md += `## To-Dos\n`;
         if (todos.length === 0) {
-            md += `_No todos._\n`;
+            md += `No to-dos recorded.\n`;
         } else {
             todos.forEach(t => {
                 if (t.status === 'cancel') {
                     md += `- ~~${t.description}~~\n`;
                 } else {
                     const check = t.status === 'done' ? 'x' : ' ';
-                    md += `- [${check}] ${t.description} (${t.status})\n`;
+                    md += `- [${check}] ${t.description}\n`;
                 }
             });
         }
@@ -521,17 +528,17 @@ app.get('/api/export', async (req, res) => {
 
         md += `## Reminders\n`;
         if (reminders.length === 0) {
-            md += `_No reminders._\n`;
+            md += `No reminders recorded.\n`;
         } else {
             reminders.forEach(r => {
-                md += `- ${r.name}: ${r.message}\n`;
+                md += `- **${r.name}**: ${r.message}\n`;
             });
         }
         md += `\n`;
 
         md += `## Scores / Leaderboard\n`;
         if (users.length === 0) {
-            md += `_No scores recorded._\n`;
+            md += `No scores recorded.\n`;
         } else {
             md += `| Username | High Score | Best Score | Drops |\n`;
             md += `|----------|-----------|------------|-------|\n`;
@@ -541,10 +548,22 @@ app.get('/api/export', async (req, res) => {
         }
 
         const filename = `show-notes-${session.id}.md`;
-        const filepath = path.join(__dirname, 'io', filename);
+        const ioDir = path.join(__dirname, 'io');
         
-        fs.writeFileSync(filepath, md, 'utf8');
-        console.log(`Export saved to ${filepath}`);
+        try {
+            fs.mkdirSync(ioDir, { recursive: true });
+        } catch (dirErr) {
+            console.error('Error creating io directory:', dirErr);
+        }
+        
+        const filepath = path.join(ioDir, filename);
+        
+        try {
+            fs.writeFileSync(filepath, md, 'utf8');
+            console.log(`Export saved to ${filepath}`);
+        } catch (writeErr) {
+            console.error('Error writing export file:', writeErr);
+        }
 
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.setHeader('Content-Type', 'text/markdown');
@@ -559,12 +578,12 @@ app.get('/api/export', async (req, res) => {
 
 app.post('/api/stream/start', async (req, res) => {
     console.log('..starting stream session (API)..');
-    const { projectName, streamTitle } = req.body || {};
+    const { projectName, streamTitle, projectUrl } = req.body || {};
     if (!projectName) {
         return res.status(400).json({ error: 'Missing projectName.' });
     }
     try {
-        const sessionId = await db.startStreamSession(projectName, streamTitle || '');
+        const sessionId = await db.startStreamSession(projectName, streamTitle || '', projectUrl || '');
         const counter = await db.incrementStreamCounter();
         const session = await db.getSessionById(sessionId);
         broadcastSSE({ event: 'stream_started', sessionId, streamNumber: counter.currentStreamNumber });
@@ -607,6 +626,7 @@ app.get('/api/stream/status', async (req, res) => {
                     id: session.id,
                     project_name: session.project_name,
                     stream_title: session.stream_title || '',
+                    project_url: session.project_url || '',
                     started_at: session.started_at,
                     ended_at: session.ended_at,
                     active: true,

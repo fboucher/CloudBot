@@ -415,3 +415,110 @@ The DB is now the authoritative source of truth. Both frontend clients (admin pa
 **Files Modified:**
 - `src/public/admin.html` — Modal UX implementation, refactored JS
 - `src/public/cloudbot.js` — `addTodo()` fix (API-then-refresh pattern)
+
+### Session: Added Project URL to Configure Session Modal (2026-03-18)
+
+**Date:** 2026-03-18  
+**Requested by:** fboucher  
+**Context:** Backend (Romero) is adding `project_url` field to session schema. Frontend needs to capture, persist, and display it.
+
+**What was implemented:**
+
+1. **Added third input field to `#sessionConfigModal`**
+   - Label: "GitHub URL"
+   - Input: `id="modalProjectUrlInput"`, `type="url"`, placeholder="https://github.com/..."
+   - Placed below Stream Title input in modal body
+   - Field is optional (does not block Start button)
+
+2. **JS variable added**
+   - `let sessionProjectUrl = '';` — stores project URL between modal edits and API calls
+
+3. **Modal Save handler updated**
+   - Reads `modalProjectUrlInput.value.trim()` → stores in `sessionProjectUrl`
+   - URL is optional (validation only checks project name and title)
+   - Modal remains dismissible even if URL is empty
+
+4. **Session start endpoint updated**
+   - `POST /api/stream/start` now includes `projectUrl: sessionProjectUrl` in JSON body
+   - Sent alongside `projectName` and `streamTitle`
+
+5. **Cold-boot restoration enhanced**
+   - `loadActiveSession()` reads `data.session.project_url` from API response
+   - Sets `sessionProjectUrl = s.project_url || ''`
+   - Calls `updateSessionInfoDisplay()` to render URL in session info area
+
+6. **Session info display updated**
+   - `updateSessionInfoDisplay()` now conditionally renders URL below project/title line
+   - Format: `<div class="text-muted small mt-1"><a href="{url}" target="_blank">{url}</a></div>`
+   - Only shown if `sessionProjectUrl` is non-empty
+   - Link opens in new tab
+
+7. **Save (PATCH) endpoint updated**
+   - `PATCH /api/session/:id` now includes `project_url: sessionProjectUrl` in body
+   - Persists URL changes to database
+
+8. **Modal pre-fill enhanced**
+   - When user opens modal before starting a session, `modalProjectUrlInput.value` pre-filled with current `sessionProjectUrl`
+   - Allows editing rather than re-typing
+   - Works for both initial configuration and re-configuration
+
+**Key behaviors:**
+- ✅ Project URL is optional — Start button not blocked by empty URL
+- ✅ URL persisted on session start, cold-boot, and explicit save
+- ✅ URL displayed in session info area when non-empty
+- ✅ Modal pre-fills URL for editing
+- ✅ No existing functionality broken (project/title logic unchanged)
+
+**Files Modified:**
+- `src/public/admin.html` — Added modal input field, JS variable, updated handlers and display logic
+
+## 2026-03-18 — Project URL in Session Config Modal (Spawn Agent 30)
+
+**Date:** 2026-03-18  
+**Status:** ✅ Implemented
+
+### Summary
+
+Added GitHub URL capture field to Configure Session modal and wired project URL through session start/patch/cold-boot flows.
+
+### Tasks Completed
+
+1. **Modal UI Enhancement**
+   - Added "GitHub URL" label + `<input type="url" id="modalProjectUrlInput">`
+   - Positioned below Stream Title input in existing modal
+   - Field is optional (does not block Start button)
+   - Uses Bootstrap 5 dark theme styling
+
+2. **JavaScript State**
+   - Created `let sessionProjectUrl = '';` variable
+   - Stores URL between modal edits and API calls
+   - Modal pre-fills input when opened (allows editing vs. re-typing)
+
+3. **API Integration**
+   - `POST /api/stream/start` includes `projectUrl: sessionProjectUrl` in body
+   - `PATCH /api/session/:id` includes `project_url: sessionProjectUrl` in body
+   - `GET /api/stream/status (cold-boot)` reads `data.session.project_url` → sets `sessionProjectUrl`
+
+4. **Display & UX**
+   - `updateSessionInfoDisplay()` renders URL as clickable link when non-empty
+   - Format: `<a href="{url}" target="_blank">{url}</a>` (opens in new tab)
+   - Only shown when URL is non-empty
+   - Modal pre-fill enables quick editing on reconfiguration
+
+### Files Modified
+
+- `src/public/admin.html` — Modal field, JS variable, event handlers, display logic
+
+### Backward Compatibility
+
+✅ URL is optional — old sessions without URL continue to work  
+✅ No breaking changes to existing project/title logic  
+✅ Cold-boot correctly restores URL if present
+
+### Key Decisions
+
+- Optional field: URL does not block session start
+- Bootstrap modal pattern: prevents polling from overwriting user input
+- Pre-fill on modal open: improves UX for re-configuration
+- Browser native `type="url"` for basic validation
+- Display full URL (not shortened): team can enhance later if needed
