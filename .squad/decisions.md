@@ -82,6 +82,20 @@
 - No changes required
 - Status: ✅ Verified
 
+#### Romero — Database Driver Migration (Decision 10)
+
+10. **Migrate database layer to @tursodatabase/database**
+    - Replace `@libsql/client` with `@tursodatabase/database` as the SQLite driver for CloudBot
+    - Database is local file only — no cloud, no `DATABASE_URL` env var
+    - Rationale: New Rust-based in-process SQLite engine with no network overhead; better long-term alignment with Turso
+    - API contract: `await db.exec(sql)` (DDL), `await db.prepare(sql).run(...)` (INSERT/UPDATE/DELETE), `await db.prepare(sql).get(arg)` (single SELECT), `await db.prepare(sql).all(arg)` (multi SELECT)
+    - All prepare chain calls and `db.exec()` must be awaited (library is promise-based; skipping await causes deferred uncaught errors from Rust engine)
+    - `src/db.js` fully rewritten — all functions remain async, same public API surface
+    - `src/package.json` updated: `@libsql/client` removed, `@tursodatabase/database` added
+    - `getClient()` kept as backward-compat export returning `db`
+    - No changes required in `src/index.js` — all DB function signatures unchanged
+    - Status: ✅ Implemented (smoke tested: init, session CRUD, todos verified)
+
 ## Governance
 
 - All meaningful changes require team consensus
