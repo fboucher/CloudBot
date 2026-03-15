@@ -267,7 +267,10 @@ async function loadSessionData(sessionId) {
     data.Title = session.stream_title || "";
     data.DateTimeStart = session.started_at;
     data.DateTimeEnd = session.ended_at;
-    data.Notes = JSON.parse(session.notes || '[]');
+    
+    // Load notes from notes table (not JSON blob)
+    const notesRows = await db.prepare("SELECT * FROM notes WHERE session_id = ? ORDER BY created_at ASC").all(sessionId);
+    data.Notes = notesRows.map(n => n.text);
   }
 
   data.UserSession = (await db.prepare("SELECT * FROM users WHERE session_id = ?").all(sessionId)).map(u => ({

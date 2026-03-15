@@ -247,3 +247,70 @@ The old `renderTodos()`/`renderReminders()`/`renderSessionTodos()`/`renderSessio
 - Fire-and-forget fetch pattern: use `.catch()` inline, no await needed for non-critical persistence.
 - Admin panel score polling uses the same 5-second interval pattern as notes/todos/reminders.
 - `GET /api/users` returns `{ username, drop_count, landed_count, high_score, best_high_score }` (snake_case from DB), sorted by best_high_score desc.
+
+### Session: Cold Boot Database Restoration
+
+**Date:** 2026-03-16
+**Files changed:** `src/public/admin.html`, `src/public/cloudbot.js`
+
+**Problem:**
+When the admin panel or stream overlay reloaded (e.g., after browser refresh, OBS scene switch, or server restart), they did not immediately fetch and display the active session state from the database. This created a "cold boot" problem where:
+- Admin panel showed empty notes/todos/reminders lists despite an active session with data in DB
+- Stream overlay waited 5 seconds before showing todos (first polling tick)
+- Both appeared disconnected from the source of truth (SQLite)
+
+**What was fixed:**
+
+33. **Admin panel: Immediate cold boot data restoration**
+    - Added render function calls in `loadActiveSession()` when `data.active === true`
+    - Now calls: `renderSessionNotes()`, `renderSessionTodos()`, `renderSessionReminders()`, `renderSessionScores()` immediately after setting form state
+    - These functions already query `/api/notes`, `/api/todos`, `/api/reminders`, `/api/users` — just needed to be invoked on initial load
+    - Result: Admin panel instantly reflects DB state when session is active, even after page refresh
+    - The existing 5s polling intervals continue to keep data fresh
+    - Status: ✅ Implemented
+
+34. **Stream overlay: Immediate cold boot data load**
+    - Modified `DOMContentLoaded` handler in `cloudbot.js` to call `loadSessionFromDb()` once immediately, then start 5s interval
+    - Before: `setInterval(loadSessionFromDb, 5000)` — first load after 5s delay
+    - After: `loadSessionFromDb()` + `setInterval(loadSessionFromDb, 5000)` — immediate load, then continue polling
+    - `loadSessionFromDb()` fetches from `/loadfromfile`, populates `_streamSession.Todos`, calls `RefreshTodosArea()`
+    - Result: Overlay displays todos instantly on page load (no 5-second blank state)
+    - Status: ✅ Implemented
+
+**Key architectural insight:**
+The DB is now the authoritative source of truth. Both frontend clients (admin panel and overlay) must bootstrap themselves from the DB on load — they can't rely on in-memory state or wait for the first polling tick. This ensures consistency across page refreshes, OBS scene switches, and server restarts.
+
+**Pattern established:**
+- Admin panel: On `data.active === true`, immediately call all render functions that fetch from REST API
+- Overlay: Call session load function once before starting interval timers
+- Both: Polling continues as normal after initial bootstrap for live updates
+
+### Session: Cold-Boot Frontend Restoration (Decisions 31–32)
+
+**Date:** 2026-03-17  
+**Focus:** Immediate database restoration on page load
+
+**Decision 31 — Admin panel: Immediate cold boot data restoration**
+
+- Modified `loadActiveSession()` in `src/public/admin.html` to immediately call render functions when `data.active === true`
+- Now calls: `renderSessionNotes()`, `renderSessionTodos()`, `renderSessionReminders()`, `renderSessionScores()` right after setting form state
+- These render functions already query the REST API (`/api/notes`, `/api/todos`, `/api/reminders`, `/api/users`) — they just needed to be invoked on initial load, not only on page navigation or polling
+- Result: Admin panel instantly reflects DB state when session is active, even after page refresh
+- Existing 5s polling intervals continue to keep data fresh
+
+**Decision 32 — Stream overlay: Immediate cold boot data load**
+
+- Modified `DOMContentLoaded` handler in `src/public/cloudbot.js` to call `loadSessionFromDb()` immediately before starting the 5-second interval
+- Before: `setInterval(loadSessionFromDb, 5000)` — first load happened 5 seconds after page load
+- After: `loadSessionFromDb()` + `setInterval(loadSessionFromDb, 5000)` — immediate load, then continue polling every 5s
+- `loadSessionFromDb()` fetches from `/loadfromfile`, populates `_streamSession.Todos`, and calls `RefreshTodosArea()`
+- Result: Overlay displays todos instantly on page load with no 5-second blank state
+
+**Impact:**
+- Database is the single source of truth for cold-boot scenarios
+- Both clients bootstrap from DB on load (no in-memory state assumptions)
+- Consistent UI state across page refreshes, OBS scene switches, server restarts
+
+**Files Modified:**
+- `src/public/admin.html` — Added immediate render function calls in `loadActiveSession()`
+- `src/public/cloudbot.js` — Added immediate `loadSessionFromDb()` call before interval

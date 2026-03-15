@@ -96,6 +96,32 @@
     - No changes required in `src/index.js` — all DB function signatures unchanged
     - Status: ✅ Implemented (smoke tested: init, session CRUD, todos verified)
 
+### Session 2026-03-17 — Cold Boot Database Restoration & Completeness
+
+#### Romero — Cold-Boot API Completeness (Decision 30)
+
+30. **Notes loaded from `notes` table in `/loadfromfile` endpoint**
+    - Fixed `loadSessionData()` to query the `notes` table instead of parsing deprecated JSON blob in `stream_sessions.notes`
+    - Migration from JSON blob to relational tables (started in Decision 1) now complete
+    - Overlay expects Notes as array of strings; admin panel separately queries `/api/notes` for full objects
+    - All three cold-boot endpoints verified: `/api/stream/status`, `/api/session`, `/loadfromfile` return complete DB data with no JSON file fallbacks
+    - Status: ✅ Implemented
+
+#### Darlene — Cold-Boot Frontend Restoration (Decisions 31–32)
+
+31. **Admin panel: Immediate cold boot data restoration**
+    - Modified `loadActiveSession()` to immediately call `renderSessionNotes()`, `renderSessionTodos()`, `renderSessionReminders()`, `renderSessionScores()` when `data.active === true`
+    - These render functions already fetch from REST API; they just needed to be invoked on initial load, not only on navigation
+    - Result: Admin panel instantly reflects DB state when session is active, even after page refresh
+    - Existing 5s polling intervals continue for live updates
+    - Status: ✅ Implemented
+
+32. **Stream overlay: Immediate cold boot data load**
+    - Modified `DOMContentLoaded` handler in `cloudbot.js` to call `loadSessionFromDb()` immediately before starting 5s interval
+    - Before: first poll after 5s delay → blank todos for 5 seconds
+    - After: immediate load + 5s polling → todos visible instantly on page load
+    - Status: ✅ Implemented
+
 ## Governance
 
 - All meaningful changes require team consensus

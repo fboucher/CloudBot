@@ -1606,6 +1606,10 @@ if (typeof window !== 'undefined') {
     window.addEventListener('DOMContentLoaded', () => {
         setInterval(checkForEffects, 2000);
         setInterval(checkTodosVisibility, 2000);
+        
+        // COLD BOOT FIX: Load session data immediately, then poll every 5s
+        // Ensures overlay displays current state on page load without waiting
+        loadSessionFromDb();
         setInterval(loadSessionFromDb, 5000);
     });
 }

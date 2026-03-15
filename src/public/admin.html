@@ -677,6 +677,14 @@
                     document.getElementById('currentStartTime').textContent = s.started_at ? new Date(s.started_at).toLocaleString() : '-';
 
                     updateSessionInfo();
+                    
+                    // COLD BOOT FIX: Immediately restore session data from DB
+                    // When active session exists, populate notes/todos/reminders/scores from the API
+                    // This ensures the admin panel reflects the true DB state on page load
+                    renderSessionNotes();
+                    renderSessionTodos();
+                    renderSessionReminders();
+                    renderSessionScores();
 
                     // Backward-compat: fetch full session data for legacy features (events, export)
                     try {

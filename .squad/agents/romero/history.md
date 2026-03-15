@@ -282,3 +282,69 @@ The migration try/catch blocks use `await db.exec(...)` — errors are properly 
 - Admin panel and cloudbot.js can now POST scores live via `/api/users/score`
 - Session responses include `users` array sorted by best score
 - Version info available for health checks/debugging
+
+### 2026-03-17 — Cold-Boot API Audit & Notes Table Integration
+
+**Work:** Audited backend APIs for cold-boot completeness, fixed Notes loading from database.
+
+**Problem Found:**
+- `loadSessionData()` in `db.js` was loading Notes from deprecated JSON blob in `stream_sessions.notes` column (line 270: `JSON.parse(session.notes || '[]')`)
+- Should have been loading from dedicated `notes` table (per Decision 1 from 2025-07-22)
+- This caused `/loadfromfile` endpoint to return stale/empty notes to overlay
+
+**Fix Applied:**
+- Updated `loadSessionData()` to query `notes` table: `SELECT * FROM notes WHERE session_id = ? ORDER BY created_at ASC`
+- Map rows to text strings: `data.Notes = notesRows.map(n => n.text)` (overlay expects array of strings)
+- Admin panel separately queries `/api/notes` which returns full `{id, text, created_at}` objects
+
+**Audit Results (all endpoints confirmed complete for cold-boot):**
+
+1. **`GET /api/stream/status`** ✅ Complete
+   - Returns `{ active: true, session: {...} }` with full session object
+   - Includes: `id, project_name, stream_title, started_at, ended_at, active, notes, todos, reminders, users`
+   - All arrays fetched in parallel via `Promise.all([db.getNotes, db.getTodos, db.getReminders, db.getSessionUsers])`
+   - No active session: returns `{ active: false }`
+
+2. **`GET /api/session`** ✅ Complete
+   - Returns flat session object with nested arrays: `{ id, project_name, stream_title, started_at, ended_at, active, notes, todos, reminders, users }`
+   - Same data structure as `/api/stream/status` session sub-object
+   - No active session: returns `{ active: false }`
+
+3. **`GET /loadfromfile`** ✅ Fixed and Complete
+   - Used by overlay polling (`loadSessionFromDb()` in cloudbot.js)
+   - Returns legacy format: `{ Project, Title, Id, DateTimeStart, DateTimeEnd, Notes, UserSession, Todos, Reminders, NewFollowers, Raiders, ... }`
+   - Now correctly loads Notes from `notes` table (was using JSON blob)
+   - No active session: returns empty structure with all arrays initialized to `[]`
+
+**Response Shapes Summary:**
+
+- **`/api/stream/status` and `/api/session`**: Modern REST API shape with snake_case fields, returns `{id, session_id, text, ...}` objects in arrays
+- **`/loadfromfile`**: Legacy overlay format with PascalCase fields, Notes as string array, Todos/Reminders with mixed-case field names
+
+**Files Modified:**
+- `src/db.js` — Fixed `loadSessionData()` to load Notes from `notes` table instead of JSON blob
+
+**Verified:**
+- `node --check` passes on `src/index.js` and `src/db.js`
+- All cold-boot endpoints return complete session state from database
+- No JSON file fallbacks remaining (removed in Decision 24)
+
+### Session: Cold-Boot API Completeness (Decision 30)
+
+**Date:** 2026-03-17  
+**Focus:** Database as source of truth for cold-boot restoration
+
+**Decision 30 — Notes loaded from `notes` table in `/loadfromfile` endpoint**
+
+- Fixed `loadSessionData()` in `src/db.js` to query the `notes` table instead of parsing deprecated JSON blob in `stream_sessions.notes`
+- Migration from JSON blob to relational tables (started in Decision 1, 2025-07-22) now complete
+- Overlay expects Notes as array of strings; admin panel separately queries `/api/notes` for full `{id, text, created_at}` objects
+- Verified all three cold-boot endpoints return complete DB data with no JSON file fallbacks
+
+**Impact:**
+- Database is now the single source of truth for all cold-boot scenarios
+- No JSON file reads or stale in-memory data
+- Admin panel and overlay can fully reconstruct state from DB on page load
+
+**Files Modified:**
+- `src/db.js` — Fixed `loadSessionData()` Notes query
