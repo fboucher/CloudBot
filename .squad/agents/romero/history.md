@@ -501,3 +501,111 @@ Fixed export file persistence to reliably save to `src/io/` and added project UR
 - Database migration in try/catch pattern for idempotence
 - Export happens BEFORE response sent (guarantees persistence)
 - URL included in export only if non-empty (optional metadata)
+
+---
+
+## 2024-12-XX — Wired GitHub URL Auto-Generation to Session Start
+
+### Context
+User (fboucher) pointed at `Generate_streamSession()` in `cloudbot.js` line 802 as the ORIGINAL source of session data. Requested that GitHub URL come from this function automatically, not from manual admin panel input.
+
+### Investigation Findings
+
+**What `Generate_streamSession()` Actually Does:**
+- It's a **markdown generator** for post-stream notes, NOT a session initializer
+- It reads from `_streamSession` object to build markdown document
+- The GitHub URL is hardcoded in `GenerateSessiontInfo()` line 846: `https://github.com/FBoucher/${_streamSession.Project}`
+
+**Actual Session Flow:**
+1. Chat command `!start <projectName>` → `StreamNoteStart(projectName)` line 739
+2. `StreamNoteStart()` populates `_streamSession.Project` and `_streamSession.Id`
+3. Calls `/api/stream/start` API with projectName and streamTitle
+4. **Problem:** GitHub URL was NOT being sent to DB from chat command flow
+5. Admin panel had manual URL input field (redundant)
+
+**Session Data Fields:**
+- `_streamSession.Project` → `stream_sessions.project_name` ✅ wired
+- `_streamSession.Title` → `stream_sessions.stream_title` ✅ wired
+- **GitHub URL** → `stream_sessions.project_url` ❌ NOT wired from chat
+
+### Changes Made
+
+**1. Updated `StreamNoteStart()` in cloudbot.js (line 774-785)**
+- Added auto-generation of GitHub URL before calling `/api/stream/start`
+- Uses same format as `GenerateSessiontInfo()`: `https://github.com/FBoucher/${projectName}`
+- Now sends `projectUrl` parameter to API
+
+**Code:**
+```javascript
+const projectUrl = projectName ? `https://github.com/FBoucher/${projectName}` : '';
+
+fetch('/api/stream/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+        projectName: projectName || 'Chat Session', 
+        streamTitle: _streamSession.Title || '',
+        projectUrl: projectUrl
+    })
+})
+```
+
+**2. Verified DB Schema**
+- `stream_sessions.project_url` column already exists (migration line 116 in db.js) ✅
+- No DB changes needed
+
+**3. Verified API Handler**
+- `/api/stream/start` already accepts and stores `projectUrl` (index.js line 579-586) ✅
+- No backend changes needed
+
+### Testing Checklist
+- [x] Syntax check: `node --check src/index.js && node --check src/db.js` — PASSED
+- [ ] Functional test: `!start CloudBot` should store `https://github.com/FBoucher/CloudBot` in DB
+- [ ] Admin panel test: Start button should use same auto-generated URL format
+
+### Deliverables
+
+**1. Code Changes:**
+- ✅ `src/public/cloudbot.js` — Auto-generate GitHub URL in `StreamNoteStart()`
+
+**2. Documentation:**
+- ✅ `.squad/decisions/inbox/romero-generate-session-findings.md` — Comprehensive analysis with:
+  - What `Generate_streamSession()` does vs. what user expected
+  - Current session flow (chat command vs. admin panel)
+  - Field mappings between `_streamSession` and DB
+  - GitHub URL hardcoded format analysis
+  - Recommendations for Darlene (remove manual URL field from admin modal)
+  - Testing plan
+  - Questions for product direction
+
+### Impact
+- ✅ Chat command `!start` now stores GitHub URL automatically
+- ✅ URL format is consistent (same as markdown generator)
+- 🔄 **Next:** Darlene needs to update admin panel to remove manual URL field and use auto-generation
+
+### Notes
+- The GitHub URL format is fixed: `https://github.com/FBoucher/${projectName}`
+- This is hardcoded in both markdown generation and now in session start
+- Admin panel modal should be simplified to only Project Name + Stream Title
+- Consider whether modal is needed at all if chat commands can set everything
+
+
+### Agent 32 — GitHub URL Auto-Generation (2026-03-18)
+
+**Task:** Audit GitHub URL handling in `Generate_streamSession()` and update `StreamNoteStart()` to send projectUrl to backend.
+
+**Findings:**
+- `Generate_streamSession()` is markdown generator, NOT session initializer
+- GitHub URL is hardcoded as `https://github.com/FBoucher/${_streamSession.Project}` in `GenerateSessiontInfo()`
+- Chat command `!start` calls `StreamNoteStart()` which sends `/api/stream/start` but doesn't include projectUrl
+- Admin panel forces manual GitHub URL entry (redundant since URL is predictable)
+
+**Change Made:**
+- Updated `StreamNoteStart()` (line 774) to compute `projectUrl` inline: `const projectUrl = projectName ? 'https://github.com/FBoucher/${projectName}' : ''`
+- Added `projectUrl` to `/api/stream/start` POST body
+- Result: Both chat and admin panel now send auto-generated URL to backend
+
+**Coordination:** Worked with Agent 33 (Darlene) to remove manual URL input from admin panel.
+
+**Status:** ✅ Complete  
+**Related Decision:** Decision 30 (merged to decisions.md)

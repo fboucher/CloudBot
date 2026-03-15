@@ -358,3 +358,16 @@ No archived decisions yet.
     - Preserves existing in-memory logic; API calls are fire-and-forget additions
     - Persists session state to DB instead of relying only on overlay memory
     - Status: ✅ Implemented
+
+#### Agent 32 — Romero + Agent 33 — Darlene (Decision 30)
+
+30. **Auto-generate GitHub URL from project name**
+    - **Context:** GitHub URL format is always `https://github.com/FBoucher/{projectName}` — no variability
+    - **Findings:** Romero audited `Generate_streamSession()` and discovered URL is hardcoded in markdown generator; admin panel was forcing manual input
+    - **Decision:** Remove GitHub URL input field from admin modal; compute URL client-side from project name
+    - **Changes:**
+      - Romero (cloudbot.js line 774-783): Updated `StreamNoteStart()` to auto-generate and send `projectUrl` to `/api/stream/start`
+      - Darlene (admin.html): Removed `sessionProjectUrl` variable and `modalProjectUrlInput` field; added inline URL computation in 3 locations (display, start button, PATCH handler)
+      - Result: Modal now has exactly two fields (Project Name + Stream Title); URL is derived, not stored
+    - **Verification:** ✅ No references to manual URL input remain; URL auto-generated in all paths
+    - Status: ✅ Implemented

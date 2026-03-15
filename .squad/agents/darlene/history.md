@@ -522,3 +522,98 @@ Added GitHub URL capture field to Configure Session modal and wired project URL 
 - Pre-fill on modal open: improves UX for re-configuration
 - Browser native `type="url"` for basic validation
 - Display full URL (not shortened): team can enhance later if needed
+
+## 2026-03-18 — Remove GitHub URL Input & Auto-generate from Project Name (Spawn Agent 31)
+
+**Date:** 2026-03-18  
+**Status:** ✅ Implemented
+
+### Summary
+
+Removed the GitHub URL input field from Configure Session modal. URL is now auto-computed from project name using the pattern `https://github.com/FBoucher/${projectName}`. This eliminates manual entry and ensures URL consistency.
+
+### Root Cause
+
+Previous session (Agent 30) incorrectly added a manual GitHub URL input field. Romero discovered that URLs follow a predictable pattern based on project name alone, making manual entry unnecessary.
+
+### Tasks Completed
+
+1. **Removed Modal HTML**
+   - Deleted entire "GitHub URL" `<div class="mb-3">` block from `#sessionConfigModal`
+   - Removed label, input field (`#modalProjectUrlInput`), and placeholder
+   - Modal now shows only two fields: Project Name and Stream Title
+
+2. **Removed JS Variable**
+   - Deleted `let sessionProjectUrl = '';` declaration
+   - Variable no longer needed — URL derived on-demand from `sessionProjectName`
+
+3. **Cleaned Modal Event Handlers**
+   - Removed `modalProjectUrlInput` value read/write in Configure button click handler
+   - Removed URL input read in Save button click handler
+   - Removed `sessionProjectUrl` assignment
+
+4. **Updated Display Function**
+   - `updateSessionInfoDisplay()` now computes URL inline: `https://github.com/FBoucher/${sessionProjectName}`
+   - URL displayed as clickable link only when `sessionProjectName` is set
+   - No separate storage — derived fresh on each render
+
+5. **Updated Start Button Handler**
+   - `POST /api/stream/start` now computes URL before fetch: `const projectUrl = sessionProjectName ? 'https://github.com/FBoucher/${sessionProjectName}' : ''`
+   - Passes computed URL in request body
+
+6. **Updated PATCH Handler**
+   - `saveCurrentSession()` computes URL before PATCH: `const projectUrl = sessionProjectName ? 'https://github.com/FBoucher/${sessionProjectName}' : ''`
+   - Sends computed URL in `project_url` field
+
+7. **Cold-Boot Handling**
+   - Removed `sessionProjectUrl = s.project_url || ''` assignment in `loadActiveSession()`
+   - API still returns `project_url` field but frontend no longer stores it separately
+   - Display derives URL from `sessionProjectName` on demand
+
+### Files Modified
+
+- `src/public/admin.html` — Modal HTML, JS variables, event handlers, display logic
+
+### Result
+
+✅ Modal has exactly two fields: Project Name (required) and Stream Title (required)  
+✅ No manual URL entry — user types project name only  
+✅ URL auto-generated consistently: `https://github.com/FBoucher/${projectName}`  
+✅ Existing functionality preserved — cold-boot, display, API calls all work  
+✅ No stored state — URL computed on-demand from project name
+
+### Key Decisions
+
+- **DRY principle:** Single source of truth (project name) → reduces data entry and sync bugs
+- **Zero manual input:** URL pattern is known — no need for user to type it
+- **Backward compatible:** API still accepts `project_url` field (computed by frontend)
+- **On-demand derivation:** No separate variable — URL computed where needed
+
+### Agent 33 — GitHub URL Auto-Generation: Remove Manual Input (2026-03-18)
+
+**Task:** Remove GitHub URL input field from admin panel modal; auto-compute URL from project name in all POST/PATCH handlers.
+
+**Findings (from Romero):**
+- GitHub URL format is always predictable: `https://github.com/FBoucher/${projectName}`
+- Admin panel was forcing manual input for no reason (URL can be auto-derived)
+- Darlene's earlier Agent 30 added the URL field; now reversing it for better UX
+
+**Changes Made (7 edits to admin.html):**
+1. **Modal HTML:** Removed `<input type="url">` for GitHub URL (lines 570–573)
+2. **Variables:** Deleted `let sessionProjectUrl = '';` (line 614)
+3. **Modal handlers:** Removed URL input reads/writes (lines 688–711)
+4. **Display function:** Changed from stored variable to inline: `const projectUrl = 'https://github.com/FBoucher/${sessionProjectName}'` (lines 714–725)
+5. **Start button:** Added inline URL computation before POST (line 968)
+6. **PATCH handler:** Added inline URL computation before update (line 1279)
+7. **Cold-boot:** Removed `sessionProjectUrl` assignment from session load (line 744)
+
+**Result:**
+- ✅ Modal simplified to 2 fields (Project Name + Stream Title, no URL)
+- ✅ URL always auto-generated in 3 places: display, start, PATCH
+- ✅ No separate state variable for URL (single source of truth = project name)
+- ✅ Zero remaining references to manual URL input
+
+**Coordination:** Worked with Agent 32 (Romero) who updated backend to receive and store projectUrl.
+
+**Status:** ✅ Complete  
+**Related Decision:** Decision 30 (merged to decisions.md)

@@ -567,10 +567,6 @@
                         <label class="form-label">Stream Title</label>
                         <input type="text" class="form-control bg-dark text-light border-secondary" id="modalTitleInput" placeholder="Stream title…">
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">GitHub URL</label>
-                        <input type="url" class="form-control bg-dark text-light border-secondary" id="modalProjectUrlInput" placeholder="https://github.com/...">
-                    </div>
                 </div>
                 <div class="modal-footer border-secondary">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -611,7 +607,6 @@
         let streamSessionData = null;
         let sessionProjectName = '';
         let sessionStreamTitle = '';
-        let sessionProjectUrl = '';
         let sessionConfigModal = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
@@ -688,14 +683,12 @@
             document.getElementById('configureSessionBtn').addEventListener('click', () => {
                 document.getElementById('modalProjectInput').value = sessionProjectName;
                 document.getElementById('modalTitleInput').value = sessionStreamTitle;
-                document.getElementById('modalProjectUrlInput').value = sessionProjectUrl;
                 sessionConfigModal.show();
             });
 
             document.getElementById('saveSessionConfigBtn').addEventListener('click', () => {
                 const project = document.getElementById('modalProjectInput').value.trim();
                 const title = document.getElementById('modalTitleInput').value.trim();
-                const url = document.getElementById('modalProjectUrlInput').value.trim();
                 
                 if (!project || !title) {
                     alert('Both project name and stream title are required');
@@ -704,7 +697,6 @@
                 
                 sessionProjectName = project;
                 sessionStreamTitle = title;
-                sessionProjectUrl = url;
                 updateSessionInfoDisplay();
                 updateStartBtnState();
                 sessionConfigModal.hide();
@@ -715,8 +707,9 @@
             const display = document.getElementById('sessionInfoDisplay');
             if (sessionProjectName && sessionStreamTitle) {
                 let html = `<strong>${sessionProjectName}</strong> — ${sessionStreamTitle}`;
-                if (sessionProjectUrl) {
-                    html += `<div class="text-muted small mt-1"><a href="${sessionProjectUrl}" target="_blank" class="text-decoration-none">${sessionProjectUrl}</a></div>`;
+                if (sessionProjectName) {
+                    const projectUrl = `https://github.com/FBoucher/${sessionProjectName}`;
+                    html += `<div class="text-muted small mt-1"><a href="${projectUrl}" target="_blank" class="text-decoration-none">${projectUrl}</a></div>`;
                 }
                 display.innerHTML = html;
             } else {
@@ -741,7 +734,6 @@
                     
                     sessionProjectName = s.project_name || '';
                     sessionStreamTitle = s.stream_title || '';
-                    sessionProjectUrl = s.project_url || '';
                     updateSessionInfoDisplay();
                     updateStreamStatus(true, s.project_name);
 
@@ -962,10 +954,11 @@
 
             document.getElementById('sessionStartBtn').disabled = true;
             try {
+                const projectUrl = sessionProjectName ? `https://github.com/FBoucher/${sessionProjectName}` : '';
                 const response = await fetch('/api/stream/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ projectName: sessionProjectName, streamTitle: sessionStreamTitle, projectUrl: sessionProjectUrl })
+                    body: JSON.stringify({ projectName: sessionProjectName, streamTitle: sessionStreamTitle, projectUrl: projectUrl })
                 });
                 const data = await response.json();
                 if (data.error) throw new Error(data.error);
@@ -1273,10 +1266,11 @@
         async function saveCurrentSession() {
             if (!currentSession) return;
             try {
+                const projectUrl = sessionProjectName ? `https://github.com/FBoucher/${sessionProjectName}` : '';
                 const response = await fetch(`/api/session/${currentSession.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ project_name: sessionProjectName, stream_title: sessionStreamTitle, project_url: sessionProjectUrl })
+                    body: JSON.stringify({ project_name: sessionProjectName, stream_title: sessionStreamTitle, project_url: projectUrl })
                 });
                 if (response.ok) showFeedback('Session saved!');
             } catch (err) {

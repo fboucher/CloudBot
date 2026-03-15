@@ -771,10 +771,17 @@ StreamNoteStart = async function(projectName)
         });
 
         // Persist session start to DB via REST API
+        // Auto-generate GitHub URL using the same format as GenerateSessiontInfo()
+        const projectUrl = projectName ? `https://github.com/FBoucher/${projectName}` : '';
+        
         fetch('/api/stream/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ projectName: projectName || 'Chat Session', streamTitle: _streamSession.Title || '' })
+            body: JSON.stringify({ 
+                projectName: projectName || 'Chat Session', 
+                streamTitle: _streamSession.Title || '',
+                projectUrl: projectUrl
+            })
         }).catch(err => console.error('Failed to start session in DB:', err));
     });
 
