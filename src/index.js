@@ -252,6 +252,16 @@ app.post('/updateproject', async (req, res) => {
 
 let currentEffect = { type: null, user: null, message: null, image: null, timestamp: null };
 
+// SSE clients for overlay push
+const sseClients = new Set();
+
+function broadcastSSE(payload) {
+  const data = `data: ${JSON.stringify(payload)}\n\n`;
+  for (const res of sseClients) {
+    res.write(data);
+  }
+}
+
 app.post('/triggereffect', async (req, res) => {
     console.log('..triggering effect..', req.body);
     if (!req.body || !req.body.effectType) {
@@ -304,6 +314,7 @@ app.get('/api/session', async (req, res) => {
             res.json({ 
                 ...session, 
                 stream_title: session.stream_title || "",
+                active: !session.ended_at,
                 data: sessionData 
             });
         } else {
@@ -422,6 +433,206 @@ app.put('/api/session/reminders/:id', async (req, res) => {
 
 app.delete('/api/session/reminders/:id', async (req, res) => {
     console.log('..deleting reminder..');
+    try {
+        await db.deleteReminder(parseInt(req.params.id));
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting reminder:', err);
+        res.status(500).json({ error: 'Failed to delete reminder.' });
+    }
+});
+
+// ─── Stream Start / Stop / Status ────────────────────────────────────────────
+
+app.post('/api/stream/start', async (req, res) => {
+    console.log('..starting stream session (API)..');
+    const { projectName, streamTitle } = req.body || {};
+    if (!projectName) {
+        return res.status(400).json({ error: 'Missing projectName.' });
+    }
+    try {
+        const sessionId = await db.startStreamSession(projectName, streamTitle || '');
+        const counter = await db.incrementStreamCounter();
+        const session = await db.getSessionById(sessionId);
+        broadcastSSE({ event: 'stream_started', sessionId, streamNumber: counter.currentStreamNumber });
+        console.log(`Stream started: session=${sessionId}, #${counter.currentStreamNumber}`);
+        res.json({ sessionId, streamNumber: counter.currentStreamNumber, session });
+    } catch (err) {
+        console.error('Error starting stream:', err);
+        res.status(500).json({ error: 'Failed to start stream.' });
+    }
+});
+
+app.post('/api/stream/stop', async (req, res) => {
+    console.log('..stopping stream session (API)..');
+    try {
+        const session = await db.getActiveSession();
+        if (!session) return res.status(400).json({ error: 'No active session.' });
+        await db.endStreamSession(session.id);
+        broadcastSSE({ event: 'stream_stopped', sessionId: session.id });
+        console.log(`Stream stopped: session=${session.id}`);
+        res.json({ msg: 'Stream stopped.', sessionId: session.id });
+    } catch (err) {
+        console.error('Error stopping stream:', err);
+        res.status(500).json({ error: 'Failed to stop stream.' });
+    }
+});
+
+app.get('/api/stream/status', async (req, res) => {
+    try {
+        const session = await db.getActiveSession();
+        if (session) {
+            res.json({ active: true, sessionId: session.id, projectName: session.project_name, streamTitle: session.stream_title || '', startedAt: session.started_at });
+        } else {
+            res.json({ active: false });
+        }
+    } catch (err) {
+        console.error('Error getting stream status:', err);
+        res.status(500).json({ error: 'Failed to get stream status.' });
+    }
+});
+
+// ─── SSE Overlay ─────────────────────────────────────────────────────────────
+
+app.get('/api/stream/events', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    sseClients.add(res);
+    res.write(`data: ${JSON.stringify({ event: 'connected' })}\n\n`);
+
+    req.on('close', () => {
+        sseClients.delete(res);
+    });
+});
+
+app.post('/api/stream/overlay', (req, res) => {
+    if (!req.body || !req.body.event) {
+        return res.status(400).json({ error: 'Missing event payload.' });
+    }
+    broadcastSSE(req.body);
+    res.json({ msg: 'Pushed to overlay.', clients: sseClients.size });
+});
+
+// ─── Notes ───────────────────────────────────────────────────────────────────
+
+app.get('/api/notes', async (req, res) => {
+    try {
+        const session = await db.getActiveSession();
+        if (!session) return res.json([]);
+        const notes = await db.getNotes(session.id);
+        res.json(notes);
+    } catch (err) {
+        console.error('Error getting notes:', err);
+        res.status(500).json({ error: 'Failed to get notes.' });
+    }
+});
+
+app.post('/api/notes', async (req, res) => {
+    const { text } = req.body || {};
+    if (!text) return res.status(400).json({ error: 'Missing text.' });
+    try {
+        const session = await db.getActiveSession();
+        if (!session) return res.status(400).json({ error: 'No active session.' });
+        const note = await db.addNote(session.id, text);
+        res.json(note);
+    } catch (err) {
+        console.error('Error adding note:', err);
+        res.status(500).json({ error: 'Failed to add note.' });
+    }
+});
+
+app.delete('/api/notes/:id', async (req, res) => {
+    try {
+        await db.deleteNote(parseInt(req.params.id));
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting note:', err);
+        res.status(500).json({ error: 'Failed to delete note.' });
+    }
+});
+
+// ─── Todos ────────────────────────────────────────────────────────────────────
+
+app.get('/api/todos', async (req, res) => {
+    try {
+        const session = await db.getActiveSession();
+        if (!session) return res.json([]);
+        const todos = await db.getTodos(session.id);
+        res.json(todos);
+    } catch (err) {
+        console.error('Error getting todos:', err);
+        res.status(500).json({ error: 'Failed to get todos.' });
+    }
+});
+
+app.post('/api/todos', async (req, res) => {
+    const { description } = req.body || {};
+    if (!description) return res.status(400).json({ error: 'Missing description.' });
+    try {
+        const session = await db.getActiveSession();
+        if (!session) return res.status(400).json({ error: 'No active session.' });
+        const todo = await db.addTodo(session.id, description, 'pending');
+        res.json(todo);
+    } catch (err) {
+        console.error('Error adding todo:', err);
+        res.status(500).json({ error: 'Failed to add todo.' });
+    }
+});
+
+app.patch('/api/todos/:id', async (req, res) => {
+    const { status } = req.body || {};
+    if (!status) return res.status(400).json({ error: 'Missing status.' });
+    try {
+        await db.updateTodoStatus(parseInt(req.params.id), status);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating todo:', err);
+        res.status(500).json({ error: 'Failed to update todo.' });
+    }
+});
+
+app.delete('/api/todos/:id', async (req, res) => {
+    try {
+        await db.deleteTodo(parseInt(req.params.id));
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting todo:', err);
+        res.status(500).json({ error: 'Failed to delete todo.' });
+    }
+});
+
+// ─── Reminders ────────────────────────────────────────────────────────────────
+
+app.get('/api/reminders', async (req, res) => {
+    try {
+        const session = await db.getActiveSession();
+        if (!session) return res.json([]);
+        const reminders = await db.getReminders(session.id);
+        res.json(reminders);
+    } catch (err) {
+        console.error('Error getting reminders:', err);
+        res.status(500).json({ error: 'Failed to get reminders.' });
+    }
+});
+
+app.post('/api/reminders', async (req, res) => {
+    const { name, interval, message } = req.body || {};
+    if (!name) return res.status(400).json({ error: 'Missing name.' });
+    try {
+        const session = await db.getActiveSession();
+        if (!session) return res.status(400).json({ error: 'No active session.' });
+        const reminder = await db.addReminder(session.id, name, message || '', 'active', interval || 0);
+        res.json(reminder);
+    } catch (err) {
+        console.error('Error adding reminder:', err);
+        res.status(500).json({ error: 'Failed to add reminder.' });
+    }
+});
+
+app.delete('/api/reminders/:id', async (req, res) => {
     try {
         await db.deleteReminder(parseInt(req.params.id));
         res.json({ success: true });
