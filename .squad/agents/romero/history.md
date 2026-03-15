@@ -263,3 +263,22 @@ The migration try/catch blocks use `await db.exec(...)` — errors are properly 
 - Export button generates downloadable markdown with correct syntax
 - Form fields stay populated and disabled during active session
 - No more JSON file writes for ephemeral session data (DB-only persistence)
+
+### 2026-03-17 — Version Endpoint, User Score Upsert & Users in Session
+
+**Work:** Added /api/version, DB user score upsert functions, /api/users endpoints, and users field in session/stream-status responses.
+
+**Decisions (25–28):**
+- Decision 25: Added `GET /api/version` — returns `pkg.version` and `BUILD_DATE` (computed once at server startup, stable across requests)
+- Decision 26: Added `upsertUser(sessionId, username, stats)` in `db.js` — SELECT then INSERT or UPDATE pattern using `@tursodatabase/database` `.prepare().get/run()` API
+- Decision 27: Added `getSessionUsers(sessionId)` in `db.js` — returns all users for a session ordered by `best_high_score DESC`
+- Decision 28: Added `GET /api/users` and `POST /api/users/score` endpoints; wired `users` field into `/api/session` and `/api/stream/status` responses
+
+**Files modified:**
+- `src/index.js` — Added `pkg` require, `BUILD_DATE` const, `/api/version` route, `/api/users` and `/api/users/score` routes, `users` field in `/api/session` and `/api/stream/status`
+- `src/db.js` — Added `upsertUser`, `getSessionUsers` functions and exported them
+
+**Impact:**
+- Admin panel and cloudbot.js can now POST scores live via `/api/users/score`
+- Session responses include `users` array sorted by best score
+- Version info available for health checks/debugging

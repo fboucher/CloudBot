@@ -216,3 +216,34 @@ The old `renderTodos()`/`renderReminders()`/`renderSessionTodos()`/`renderSessio
 - Form fields provide clear visual state during stream (disabled) and between streams (enabled, cleared)
 - Overlay !start/!stop commands now persist session state to database instead of memory-only
 - Export button generates proper downloadable file with correct markdown syntax
+
+### Session: Dynamic version footer, score persistence, leaderboard panel
+
+**Date:** 2026-06-15
+**Files changed:** `src/public/admin.html`, `src/public/cloudbot.js`
+
+**What was done:**
+
+30. **Dynamic version footer (`admin.html`)**
+    - Changed `<div class="version-footer">v1.0.0 · build 2026-03-15</div>` to `id="versionFooter"` with no hardcoded text.
+    - Added `loadVersion()` async function: calls `GET /api/version`, populates element with `v${data.version} · build ${data.build}`.
+    - Called on `DOMContentLoaded`. Fails silently if API unavailable.
+    - Status: ✅ Implemented
+
+31. **Score persistence fire-and-forget (`cloudbot.js`)**
+    - Added `persistUserScore(user)` helper: POSTs to `POST /api/users/score` with username, dropCount, landedCount, highScore, bestHighScore.
+    - Called at end of `UserLanded()` (after landedCount++ and highScore updates) and `IncrementDropCounter()` (after dropCount++).
+    - Fire-and-forget — errors logged but in-memory logic unaffected.
+    - Status: ✅ Implemented
+
+32. **Leaderboard card in Current Session tab (`admin.html`)**
+    - Added Bootstrap dark card with `id="sessionScoresList"` below the Reminders card.
+    - `renderSessionScores()` polls `GET /api/users` and renders a `table-dark table-sm table-hover` with columns: Player, Drops, Landed, Score, Best.
+    - Shows "No players yet." when array is empty.
+    - `setInterval(renderSessionScores, 5000)` added alongside other intervals; called once on load and on session page navigation.
+    - Status: ✅ Implemented
+
+**Key patterns observed:**
+- Fire-and-forget fetch pattern: use `.catch()` inline, no await needed for non-critical persistence.
+- Admin panel score polling uses the same 5-second interval pattern as notes/todos/reminders.
+- `GET /api/users` returns `{ username, drop_count, landed_count, high_score, best_high_score }` (snake_case from DB), sorted by best_high_score desc.

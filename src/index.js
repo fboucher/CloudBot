@@ -2,6 +2,8 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const dateFormat = require('dateformat');
+const pkg = require('./package.json');
+const BUILD_DATE = new Date().toISOString().split('T')[0];
 let text2png;
 try {
     text2png = require('text2png');
@@ -300,15 +302,20 @@ app.get('/gettodosvisibility', (req, res) => {
     res.json(todosVisibility);
 });
 
+app.get('/api/version', (req, res) => {
+    res.json({ version: pkg.version, build: BUILD_DATE });
+});
+
 app.get('/api/session', async (req, res) => {
     console.log('..getting active session..');
     try {
         const session = await db.getActiveSession();
         if (session) {
-            const [notes, todos, reminders] = await Promise.all([
+            const [notes, todos, reminders, users] = await Promise.all([
                 db.getNotes(session.id),
                 db.getTodos(session.id),
-                db.getReminders(session.id)
+                db.getReminders(session.id),
+                db.getSessionUsers(session.id)
             ]);
             res.json({
                 id: session.id,
@@ -319,7 +326,8 @@ app.get('/api/session', async (req, res) => {
                 active: !session.ended_at,
                 notes,
                 todos,
-                reminders
+                reminders,
+                users
             });
         } else {
             res.json({ active: false });
@@ -569,10 +577,11 @@ app.get('/api/stream/status', async (req, res) => {
     try {
         const session = await db.getActiveSession();
         if (session) {
-            const [notes, todos, reminders] = await Promise.all([
+            const [notes, todos, reminders, users] = await Promise.all([
                 db.getNotes(session.id),
                 db.getTodos(session.id),
-                db.getReminders(session.id)
+                db.getReminders(session.id),
+                db.getSessionUsers(session.id)
             ]);
             res.json({
                 active: true,
@@ -585,7 +594,8 @@ app.get('/api/stream/status', async (req, res) => {
                     active: true,
                     notes,
                     todos,
-                    reminders
+                    reminders,
+                    users
                 }
             });
         } else {
@@ -706,6 +716,32 @@ app.delete('/api/todos/:id', async (req, res) => {
     } catch (err) {
         console.error('Error deleting todo:', err);
         res.status(500).json({ error: 'Failed to delete todo.' });
+    }
+});
+
+// ─── Users / Scores ──────────────────────────────────────────────────────────
+
+app.get('/api/users', async (req, res) => {
+    try {
+        const session = await db.getActiveSession();
+        if (!session) return res.json([]);
+        const users = await db.getSessionUsers(session.id);
+        res.json(users);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/users/score', async (req, res) => {
+    try {
+        const session = await db.getActiveSession();
+        if (!session) return res.status(404).json({ error: 'No active session' });
+        const { username, dropCount, landedCount, highScore, bestHighScore } = req.body;
+        if (!username) return res.status(400).json({ error: 'username required' });
+        await db.upsertUser(session.id, username, { dropCount, landedCount, highScore, bestHighScore });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 

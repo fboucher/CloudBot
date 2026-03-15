@@ -1,26 +1,12 @@
-const { createClient } = require("@libsql/client");
 const path = require("path");
-const fs = require("fs");
 
-let client;
-let dbPath;
+let db;
+const dbPath = path.join(__dirname, "io", "cloudbot.db");
 
-function getDbUrl() {
-  if (process.env.DATABASE_URL) {
-    return process.env.DATABASE_URL;
-  }
-  dbPath = path.join(__dirname, "io", "cloudbot.db");
-  return `file:${dbPath}`;
-}
-
-function initDb() {
-  const dbUrl = getDbUrl();
-  console.log(`Initializing database: ${dbUrl}`);
-
-  client = createClient({
-    url: dbUrl,
-  });
-
+async function initDb() {
+  const { connect } = await import("@tursodatabase/database");
+  db = await connect(dbPath);
+  console.log(`Initializing database: ${dbPath}`);
   return createTables();
 }
 
@@ -105,13 +91,13 @@ async function createTables() {
 
   try {
     for (const sql of tables) {
-      await client.execute(sql);
+      await db.exec(sql);
     }
     console.log("Database tables initialized");
 
     // Migration: Add stream_title column if it doesn't exist
     try {
-      await client.execute("ALTER TABLE stream_sessions ADD COLUMN stream_title TEXT DEFAULT ''");
+      await db.exec("ALTER TABLE stream_sessions ADD COLUMN stream_title TEXT DEFAULT ''");
       console.log("Migration: Added stream_title column");
     } catch (e) {
       // Column probably already exists, ignore
@@ -119,15 +105,15 @@ async function createTables() {
 
     // Migration: Add interval column to reminders if it doesn't exist
     try {
-      await client.execute("ALTER TABLE reminders ADD COLUMN interval INTEGER DEFAULT 0");
+      await db.exec("ALTER TABLE reminders ADD COLUMN interval INTEGER DEFAULT 0");
       console.log("Migration: Added interval column to reminders");
     } catch (e) {
       // Column probably already exists, ignore
     }
 
-    const counterResult = await client.execute("SELECT * FROM stream_counter WHERE id = 1");
-    if (counterResult.rows.length === 0) {
-      await client.execute("INSERT INTO stream_counter (id, current_stream_number, last_stream_date) VALUES (1, 0, '')");
+    const counterRow = await db.prepare("SELECT * FROM stream_counter WHERE id = 1").get();
+    if (!counterRow) {
+      await db.prepare("INSERT INTO stream_counter (id, current_stream_number, last_stream_date) VALUES (?, ?, ?)").run(1, 0, "");
       console.log("Initialized stream_counter");
     }
   } catch (err) {
@@ -137,138 +123,117 @@ async function createTables() {
 }
 
 async function getClient() {
-  if (!client) {
+  if (!db) {
     await initDb();
   }
-  return client;
+  return db;
 }
 
 async function startStreamSession(projectName, streamTitle = "") {
-  const c = await getClient();
+  if (!db) await initDb();
   const startedAt = new Date().toISOString();
 
-  const result = await c.execute({
-    sql: "INSERT INTO stream_sessions (project_name, stream_title, started_at, notes) VALUES (?, ?, ?, '[]')",
-    args: [projectName, streamTitle, startedAt]
-  });
+  const result = await db.prepare(
+    "INSERT INTO stream_sessions (project_name, stream_title, started_at, notes) VALUES (?, ?, ?, '[]')"
+  ).run(projectName, streamTitle, startedAt);
 
-  return result.lastInsertId;
+  return result.lastInsertRowid;
 }
 
 async function endStreamSession(sessionId) {
-  const c = await getClient();
+  if (!db) await initDb();
   const endedAt = new Date().toISOString();
-
-  await c.execute({
-    sql: "UPDATE stream_sessions SET ended_at = ? WHERE id = ?",
-    args: [endedAt, sessionId]
-  });
+  await db.prepare("UPDATE stream_sessions SET ended_at = ? WHERE id = ?").run(endedAt, sessionId);
 }
 
 async function getActiveSession() {
-  const c = await getClient();
-  const result = await c.execute("SELECT * FROM stream_sessions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1");
-  return result.rows[0] || null;
+  if (!db) await initDb();
+  const result = await db.prepare(
+    "SELECT * FROM stream_sessions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1"
+  ).get();
+  return result || null;
 }
 
 async function getSessionById(sessionId) {
-  const c = await getClient();
-  const result = await c.execute({ sql: "SELECT * FROM stream_sessions WHERE id = ?", args: [sessionId] });
-  return result.rows[0] || null;
+  if (!db) await initDb();
+  const result = await db.prepare("SELECT * FROM stream_sessions WHERE id = ?").get(sessionId);
+  return result || null;
 }
 
 async function getAllSessions() {
-  const c = await getClient();
-  const result = await c.execute("SELECT * FROM stream_sessions ORDER BY id DESC");
-  return result.rows;
+  if (!db) await initDb();
+  return db.prepare("SELECT * FROM stream_sessions ORDER BY id DESC").all();
 }
 
 async function saveSessionData(sessionId, data) {
-  const c = await getClient();
+  if (!db) await initDb();
 
   if (data.UserSession) {
-    await c.execute({ sql: "DELETE FROM users WHERE session_id = ?", args: [sessionId] });
+    await db.prepare("DELETE FROM users WHERE session_id = ?").run(sessionId);
     for (const user of data.UserSession) {
-      await c.execute({
-        sql: `INSERT INTO users (session_id, username, drop_count, landed_count, high_score, best_high_score, last_update)
-              VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        args: [sessionId, user.user, user.dropCount || 0, user.landedCount || 0, user.highScore || 0, user.bestHighScore || 0, user.lastUpdate || null]
-      });
+      await db.prepare(
+        `INSERT INTO users (session_id, username, drop_count, landed_count, high_score, best_high_score, last_update)
+              VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(sessionId, user.user, user.dropCount || 0, user.landedCount || 0, user.highScore || 0, user.bestHighScore || 0, user.lastUpdate || null);
     }
   }
 
   if (data.Todos) {
-    await c.execute({ sql: "DELETE FROM todos WHERE session_id = ?", args: [sessionId] });
+    await db.prepare("DELETE FROM todos WHERE session_id = ?").run(sessionId);
     for (const todo of data.Todos) {
-      await c.execute({
-        sql: "INSERT INTO todos (session_id, description, status) VALUES (?, ?, ?)",
-        args: [sessionId, todo.description, todo.status]
-      });
+      await db.prepare("INSERT INTO todos (session_id, description, status) VALUES (?, ?, ?)").run(sessionId, todo.description, todo.status);
     }
   }
 
   if (data.Reminders) {
-    await c.execute({ sql: "DELETE FROM reminders WHERE session_id = ?", args: [sessionId] });
+    await db.prepare("DELETE FROM reminders WHERE session_id = ?").run(sessionId);
     for (const reminder of data.Reminders) {
-      await c.execute({
-        sql: "INSERT INTO reminders (session_id, name, message, status, last_check) VALUES (?, ?, ?, ?, ?)",
-        args: [sessionId, reminder.Name, reminder.Message, reminder.Status, reminder.LastCheck || null]
-      });
+      await db.prepare(
+        "INSERT INTO reminders (session_id, name, message, status, last_check) VALUES (?, ?, ?, ?, ?)"
+      ).run(sessionId, reminder.Name, reminder.Message, reminder.Status, reminder.LastCheck || null);
     }
   }
 
   if (data.TimeLogs) {
-    await c.execute({ sql: "DELETE FROM time_logs WHERE session_id = ?", args: [sessionId] });
+    await db.prepare("DELETE FROM time_logs WHERE session_id = ?").run(sessionId);
     for (const log of data.TimeLogs) {
-      await c.execute({
-        sql: "INSERT INTO time_logs (session_id, username, message, timestamp) VALUES (?, ?, ?, ?)",
-        args: [sessionId, log.user, log.message, log.time]
-      });
+      await db.prepare("INSERT INTO time_logs (session_id, username, message, timestamp) VALUES (?, ?, ?, ?)").run(sessionId, log.user, log.message, log.time);
     }
   }
 
   if (data.NewFollowers) {
     for (const user of data.NewFollowers) {
-      await c.execute({
-        sql: "INSERT INTO stream_events (session_id, event_type, username) VALUES (?, 'follow', ?)",
-        args: [sessionId, user]
-      });
+      await db.prepare("INSERT INTO stream_events (session_id, event_type, username) VALUES (?, 'follow', ?)").run(sessionId, user);
     }
   }
 
   if (data.Raiders) {
     for (const raider of data.Raiders) {
-      await c.execute({
-        sql: "INSERT INTO stream_events (session_id, event_type, username, metadata) VALUES (?, 'raid', ?, ?)",
-        args: [sessionId, raider.user, JSON.stringify({ viewers: raider.viewers })]
-      });
+      await db.prepare(
+        "INSERT INTO stream_events (session_id, event_type, username, metadata) VALUES (?, 'raid', ?, ?)"
+      ).run(sessionId, raider.user, JSON.stringify({ viewers: raider.viewers }));
     }
   }
 
   if (data.Subscribers) {
     for (const sub of data.Subscribers) {
-      await c.execute({
-        sql: "INSERT INTO stream_events (session_id, event_type, username, metadata) VALUES (?, 'sub', ?, ?)",
-        args: [sessionId, sub.user, JSON.stringify({ months: sub.streamMonths })]
-      });
+      await db.prepare(
+        "INSERT INTO stream_events (session_id, event_type, username, metadata) VALUES (?, 'sub', ?, ?)"
+      ).run(sessionId, sub.user, JSON.stringify({ months: sub.streamMonths }));
     }
   }
 
   if (data.Cheerers) {
     for (const cheerer of data.Cheerers) {
-      await c.execute({
-        sql: "INSERT INTO stream_events (session_id, event_type, username, metadata) VALUES (?, 'cheer', ?, ?)",
-        args: [sessionId, cheerer.user, JSON.stringify({ bits: cheerer.bits })]
-      });
+      await db.prepare(
+        "INSERT INTO stream_events (session_id, event_type, username, metadata) VALUES (?, 'cheer', ?, ?)"
+      ).run(sessionId, cheerer.user, JSON.stringify({ bits: cheerer.bits }));
     }
   }
 
   if (data.Hosts) {
     for (const host of data.Hosts) {
-      await c.execute({
-        sql: "INSERT INTO stream_events (session_id, event_type, username) VALUES (?, 'host', ?)",
-        args: [sessionId, host]
-      });
+      await db.prepare("INSERT INTO stream_events (session_id, event_type, username) VALUES (?, 'host', ?)").run(sessionId, host);
     }
   }
 
@@ -276,7 +241,7 @@ async function saveSessionData(sessionId, data) {
 }
 
 async function loadSessionData(sessionId) {
-  const c = await getClient();
+  if (!db) await initDb();
 
   const data = {
     Project: "",
@@ -305,8 +270,7 @@ async function loadSessionData(sessionId) {
     data.Notes = JSON.parse(session.notes || '[]');
   }
 
-  const usersResult = await c.execute({ sql: "SELECT * FROM users WHERE session_id = ?", args: [sessionId] });
-  data.UserSession = usersResult.rows.map(u => ({
+  data.UserSession = (await db.prepare("SELECT * FROM users WHERE session_id = ?").all(sessionId)).map(u => ({
     user: u.username,
     dropCount: u.drop_count,
     landedCount: u.landed_count,
@@ -315,15 +279,13 @@ async function loadSessionData(sessionId) {
     lastUpdate: u.last_update
   }));
 
-  const todosResult = await c.execute({ sql: "SELECT * FROM todos WHERE session_id = ?", args: [sessionId] });
-  data.Todos = todosResult.rows.map(t => ({
+  data.Todos = (await db.prepare("SELECT * FROM todos WHERE session_id = ?").all(sessionId)).map(t => ({
     id: t.id,
     description: t.description,
     status: t.status
   }));
 
-  const remindersResult = await c.execute({ sql: "SELECT * FROM reminders WHERE session_id = ?", args: [sessionId] });
-  data.Reminders = remindersResult.rows.map(r => ({
+  data.Reminders = (await db.prepare("SELECT * FROM reminders WHERE session_id = ?").all(sessionId)).map(r => ({
     id: r.id,
     Name: r.name,
     Message: r.message,
@@ -331,15 +293,14 @@ async function loadSessionData(sessionId) {
     LastCheck: r.last_check
   }));
 
-  const timeLogsResult = await c.execute({ sql: "SELECT * FROM time_logs WHERE session_id = ?", args: [sessionId] });
-  data.TimeLogs = timeLogsResult.rows.map(l => ({
+  data.TimeLogs = (await db.prepare("SELECT * FROM time_logs WHERE session_id = ?").all(sessionId)).map(l => ({
     user: l.username,
     message: l.message,
     time: l.timestamp
   }));
 
-  const eventsResult = await c.execute({ sql: "SELECT * FROM stream_events WHERE session_id = ?", args: [sessionId] });
-  for (const event of eventsResult.rows) {
+  const events = await db.prepare("SELECT * FROM stream_events WHERE session_id = ?").all(sessionId);
+  for (const event of events) {
     switch (event.event_type) {
       case 'follow':
         data.NewFollowers.push(event.username);
@@ -366,137 +327,119 @@ async function loadSessionData(sessionId) {
 }
 
 async function getStreamCounter() {
-  const c = await getClient();
-  const result = await c.execute("SELECT * FROM stream_counter WHERE id = 1");
-  return result.rows[0] || { current_stream_number: 0, last_stream_date: "" };
+  if (!db) await initDb();
+  return (await db.prepare("SELECT * FROM stream_counter WHERE id = 1").get()) || { current_stream_number: 0, last_stream_date: "" };
 }
 
 async function incrementStreamCounter() {
-  const c = await getClient();
+  if (!db) await initDb();
   const counter = await getStreamCounter();
   const today = new Date().toISOString().split('T')[0];
 
   const newNumber = (counter.current_stream_number || 0) + 1;
-  await c.execute({
-    sql: "UPDATE stream_counter SET current_stream_number = ?, last_stream_date = ? WHERE id = 1",
-    args: [newNumber, today]
-  });
+  await db.prepare("UPDATE stream_counter SET current_stream_number = ?, last_stream_date = ? WHERE id = 1").run(newNumber, today);
 
   return { currentStreamNumber: newNumber, lastStreamDate: today };
 }
 
 async function updateNotes(sessionId, notes) {
-  const c = await getClient();
-  await c.execute({
-    sql: "UPDATE stream_sessions SET notes = ? WHERE id = ?",
-    args: [JSON.stringify(notes), sessionId]
-  });
+  if (!db) await initDb();
+  await db.prepare("UPDATE stream_sessions SET notes = ? WHERE id = ?").run(JSON.stringify(notes), sessionId);
 }
 
 async function addTodo(sessionId, description, status = 'new') {
-  const c = await getClient();
-  const result = await c.execute({
-    sql: "INSERT INTO todos (session_id, description, status) VALUES (?, ?, ?)",
-    args: [sessionId, description, status]
-  });
-  const newTodo = await c.execute({
-    sql: "SELECT * FROM todos WHERE id = ?",
-    args: [result.lastInsertId]
-  });
-  return newTodo.rows[0];
+  if (!db) await initDb();
+  const result = await db.prepare("INSERT INTO todos (session_id, description, status) VALUES (?, ?, ?)").run(sessionId, description, status);
+  return db.prepare("SELECT * FROM todos WHERE id = ?").get(result.lastInsertRowid);
 }
 
 async function updateTodoStatus(todoId, status) {
-  const c = await getClient();
-  await c.execute({
-    sql: "UPDATE todos SET status = ? WHERE id = ?",
-    args: [status, todoId]
-  });
+  if (!db) await initDb();
+  await db.prepare("UPDATE todos SET status = ? WHERE id = ?").run(status, todoId);
 }
 
 async function deleteTodo(todoId) {
-  const c = await getClient();
-  await c.execute({
-    sql: "DELETE FROM todos WHERE id = ?",
-    args: [todoId]
-  });
+  if (!db) await initDb();
+  await db.prepare("DELETE FROM todos WHERE id = ?").run(todoId);
 }
 
 async function addReminder(sessionId, name, message, status = 'active', interval = 0) {
-  const c = await getClient();
-  const result = await c.execute({
-    sql: "INSERT INTO reminders (session_id, name, message, status, interval) VALUES (?, ?, ?, ?, ?)",
-    args: [sessionId, name, message, status, interval]
-  });
-  const newReminder = await c.execute({
-    sql: "SELECT * FROM reminders WHERE id = ?",
-    args: [result.lastInsertId]
-  });
-  return newReminder.rows[0];
+  if (!db) await initDb();
+  const result = await db.prepare(
+    "INSERT INTO reminders (session_id, name, message, status, interval) VALUES (?, ?, ?, ?, ?)"
+  ).run(sessionId, name, message, status, interval);
+  return db.prepare("SELECT * FROM reminders WHERE id = ?").get(result.lastInsertRowid);
 }
 
 async function updateReminderStatus(reminderId, status) {
-  const c = await getClient();
-  await c.execute({
-    sql: "UPDATE reminders SET status = ? WHERE id = ?",
-    args: [status, reminderId]
-  });
+  if (!db) await initDb();
+  await db.prepare("UPDATE reminders SET status = ? WHERE id = ?").run(status, reminderId);
 }
 
 async function deleteReminder(reminderId) {
-  const c = await getClient();
-  await c.execute({
-    sql: "DELETE FROM reminders WHERE id = ?",
-    args: [reminderId]
-  });
+  if (!db) await initDb();
+  await db.prepare("DELETE FROM reminders WHERE id = ?").run(reminderId);
 }
 
 async function addNote(sessionId, text) {
-  const c = await getClient();
-  const result = await c.execute({
-    sql: "INSERT INTO notes (session_id, text) VALUES (?, ?)",
-    args: [sessionId, text]
-  });
-  const newNote = await c.execute({
-    sql: "SELECT * FROM notes WHERE id = ?",
-    args: [result.lastInsertId]
-  });
-  return newNote.rows[0];
+  if (!db) await initDb();
+  const result = await db.prepare("INSERT INTO notes (session_id, text) VALUES (?, ?)").run(sessionId, text);
+  return db.prepare("SELECT * FROM notes WHERE id = ?").get(result.lastInsertRowid);
 }
 
 async function getNotes(sessionId) {
-  const c = await getClient();
-  const result = await c.execute({
-    sql: "SELECT * FROM notes WHERE session_id = ? ORDER BY created_at ASC",
-    args: [sessionId]
-  });
-  return result.rows;
+  if (!db) await initDb();
+  return db.prepare("SELECT * FROM notes WHERE session_id = ? ORDER BY created_at ASC").all(sessionId);
 }
 
 async function deleteNote(noteId) {
-  const c = await getClient();
-  await c.execute({
-    sql: "DELETE FROM notes WHERE id = ?",
-    args: [noteId]
-  });
+  if (!db) await initDb();
+  await db.prepare("DELETE FROM notes WHERE id = ?").run(noteId);
 }
 
 async function getTodos(sessionId) {
-  const c = await getClient();
-  const result = await c.execute({
-    sql: "SELECT * FROM todos WHERE session_id = ? ORDER BY created_at ASC",
-    args: [sessionId]
-  });
-  return result.rows;
+  if (!db) await initDb();
+  return db.prepare("SELECT * FROM todos WHERE session_id = ? ORDER BY created_at ASC").all(sessionId);
 }
 
 async function getReminders(sessionId) {
-  const c = await getClient();
-  const result = await c.execute({
-    sql: "SELECT * FROM reminders WHERE session_id = ? ORDER BY created_at ASC",
-    args: [sessionId]
-  });
-  return result.rows;
+  if (!db) await initDb();
+  return db.prepare("SELECT * FROM reminders WHERE session_id = ? ORDER BY created_at ASC").all(sessionId);
+}
+
+async function upsertUser(sessionId, username, stats) {
+  if (!db) await initDb();
+  const existing = await db.prepare(
+    'SELECT id FROM users WHERE session_id = ? AND username = ?'
+  ).get(sessionId, username);
+
+  if (existing) {
+    await db.prepare(
+      `UPDATE users SET drop_count = ?, landed_count = ?, high_score = ?,
+       best_high_score = ?, last_update = ? WHERE session_id = ? AND username = ?`
+    ).run(
+      stats.dropCount ?? 0, stats.landedCount ?? 0,
+      stats.highScore ?? 0, stats.bestHighScore ?? 0,
+      new Date().toISOString(), sessionId, username
+    );
+  } else {
+    await db.prepare(
+      `INSERT INTO users (session_id, username, drop_count, landed_count, high_score, best_high_score, last_update)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      sessionId, username,
+      stats.dropCount ?? 0, stats.landedCount ?? 0,
+      stats.highScore ?? 0, stats.bestHighScore ?? 0,
+      new Date().toISOString()
+    );
+  }
+}
+
+async function getSessionUsers(sessionId) {
+  if (!db) await initDb();
+  return db.prepare(
+    'SELECT * FROM users WHERE session_id = ? ORDER BY best_high_score DESC'
+  ).all(sessionId);
 }
 
 module.exports = {
@@ -522,5 +465,7 @@ module.exports = {
   addReminder,
   getReminders,
   updateReminderStatus,
-  deleteReminder
+  deleteReminder,
+  upsertUser,
+  getSessionUsers
 };

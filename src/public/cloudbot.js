@@ -273,6 +273,7 @@ UserLanded = function(user, curScore)
         else{
             console.log( "... no new highscore, try again");
         }
+        persistUserScore(_streamSession.UserSession[userPos]);
     }
     else
     {
@@ -280,7 +281,7 @@ UserLanded = function(user, curScore)
     }
 }
 
-        
+
 
 ParseMessage = function(message)
 {
@@ -360,11 +361,26 @@ ChatBotShout = function(message)
 
 
 
+async function persistUserScore(user) {
+    fetch('/api/users/score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            username: user.user,
+            dropCount: user.dropCount || 0,
+            landedCount: user.landedCount || 0,
+            highScore: user.highScore || 0,
+            bestHighScore: user.bestHighScore || 0
+        })
+    }).catch(err => console.error('Failed to persist score:', err));
+}
+
 IncrementDropCounter = function(user)
 {
     let userPos = getUserPosition(user);
     _streamSession.UserSession[userPos].dropCount++;
     _streamSession.UserSession[userPos].lastUpdate = new Date();
+    persistUserScore(_streamSession.UserSession[userPos]);
 }
 
 
@@ -426,9 +442,14 @@ Attention = function(user, message)
 addTodo = function(description)
 {
     const cntTodos = _streamSession.Todos.length;
-
     _streamSession.Todos.push(new Todo(cntTodos + 1, description, TodoStatusEnum.new));
     RefreshTodosArea();
+
+    fetch('/api/todos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description })
+    }).catch(err => console.error('Error saving todo to DB:', err));
 }
 
 
@@ -486,6 +507,12 @@ SetTodoStatus = function(id, status)
 addReminder = function(name, message)
 { 
     _streamSession.Reminders.push(new Reminder(name, message));
+
+    fetch('/api/reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, message, interval: 0 })
+    }).catch(err => console.error('Error saving reminder to DB:', err));
 }
 
 
@@ -740,6 +767,13 @@ StreamNoteStart = async function(projectName)
             // Display banner immediately when project is set
             showProjectBanner();
         });
+
+        // Persist session start to DB via REST API
+        fetch('/api/stream/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ projectName: projectName || 'Chat Session', streamTitle: _streamSession.Title || '' })
+        }).catch(err => console.error('Failed to start session in DB:', err));
     });
 
 }
@@ -756,6 +790,10 @@ StreamNoteStop = function()
     let streamNotes = Generate_streamSession();
     console.log('Notes: ', streamNotes);
     SaveNotesToFile(_streamSession, streamNotes);
+
+    // Persist session stop to DB via REST API
+    fetch('/api/stream/stop', { method: 'POST' })
+        .catch(err => console.error('Failed to stop session in DB:', err));
 }
 
 
@@ -1063,6 +1101,12 @@ CreateTimeLog = function(message, user){
 
 SavingNote = function(message){
     _streamSession.Notes.push(message);
+
+    fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: message })
+    }).catch(err => console.error('Error saving note to DB:', err));
 }
 
 

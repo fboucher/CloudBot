@@ -282,7 +282,7 @@
                         </a>
                     </li>
                 </ul>
-                <div class="version-footer">v1.0.0 · build 2026-03-15</div>
+                <div class="version-footer" id="versionFooter"></div>
             </nav>
 
             <main class="col-md-10 main-content">
@@ -450,6 +450,16 @@
                             <p class="text-muted">No reminders yet</p>
                         </div>
                     </div>
+
+                    <!-- Scores Section -->
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="card-title">Leaderboard</span>
+                        </div>
+                        <div class="card-body p-0" id="sessionScoresList">
+                            <p class="text-muted p-3 mb-0">No players yet.</p>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="historyPage" style="display: none;">
@@ -570,11 +580,14 @@
         document.addEventListener('DOMContentLoaded', async () => {
             await loadActiveSession();
             setupNavigation();
+            loadVersion();
             setInterval(loadActiveSession, 5000);
             setInterval(pollForEffects, 2000);
             setInterval(renderSessionNotes, 5000);
             setInterval(renderSessionTodos, 5000);
             setInterval(renderSessionReminders, 5000);
+            setInterval(renderSessionScores, 5000);
+            renderSessionScores();
         });
 
         // Poll for effects from stream view
@@ -627,6 +640,7 @@
                 renderSessionNotes();
                 renderSessionTodos();
                 renderSessionReminders();
+                renderSessionScores();
             }
         }
 
@@ -1131,6 +1145,49 @@
             fetch(`/api/reminders/${id}`, { method: 'DELETE' })
                 .then(() => renderSessionReminders())
                 .catch(err => console.error('Error deleting reminder:', err));
+        }
+
+        async function loadVersion() {
+            try {
+                const res = await fetch('/api/version');
+                const data = await res.json();
+                const el = document.getElementById('versionFooter');
+                if (el) el.textContent = `v${data.version} · build ${data.build}`;
+            } catch (e) {
+                // fail silently — footer stays empty
+            }
+        }
+
+        async function renderSessionScores() {
+            try {
+                const res = await fetch('/api/users');
+                const users = await res.json();
+                const container = document.getElementById('sessionScoresList');
+                if (!container) return;
+
+                if (!users.length) {
+                    container.innerHTML = '<p class="text-muted small p-3 mb-0">No players yet.</p>';
+                    return;
+                }
+
+                container.innerHTML = `
+                  <table class="table table-dark table-sm table-hover mb-0">
+                    <thead><tr>
+                      <th>Player</th><th>Drops</th><th>Landed</th><th>Score</th><th>Best</th>
+                    </tr></thead>
+                    <tbody>
+                      ${users.map(u => `<tr>
+                        <td>${u.username}</td>
+                        <td>${u.drop_count}</td>
+                        <td>${u.landed_count}</td>
+                        <td>${u.high_score}</td>
+                        <td>${u.best_high_score}</td>
+                      </tr>`).join('')}
+                    </tbody>
+                  </table>`;
+            } catch (e) {
+                console.error('Failed to load scores:', e);
+            }
         }
 
         // FIX #10: POST /api/reminders
