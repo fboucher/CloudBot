@@ -598,44 +598,42 @@
 
         async function loadActiveSession() {
             try {
-                const response = await fetch('/api/session');
+                // FIX #5: use GET /api/stream/status
+                const response = await fetch('/api/stream/status');
                 const data = await response.json();
 
                 if (data.active) {
-                    currentSession = data;
-                    streamSessionData = data.data;
-                    updateStreamStatus(true, data.project_name);
-                    
-                    // Stream Control page
-                    document.getElementById('startStreamBtn').disabled = true;
-                    document.getElementById('endStreamBtn').disabled = false;
-                    setInputIfNotFocused('projectInput', data.project_name);
-                    setInputIfNotFocused('streamTitleInput', data.stream_title || '');
-                    
-                    // Current Session page
+                    currentSession = {
+                        id: data.sessionId,
+                        project_name: data.projectName,
+                        stream_title: data.streamTitle,
+                        started_at: data.startedAt
+                    };
+                    updateStreamStatus(true, data.projectName);
+
                     document.getElementById('sessionStartBtn').disabled = true;
                     document.getElementById('sessionStopBtn').disabled = false;
-                    setInputIfNotFocused('sessionProjectInput', data.project_name || '');
-                    setInputIfNotFocused('sessionTitleInput', data.stream_title || '');
-                    document.getElementById('currentStreamNumber').textContent = data.id;
-                    document.getElementById('currentStartTime').textContent = data.started_at ? new Date(data.started_at).toLocaleString() : '-';
-                    
+                    setInputIfNotFocused('sessionProjectInput', data.projectName || '');
+                    setInputIfNotFocused('sessionTitleInput', data.streamTitle || '');
+                    document.getElementById('currentStreamNumber').textContent = data.sessionId;
+                    document.getElementById('currentStartTime').textContent = data.startedAt ? new Date(data.startedAt).toLocaleString() : '-';
+
                     updateSessionInfo();
-                    renderTodos();
-                    renderReminders();
-                    renderSessionNotes();
-                    renderSessionTodos();
-                    renderSessionReminders();
+
+                    // Backward-compat: fetch full session data for legacy features (events, export)
+                    try {
+                        const legacyRes = await fetch('/api/session');
+                        const legacyData = await legacyRes.json();
+                        streamSessionData = legacyData.data || null;
+                    } catch (_) { streamSessionData = null; }
+
                     loadRecentEvents();
                 } else {
                     currentSession = null;
                     streamSessionData = null;
                     updateStreamStatus(false);
-                    document.getElementById('startStreamBtn').disabled = false;
-                    document.getElementById('endStreamBtn').disabled = true;
-                    
-                    // Current Session page
-                    document.getElementById('sessionStartBtn').disabled = false;
+
+                    updateStartBtnState();
                     document.getElementById('sessionStopBtn').disabled = true;
                     document.getElementById('sessionProjectInput').value = '';
                     document.getElementById('sessionTitleInput').value = '';
@@ -647,6 +645,13 @@
             } catch (err) {
                 console.error('Error loading session:', err);
             }
+        }
+
+        // FIX #5: disable Start unless both inputs are filled
+        function updateStartBtnState() {
+            const project = document.getElementById('sessionProjectInput').value.trim();
+            const title = document.getElementById('sessionTitleInput').value.trim();
+            document.getElementById('sessionStartBtn').disabled = !(project && title);
         }
 
         function updateStreamStatus(isLive, projectName = '') {
@@ -669,8 +674,11 @@
 
                 let followers = 0, subs = 0, raids = 0;
 
+                // FIX #12: was using server-side db.loadSessionData — replaced with fetch
                 for (const session of sessions) {
-                    const data = await db.loadSessionData(session.id);
+                    const res = await fetch(`/api/session/${session.id}`);
+                    const sessionData = await res.json();
+                    const data = sessionData.data || {};
                     followers += (data.NewFollowers || []).length;
                     subs += (data.Subscribers || []).length;
                     raids += (data.Raiders || []).length;
@@ -700,21 +708,6 @@
             const minutes = Math.floor((duration % 3600) / 60);
             document.getElementById('currentDuration').textContent = `${hours}h ${minutes}m`;
         }
-
-        document.getElementById('streamTitleInput').addEventListener('change', async () => {
-            if (!currentSession) return;
-            const title = document.getElementById('streamTitleInput').value.trim();
-            try {
-                await fetch('/updatestreamtitle', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sessionId: currentSession.id, title })
-                });
-                showFeedback('Title saved');
-            } catch (err) {
-                console.error('Error saving title:', err);
-            }
-        });
 
         let todosVisibleOnStream = true;
 
@@ -788,65 +781,8 @@
             }).join('');
         }
 
-        document.getElementById('startStreamBtn').addEventListener('click', async () => {
-            const project = document.getElementById('projectInput').value.trim();
-            const title = document.getElementById('streamTitleInput').value.trim();
-            if (!project) {
-                alert('Please enter a project name');
-                return;
-            }
-
-            try {
-                const response = await fetch('/startstream', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ project, title })
-                });
-                const data = await response.json();
-                console.log('Stream started:', data);
-                
-                // Trigger project animation on stream view
-                await fetch('/triggereffect', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        effectType: 'startproject', 
-                        project: project
-                    })
-                });
-                
-                await loadActiveSession();
-            } catch (err) {
-                console.error('Error starting stream:', err);
-                alert('Failed to start stream');
-            }
-        });
-
-        document.getElementById('endStreamBtn').addEventListener('click', async () => {
-            if (!currentSession) return;
-
-            if (!confirm('Are you sure you want to end the stream?')) return;
-
-            try {
-                await fetch('/savetofile', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ streamSession: streamSessionData })
-                });
-
-                const response = await fetch('/endstream', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sessionId: currentSession.id })
-                });
-                
-                await loadActiveSession();
-                showPage('history');
-            } catch (err) {
-                console.error('Error ending stream:', err);
-                alert('Failed to end stream');
-            }
-        });
+        // FIX #1 #2 #3 #4: removed dead startStreamBtn/endStreamBtn/projectInput/streamTitleInput event listeners
+        // (those elements do not exist in the HTML — the session page uses sessionStartBtn/sessionStopBtn)
 
         async function loadSessions() {
             try {
@@ -880,193 +816,74 @@
             }
         }
 
-        function renderTodos() {
-            const container = document.getElementById('todosList');
-            if (!streamSessionData || !streamSessionData.Todos || streamSessionData.Todos.length === 0) {
-                container.innerHTML = '<p class="text-muted">No todos yet</p>';
-                return;
-            }
-
-            container.innerHTML = streamSessionData.Todos.map(t => `
-                <div class="todo-item ${t.status}">
-                    <span>${t.id}. ${t.description}</span>
-                    <div>
-                        <button class="btn btn-sm btn-cb" onclick="setTodoStatus(${t.id}, 'new')">New</button>
-                        <button class="btn btn-sm btn-cb" onclick="setTodoStatus(${t.id}, 'inProgress')">In Progress</button>
-                        <button class="btn btn-sm btn-cb-success" onclick="setTodoStatus(${t.id}, 'done')">Done</button>
-                        <button class="btn btn-sm btn-cb-danger" onclick="deleteTodo(${t.id})">Delete</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function setTodoStatus(id, status) {
-            if (!streamSessionData) return;
-            
-            fetch(`/api/session/todos/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status })
-            }).then(() => loadActiveSession());
-        }
-
-        function deleteTodo(id) {
-            if (!streamSessionData || !streamSessionData.Todos) return;
-            fetch(`/api/session/todos/${id}`, {
-                method: 'DELETE'
-            }).then(() => loadActiveSession());
-        }
-
-        function addTodo() {
-            const text = document.getElementById('newTodoText').value.trim();
-            if (!text || !streamSessionData) {
-                const modal = document.getElementById('addTodoModal');
-                const bsModal = bootstrap.Modal.getInstance(modal);
-                if (bsModal) bsModal.hide();
-                else document.getElementById('addTodoModal').style.display = 'none';
-                return;
-            }
-
-            fetch('/api/session/todos', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ description: text, status: 'new' })
-            }).then(() => {
-                loadActiveSession();
-                renderTodos();
-            });
-            
-            const modal = document.getElementById('addTodoModal');
-            const bsModal = bootstrap.Modal.getInstance(modal);
-            if (bsModal) bsModal.hide();
-            else modal.style.display = 'none';
-            document.getElementById('newTodoText').value = '';
-        }
-
-        function renderReminders() {
-            const container = document.getElementById('remindersList');
-            if (!streamSessionData || !streamSessionData.Reminders || streamSessionData.Reminders.length === 0) {
-                container.innerHTML = '<p class="text-muted">No reminders yet</p>';
-                return;
-            }
-
-            container.innerHTML = streamSessionData.Reminders.map(r => `
-                <div class="reminder-item ${r.Status === 'inactive' ? 'inactive' : ''}">
-                    <span><strong>${r.Name}</strong>: ${r.Message}</span>
-                    <div>
-                        <button class="btn btn-sm btn-cb" onclick="setReminderStatus(${r.id}, 'active')">Activate</button>
-                        <button class="btn btn-sm btn-cb-danger" onclick="setReminderStatus(${r.id}, 'inactive')">Pause</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function setReminderStatus(id, status) {
-            if (!streamSessionData) return;
-            
-            fetch(`/api/session/reminders/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status })
-            }).then(() => loadActiveSession());
-        }
-
-        function addReminder() {
-            const name = document.getElementById('newReminderName').value.trim();
-            const message = document.getElementById('newReminderMessage').value.trim();
-            if (!name || !message || !streamSessionData) {
-                const modal = document.getElementById('addReminderModal');
-                const bsModal = bootstrap.Modal.getInstance(modal);
-                if (bsModal) bsModal.hide();
-                else modal.style.display = 'none';
-                return;
-            }
-
-            fetch('/api/session/reminders', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, message, status: 'active' })
-            }).then(() => {
-                loadActiveSession();
-                renderReminders();
-            });
-            
-            const modal = document.getElementById('addReminderModal');
-            const bsModal = bootstrap.Modal.getInstance(modal);
-            if (bsModal) bsModal.hide();
-            else modal.style.display = 'none';
-            document.getElementById('newReminderName').value = '';
-            document.getElementById('newReminderMessage').value = '';
-        }
-
-        // Session page - Start/Stop buttons
+        // FIX #5: Start/Stop buttons use new API endpoints
         document.getElementById('sessionStartBtn').addEventListener('click', async () => {
             const project = document.getElementById('sessionProjectInput').value.trim();
             const title = document.getElementById('sessionTitleInput').value.trim();
-            if (!project) {
-                alert('Please enter a project name');
-                return;
-            }
+            if (!project || !title) return;
 
+            document.getElementById('sessionStartBtn').disabled = true;
             try {
-                const response = await fetch('/startstream', {
+                const response = await fetch('/api/stream/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ project, title })
+                    body: JSON.stringify({ projectName: project, streamTitle: title })
                 });
                 const data = await response.json();
-                console.log('Stream started:', data);
-                
-                // Trigger project animation on stream view
+                if (data.error) throw new Error(data.error);
+
+                document.getElementById('sessionStopBtn').disabled = false;
+                updateStreamStatus(true, project);
+                showFeedback('Stream started!');
+
                 await fetch('/triggereffect', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        effectType: 'startproject', 
-                        project: project
-                    })
+                    body: JSON.stringify({ effectType: 'startproject', project })
                 });
-                
+
                 await loadActiveSession();
             } catch (err) {
                 console.error('Error starting stream:', err);
-                alert('Failed to start stream');
+                alert('Failed to start stream: ' + err.message);
+                updateStartBtnState();
             }
         });
 
         document.getElementById('sessionStopBtn').addEventListener('click', async () => {
-            if (!currentSession) return;
-
             if (!confirm('Are you sure you want to stop the stream?')) return;
 
+            document.getElementById('sessionStopBtn').disabled = true;
             try {
-                await fetch('/savetofile', {
+                const response = await fetch('/api/stream/stop', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ streamSession: streamSessionData })
+                    headers: { 'Content-Type': 'application/json' }
                 });
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
 
-                const response = await fetch('/endstream', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sessionId: currentSession.id })
-                });
-                
-                // Trigger stop effect on stream view
+                updateStreamStatus(false);
+                showFeedback('Stream stopped!');
+
                 await fetch('/triggereffect', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ effectType: 'stopproject' })
                 });
-                
+
                 await loadActiveSession();
             } catch (err) {
                 console.error('Error stopping stream:', err);
-                alert('Failed to stop stream');
+                alert('Failed to stop stream: ' + err.message);
+                document.getElementById('sessionStopBtn').disabled = false;
             }
         });
 
-        // Session page - Save project/title changes
+        // FIX #5: enforce Start button disabled unless both inputs are filled
+        document.getElementById('sessionProjectInput').addEventListener('input', updateStartBtnState);
+        document.getElementById('sessionTitleInput').addEventListener('input', updateStartBtnState);
+
+        // Session page - Save project/title changes on blur
         document.getElementById('sessionProjectInput').addEventListener('change', async () => {
             if (!currentSession) return;
             const project = document.getElementById('sessionProjectInput').value.trim();
@@ -1097,140 +914,196 @@
             }
         });
 
-        // Session page - Notes functions
-        function renderSessionNotes() {
+        // FIX #8: Notes wired to /api/notes
+        async function renderSessionNotes() {
             const container = document.getElementById('sessionNotesList');
-            if (!streamSessionData || !streamSessionData.Notes || streamSessionData.Notes.length === 0) {
-                container.innerHTML = '<p class="text-muted">No notes yet</p>';
-                return;
+            try {
+                const res = await fetch('/api/notes');
+                const notes = await res.json();
+                if (!Array.isArray(notes) || notes.length === 0) {
+                    container.innerHTML = '<p class="text-muted">No notes yet</p>';
+                    return;
+                }
+                container.innerHTML = notes.map(n => `
+                    <div class="todo-item">
+                        <span>${escapeHtml(n.text)}</span>
+                        <div>
+                            <button class="btn btn-sm btn-cb" onclick="showNoteOnStream(${n.id}, this)">
+                                <i class="bi bi-broadcast"></i> Show
+                            </button>
+                            <button class="btn btn-sm btn-cb-danger" onclick="deleteNote(${n.id})">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                container.innerHTML = '<p class="text-danger">Error loading notes</p>';
             }
-            container.innerHTML = streamSessionData.Notes.map((n, i) => `
-                <div class="todo-item">
-                    <span>${i + 1}. ${n}</span>
-                    <button class="btn btn-sm btn-cb-danger" onclick="deleteNote(${i})">Delete</button>
-                </div>
-            `).join('');
         }
 
         function addNote() {
             const text = document.getElementById('newNoteText').value.trim();
-            if (!text || !streamSessionData) {
-                const modal = document.getElementById('addNoteModal');
-                const bsModal = bootstrap.Modal.getInstance(modal);
-                if (bsModal) bsModal.hide();
-                else modal.style.display = 'none';
-                return;
-            }
-
-            const notes = streamSessionData.Notes || [];
-            notes.push(text);
-            
-            fetch('/api/session/notes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ notes })
-            }).then(() => loadActiveSession());
-            
-            renderSessionNotes();
-            
             const modal = document.getElementById('addNoteModal');
             const bsModal = bootstrap.Modal.getInstance(modal);
             if (bsModal) bsModal.hide();
             else modal.style.display = 'none';
-            document.getElementById('newNoteText').value = '';
-        }
+            if (!text) return;
 
-        function deleteNote(index) {
-            if (!streamSessionData || !streamSessionData.Notes) return;
-            const notes = [...streamSessionData.Notes];
-            notes.splice(index, 1);
-            fetch('/api/session/notes', {
+            fetch('/api/notes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ notes })
-            }).then(() => loadActiveSession());
-            renderSessionNotes();
+                body: JSON.stringify({ text })
+            }).then(() => {
+                document.getElementById('newNoteText').value = '';
+                renderSessionNotes();
+            }).catch(err => console.error('Error adding note:', err));
         }
 
-        // Session page - Todos functions
-        function renderSessionTodos() {
-            const container = document.getElementById('sessionTodosList');
-            if (!streamSessionData || !streamSessionData.Todos || streamSessionData.Todos.length === 0) {
-                container.innerHTML = '<p class="text-muted">No todos yet</p>';
-                return;
-            }
-            container.innerHTML = streamSessionData.Todos.map(t => `
-                <div class="todo-item ${t.status}">
-                    <span>${t.id}. ${t.description}</span>
-                    <div>
-                        <button class="btn btn-sm btn-cb" onclick="setSessionTodoStatus(${t.id}, 'new')">New</button>
-                        <button class="btn btn-sm btn-cb" onclick="setSessionTodoStatus(${t.id}, 'inProgress')">In Progress</button>
-                        <button class="btn btn-sm btn-cb-success" onclick="setSessionTodoStatus(${t.id}, 'done')">Done</button>
-                        <button class="btn btn-sm btn-cb-danger" onclick="deleteSessionTodo(${t.id})">Delete</button>
-                    </div>
-                </div>
-            `).join('');
+        // FIX #8: delete by id
+        function deleteNote(id) {
+            fetch(`/api/notes/${id}`, { method: 'DELETE' })
+                .then(() => renderSessionNotes())
+                .catch(err => console.error('Error deleting note:', err));
         }
 
-        function setSessionTodoStatus(id, status) {
-            if (!streamSessionData) return;
-            
-            fetch(`/api/session/todos/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status })
-            }).then(() => loadActiveSession());
-
-            if (status === 'done') {
-                fetch('/triggereffect', {
+        // FIX #14: show note on stream via overlay API
+        async function showNoteOnStream(id, btn) {
+            const text = btn.closest('.todo-item').querySelector('span').textContent;
+            try {
+                await fetch('/api/stream/overlay', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ effectType: 'tododone' })
+                    body: JSON.stringify({ event: 'note', content: text })
                 });
+                showFeedback('Note sent to stream!');
+            } catch (err) {
+                console.error('Error showing note on stream:', err);
             }
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // FIX #9: Todos wired to /api/todos
+        async function renderSessionTodos() {
+            const container = document.getElementById('sessionTodosList');
+            try {
+                const res = await fetch('/api/todos');
+                const todos = await res.json();
+                if (!Array.isArray(todos) || todos.length === 0) {
+                    container.innerHTML = '<p class="text-muted">No todos yet</p>';
+                    return;
+                }
+                container.innerHTML = todos.map(t => `
+                    <div class="todo-item ${t.status || ''}">
+                        <span>${t.id}. ${escapeHtml(t.description)}</span>
+                        <div>
+                            <button class="btn btn-sm btn-cb" onclick="setSessionTodoStatus(${t.id}, 'new')">New</button>
+                            <button class="btn btn-sm btn-cb" onclick="setSessionTodoStatus(${t.id}, 'inProgress')">In Progress</button>
+                            <button class="btn btn-sm btn-cb-success" onclick="setSessionTodoStatus(${t.id}, 'done')">Done</button>
+                            <button class="btn btn-sm btn-cb-danger" onclick="deleteSessionTodo(${t.id})">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                container.innerHTML = '<p class="text-danger">Error loading todos</p>';
+            }
+        }
+
+        // FIX #9: PATCH /api/todos/:id
+        function setSessionTodoStatus(id, status) {
+            fetch(`/api/todos/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            }).then(() => {
+                renderSessionTodos();
+                if (status === 'done') {
+                    fetch('/triggereffect', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ effectType: 'tododone' })
+                    });
+                }
+            });
         }
 
         function deleteSessionTodo(id) {
-            if (!streamSessionData || !streamSessionData.Todos) return;
-            fetch(`/api/session/todos/${id}`, {
-                method: 'DELETE'
-            }).then(() => loadActiveSession());
+            fetch(`/api/todos/${id}`, { method: 'DELETE' })
+                .then(() => renderSessionTodos());
         }
 
-        // Session page - Reminders functions
-        function renderSessionReminders() {
-            const container = document.getElementById('sessionRemindersList');
-            if (!streamSessionData || !streamSessionData.Reminders || streamSessionData.Reminders.length === 0) {
-                container.innerHTML = '<p class="text-muted">No reminders yet</p>';
-                return;
-            }
-            container.innerHTML = streamSessionData.Reminders.map(r => `
-                <div class="reminder-item ${r.Status === 'inactive' ? 'inactive' : ''}">
-                    <span><strong>${r.Name}</strong>: ${r.Message}</span>
-                    <div>
-                        <button class="btn btn-sm btn-cb" onclick="setSessionReminderStatus(${r.id}, 'active')">Activate</button>
-                        <button class="btn btn-sm btn-cb-danger" onclick="setSessionReminderStatus(${r.id}, 'inactive')">Pause</button>
-                        <button class="btn btn-sm btn-cb-danger" onclick="deleteSessionReminder(${r.id})">Delete</button>
-                    </div>
-                </div>
-            `).join('');
-        }
+        // FIX #9: POST /api/todos
+        function addTodo() {
+            const text = document.getElementById('newTodoText').value.trim();
+            const modal = document.getElementById('addTodoModal');
+            const bsModal = bootstrap.Modal.getInstance(modal);
+            if (bsModal) bsModal.hide();
+            else modal.style.display = 'none';
+            if (!text) return;
 
-        function setSessionReminderStatus(id, status) {
-            if (!streamSessionData) return;
-            
-            fetch(`/api/session/reminders/${id}`, {
-                method: 'PUT',
+            fetch('/api/todos', {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status })
-            }).then(() => loadActiveSession());
+                body: JSON.stringify({ description: text })
+            }).then(() => {
+                document.getElementById('newTodoText').value = '';
+                renderSessionTodos();
+            }).catch(err => console.error('Error adding todo:', err));
+        }
+
+        // FIX #10 #13: Reminders wired to /api/reminders, delete button included
+        async function renderSessionReminders() {
+            const container = document.getElementById('sessionRemindersList');
+            try {
+                const res = await fetch('/api/reminders');
+                const reminders = await res.json();
+                if (!Array.isArray(reminders) || reminders.length === 0) {
+                    container.innerHTML = '<p class="text-muted">No reminders yet</p>';
+                    return;
+                }
+                container.innerHTML = reminders.map(r => `
+                    <div class="reminder-item">
+                        <span><strong>${escapeHtml(r.name)}</strong>${r.message ? ': ' + escapeHtml(r.message) : ''}</span>
+                        <div>
+                            <button class="btn btn-sm btn-cb-danger" onclick="deleteSessionReminder(${r.id})">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                container.innerHTML = '<p class="text-danger">Error loading reminders</p>';
+            }
         }
 
         function deleteSessionReminder(id) {
-            if (!streamSessionData || !streamSessionData.Reminders) return;
-            fetch(`/api/session/reminders/${id}`, {
-                method: 'DELETE'
-            }).then(() => loadActiveSession());
+            fetch(`/api/reminders/${id}`, { method: 'DELETE' })
+                .then(() => renderSessionReminders())
+                .catch(err => console.error('Error deleting reminder:', err));
+        }
+
+        // FIX #10: POST /api/reminders
+        function addReminder() {
+            const name = document.getElementById('newReminderName').value.trim();
+            const message = document.getElementById('newReminderMessage').value.trim();
+            const modal = document.getElementById('addReminderModal');
+            const bsModal = bootstrap.Modal.getInstance(modal);
+            if (bsModal) bsModal.hide();
+            else modal.style.display = 'none';
+            if (!name) return;
+
+            fetch('/api/reminders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, message })
+            }).then(() => {
+                document.getElementById('newReminderName').value = '';
+                document.getElementById('newReminderMessage').value = '';
+                renderSessionReminders();
+            }).catch(err => console.error('Error adding reminder:', err));
         }
 
         async function loadUsers() {

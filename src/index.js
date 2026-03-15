@@ -574,7 +574,7 @@ app.post('/api/todos', async (req, res) => {
     try {
         const session = await db.getActiveSession();
         if (!session) return res.status(400).json({ error: 'No active session.' });
-        const todo = await db.addTodo(session.id, description, 'pending');
+        const todo = await db.addTodo(session.id, description, 'new');
         res.json(todo);
     } catch (err) {
         console.error('Error adding todo:', err);
