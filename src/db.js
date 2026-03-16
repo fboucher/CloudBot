@@ -197,8 +197,8 @@ async function saveSessionData(sessionId, data) {
     await db.prepare("DELETE FROM reminders WHERE session_id = ?").run(sessionId);
     for (const reminder of data.Reminders) {
       await db.prepare(
-        "INSERT INTO reminders (session_id, name, message, status, last_check) VALUES (?, ?, ?, ?, ?)"
-      ).run(sessionId, reminder.Name, reminder.Message, reminder.Status, reminder.LastCheck || null);
+        "INSERT INTO reminders (session_id, name, message, status, last_check, interval) VALUES (?, ?, ?, ?, ?, ?)"
+      ).run(sessionId, reminder.Name, reminder.Message, reminder.Status, reminder.LastCheck || null, reminder.interval || 0);
     }
   }
 
@@ -303,7 +303,8 @@ async function loadSessionData(sessionId) {
     Name: r.name,
     Message: r.message,
     Status: r.status,
-    LastCheck: r.last_check
+    LastCheck: r.last_check,
+    interval: r.interval || 0
   }));
 
   data.TimeLogs = (await db.prepare("SELECT * FROM time_logs WHERE session_id = ?").all(sessionId)).map(l => ({

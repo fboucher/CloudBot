@@ -498,6 +498,13 @@ SetTodoStatus = function(id, status)
             console.log(`match!: ${_streamSession.Todos[i].id} - ${_streamSession.Todos[i].status}`);
             _streamSession.Todos[i].status = status;
             found = true;
+            
+            // Persist to DB
+            fetch(`/api/todos/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            }).catch(err => console.error('Error updating todo status:', err));
         }
     }
     RefreshTodosArea();
@@ -519,12 +526,12 @@ addReminder = function(name, message)
 
 
 
-SetReminderStatus = function(name, status)
+SetReminderStatus = function(id, status)
 {
     let found = false;
     const max = _streamSession.Reminders.length;
 
-    console.log(`... searching for!: ${name}`);
+    console.log(`... searching for!: ${id}`);
 
     for(i = 0; i < max && !found; i++){
         console.log(`Look at: ${_streamSession.Reminders[i].Name} - ${_streamSession.Reminders[i].Status}`);
@@ -532,6 +539,13 @@ SetReminderStatus = function(name, status)
             console.log(`match!: ${_streamSession.Reminders[i].Name} - ${_streamSession.Reminders[i].Status}`);
             _streamSession.Reminders[i].Status = status;
             found = true;
+            
+            // Persist to DB
+            fetch(`/api/session/reminders/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            }).catch(err => console.error('Error updating reminder status:', err));
         }
     }
 }
@@ -1203,6 +1217,8 @@ makeItRain = function() {
 let bannerTimer = null;
 let githubCache = {};
 const GITHUB_OWNER = 'fboucher'; // Default GitHub owner
+let bannerManualMode = false; // Track if banner is under manual control
+let currentBannerTimeout = null; // Track the hide timeout
 
 const bannerVariants = [
     { name: 'pixel', className: 'banner-pixel', image: 'public/medias/CB-Yeah.gif', alt: 'CloudBot Yeah', pixelate: false, useMarquee: true },
@@ -1302,26 +1318,62 @@ showProjectBanner = async function() {
     // Show banner with animation
     banner.classList.add('show');
 
-    // Hide banner after 60 seconds
-    setTimeout(() => {
-        banner.classList.remove('show');
-    }, 60000);
+    // Clear any existing hide timeout
+    if (currentBannerTimeout) {
+        clearTimeout(currentBannerTimeout);
+        currentBannerTimeout = null;
+    }
+
+    // Only auto-hide if not in manual mode
+    if (!bannerManualMode) {
+        currentBannerTimeout = setTimeout(() => {
+            banner.classList.remove('show');
+            currentBannerTimeout = null;
+        }, 60000);
+    }
 }
 
 hideProjectBanner = function() {
     const banner = document.getElementById('projectBanner');
     banner.classList.remove('show');
+    // Clear any pending hide timeout
+    if (currentBannerTimeout) {
+        clearTimeout(currentBannerTimeout);
+        currentBannerTimeout = null;
+    }
+}
+
+toggleProjectBannerDisplay = async function() {
+    const banner = document.getElementById('projectBanner');
+    
+    if (!banner) return;
+    
+    const isVisible = banner.classList.contains('show');
+    
+    if (isVisible) {
+        // Hide it
+        hideProjectBanner();
+        bannerManualMode = false; // Allow auto-timer to work again
+    } else {
+        // Show it
+        bannerManualMode = true; // Prevent auto-hide
+        await showProjectBanner();
+    }
 }
 
 startBannerTimer = function() {
-    // Show banner immediately on start
+    // Show banner immediately on start (only if not in manual mode)
     setTimeout(() => {
-        showProjectBanner();
+        if (!bannerManualMode) {
+            showProjectBanner();
+        }
     }, 5000); // Wait 5 seconds after page load
 
-    // Then show every 15 minutes (900000 ms)
+    // Then show every 15 minutes (900000 ms) - only if not in manual mode
     bannerTimer = setInterval(() => {
-        showProjectBanner();
+        if (!bannerManualMode) {
+            showProjectBanner();
+        }
     }, 900000);
 }
 
@@ -1607,6 +1659,10 @@ function handleEffect(effect) {
                 playSound('yeah', SoundEnum.yeah);
             }
             break;
+            
+        case 'toggleProjectBanner':
+            toggleProjectBannerDisplay();
+            break;
     }
 }
 
@@ -1628,6 +1684,21 @@ async function loadSessionFromDb() {
         const response = await fetch('/loadfromfile');
         const data = await response.json();
         
+        // Load core session properties
+        if (data.Id !== undefined) {
+            _streamSession.Id = data.Id;
+        }
+        if (data.Project !== undefined) {
+            _streamSession.Project = data.Project;
+        }
+        if (data.Title !== undefined) {
+            _streamSession.Title = data.Title;
+        }
+        if (data.DateTimeStart !== undefined) {
+            _streamSession.DateTimeStart = data.DateTimeStart;
+        }
+        
+        // Load arrays
         if (data.Todos) {
             _streamSession.Todos = data.Todos.map((o) => { 
                 const newTodo = new Todo(); 
@@ -1647,13 +1718,60 @@ async function loadSessionFromDb() {
                     newReminder[key] = value; 
                 } return newReminder; 
             });
+            RefreshRemindersArea();
         }
         
         if (data.Notes) {
             _streamSession.Notes = data.Notes;
         }
+        
+        if (data.UserSession) {
+            _streamSession.UserSession = data.UserSession.map((o) => { 
+                const newUser = new UserSession(); 
+                for (const [key, value] of Object.entries(o)) 
+                { 
+                    newUser[key] = value; 
+                } return newUser; 
+            });
+        }
+        
+        if (data.NewFollowers) {
+            _streamSession.NewFollowers = data.NewFollowers;
+        }
+        
+        if (data.Raiders) {
+            _streamSession.Raiders = data.Raiders.map((o) => { 
+                const newRaider = new Raider(); 
+                for (const [key, value] of Object.entries(o)) 
+                { 
+                    newRaider[key] = value; 
+                } return newRaider; 
+            });
+        }
+        
+        if (data.Subscribers) {
+            _streamSession.Subscribers = data.Subscribers;
+        }
+        
+        if (data.Hosts) {
+            _streamSession.Hosts = data.Hosts;
+        }
+        
+        if (data.Cheerers) {
+            _streamSession.Cheerers = data.Cheerers;
+        }
+        
+        if (data.TimeLogs) {
+            _streamSession.TimeLogs = data.TimeLogs.map((o) => { 
+                const newLog = new TimeLog(); 
+                for (const [key, value] of Object.entries(o)) 
+                { 
+                    newLog[key] = value; 
+                } return newLog; 
+            });
+        }
     } catch (err) {
-        // Silent fail
+        // Silent fail - session might not exist yet
     }
 }
 

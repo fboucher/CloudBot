@@ -368,9 +368,9 @@ app.get('/api/session/:id', async (req, res) => {
 app.patch('/api/session/:id', async (req, res) => {
     console.log('..updating session..');
     const id = parseInt(req.params.id);
-    const { project_name, stream_title, project_url } = req.body || {};
-    if (project_name === undefined && stream_title === undefined && project_url === undefined) {
-        return res.status(400).json({ error: 'Provide project_name, stream_title, and/or project_url to update.' });
+    const { project_name, stream_title, project_url, ended_at } = req.body || {};
+    if (project_name === undefined && stream_title === undefined && project_url === undefined && ended_at === undefined) {
+        return res.status(400).json({ error: 'Provide project_name, stream_title, project_url, and/or ended_at to update.' });
     }
     try {
         const c = await db.getClient();
@@ -382,6 +382,9 @@ app.patch('/api/session/:id', async (req, res) => {
         }
         if (project_url !== undefined) {
             await c.prepare("UPDATE stream_sessions SET project_url = ? WHERE id = ?").run(project_url, id);
+        }
+        if (ended_at !== undefined) {
+            await c.prepare("UPDATE stream_sessions SET ended_at = ? WHERE id = ?").run(ended_at, id);
         }
         const session = await db.getSessionById(id);
         console.log(`Session ${id} updated.`);
@@ -481,93 +484,110 @@ app.delete('/api/session/reminders/:id', async (req, res) => {
     }
 });
 
+// Helper function to generate and save show notes markdown
+async function generateAndSaveShowNotes(sessionId) {
+    const session = await db.getSessionById(sessionId);
+    if (!session) throw new Error(`Session ${sessionId} not found`);
+
+    const [notes, todos, reminders, users] = await Promise.all([
+        db.getNotes(session.id),
+        db.getTodos(session.id),
+        db.getReminders(session.id),
+        db.getSessionUsers(session.id)
+    ]);
+
+    const dateFormatted = session.started_at ? session.started_at.split('T')[0] : new Date().toISOString().split('T')[0];
+    
+    let md = `# Stream Notes — ${session.project_name || 'Untitled Project'}\n\n`;
+    md += `**Stream Title:** ${session.stream_title || 'No title'}\n`;
+    md += `**Date:** ${dateFormatted}\n`;
+    if (session.project_url && session.project_url.trim() !== '') {
+        md += `**Project:** All code for this project is available on GitHub: ${session.project_url}\n`;
+    }
+    md += `\n`;
+
+    md += `## Notes\n`;
+    if (notes.length === 0) {
+        md += `No notes recorded.\n`;
+    } else {
+        notes.forEach(n => { md += `- ${n.text}\n`; });
+    }
+    md += `\n`;
+
+    md += `## To-Dos\n`;
+    if (todos.length === 0) {
+        md += `No to-dos recorded.\n`;
+    } else {
+        todos.forEach(t => {
+            if (t.status === 'cancel') {
+                md += `- ~~${t.description}~~\n`;
+            } else {
+                const check = t.status === 'done' ? 'x' : ' ';
+                md += `- [${check}] ${t.description}\n`;
+            }
+        });
+    }
+    md += `\n`;
+
+    md += `## Reminders\n`;
+    if (reminders.length === 0) {
+        md += `No reminders recorded.\n`;
+    } else {
+        reminders.forEach(r => {
+            md += `- **${r.name}**: ${r.message}\n`;
+        });
+    }
+    md += `\n`;
+
+    md += `## Scores / Leaderboard\n`;
+    if (users.length === 0) {
+        md += `No scores recorded.\n`;
+    } else {
+        md += `| Username | High Score | Best Score | Drops |\n`;
+        md += `|----------|-----------|------------|-------|\n`;
+        users.forEach(u => {
+            md += `| ${u.username} | ${u.high_score} | ${u.best_high_score} | ${u.drop_count} |\n`;
+        });
+    }
+
+    const filename = `show-notes-${session.id}.md`;
+    const ioDir = path.join(__dirname, 'io');
+    
+    fs.mkdirSync(ioDir, { recursive: true });
+    
+    const filepath = path.join(ioDir, filename);
+    fs.writeFileSync(filepath, md, 'utf8');
+    
+    return { filename, content: md, filepath };
+}
+
 app.get('/api/export', async (req, res) => {
     try {
-        const session = await db.getActiveSession();
-        if (!session) return res.status(404).json({ error: 'No active session' });
+        let session = null;
+        const { sessionId } = req.query;
 
-        const [notes, todos, reminders, users] = await Promise.all([
-            db.getNotes(session.id),
-            db.getTodos(session.id),
-            db.getReminders(session.id),
-            db.getSessionUsers(session.id)
-        ]);
-
-        const dateFormatted = session.started_at ? session.started_at.split('T')[0] : new Date().toISOString().split('T')[0];
-        
-        let md = `# Stream Notes — ${session.project_name || 'Untitled Project'}\n\n`;
-        md += `**Stream Title:** ${session.stream_title || 'No title'}\n`;
-        md += `**Date:** ${dateFormatted}\n`;
-        if (session.project_url && session.project_url.trim() !== '') {
-            md += `**Project:** All code for this project is available on GitHub: ${session.project_url}\n`;
-        }
-        md += `\n`;
-
-        md += `## Notes\n`;
-        if (notes.length === 0) {
-            md += `No notes recorded.\n`;
+        if (sessionId) {
+            session = await db.getSessionById(sessionId);
         } else {
-            notes.forEach(n => { md += `- ${n.text}\n`; });
-        }
-        md += `\n`;
-
-        md += `## To-Dos\n`;
-        if (todos.length === 0) {
-            md += `No to-dos recorded.\n`;
-        } else {
-            todos.forEach(t => {
-                if (t.status === 'cancel') {
-                    md += `- ~~${t.description}~~\n`;
-                } else {
-                    const check = t.status === 'done' ? 'x' : ' ';
-                    md += `- [${check}] ${t.description}\n`;
-                }
-            });
-        }
-        md += `\n`;
-
-        md += `## Reminders\n`;
-        if (reminders.length === 0) {
-            md += `No reminders recorded.\n`;
-        } else {
-            reminders.forEach(r => {
-                md += `- **${r.name}**: ${r.message}\n`;
-            });
-        }
-        md += `\n`;
-
-        md += `## Scores / Leaderboard\n`;
-        if (users.length === 0) {
-            md += `No scores recorded.\n`;
-        } else {
-            md += `| Username | High Score | Best Score | Drops |\n`;
-            md += `|----------|-----------|------------|-------|\n`;
-            users.forEach(u => {
-                md += `| ${u.username} | ${u.high_score} | ${u.best_high_score} | ${u.drop_count} |\n`;
-            });
+            session = await db.getActiveSession();
         }
 
-        const filename = `show-notes-${session.id}.md`;
-        const ioDir = path.join(__dirname, 'io');
+        if (!session) {
+            const lastSession = await db.getAllSessions();
+            if (lastSession && lastSession.length > 0) {
+                session = lastSession[0];
+            }
+        }
+
+        if (!session) return res.status(404).json({ error: 'No session found to export' });
+
+        const { filename, content } = await generateAndSaveShowNotes(session.id);
         
-        try {
-            fs.mkdirSync(ioDir, { recursive: true });
-        } catch (dirErr) {
-            console.error('Error creating io directory:', dirErr);
-        }
+        console.log(`Export saved to src/io/${filename}`);
         
-        const filepath = path.join(ioDir, filename);
-        
-        try {
-            fs.writeFileSync(filepath, md, 'utf8');
-            console.log(`Export saved to ${filepath}`);
-        } catch (writeErr) {
-            console.error('Error writing export file:', writeErr);
-        }
-
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.setHeader('Content-Type', 'text/markdown');
-        res.send(md);
+        res.send(content);
     } catch (err) {
         console.error('Error exporting session:', err);
         res.status(500).json({ error: 'Failed to export session.' });
@@ -603,6 +623,16 @@ app.post('/api/stream/stop', async (req, res) => {
         await db.endStreamSession(session.id);
         broadcastSSE({ event: 'stream_stopped', sessionId: session.id });
         console.log(`Stream stopped: session=${session.id}`);
+        
+        // Auto-generate show notes markdown file
+        try {
+            const { filename, filepath } = await generateAndSaveShowNotes(session.id);
+            console.log(`Show notes auto-saved to src/io/${filename}`);
+        } catch (exportErr) {
+            console.error('Failed to auto-generate show notes:', exportErr);
+            // Don't fail the stop endpoint if show notes generation fails
+        }
+        
         res.json({ msg: 'Stream stopped.', sessionId: session.id });
     } catch (err) {
         console.error('Error stopping stream:', err);

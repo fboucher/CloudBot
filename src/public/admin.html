@@ -393,8 +393,8 @@
                                 <button class="btn btn-cb btn-sm" onclick="showAttentionPrompt()">
                                     <i class="bi bi-exclamation-triangle"></i> Attention
                                 </button>
-                                <button class="btn btn-cb btn-sm" onclick="showHelloPrompt()">
-                                    <i class="bi bi-emoji-smile"></i> Hello
+                                <button class="btn btn-cb btn-sm" onclick="toggleProjectBanner()">
+                                    <i class="bi bi-folder"></i> Project
                                 </button>
                                 <button class="btn btn-cb btn-sm" onclick="triggerDrop()">
                                     <i class="bi bi-arrow-down-circle"></i> Drop
@@ -930,6 +930,7 @@
                         <td>${s.ended_at ? new Date(s.ended_at).toLocaleString() : 'Active'}</td>
                         <td>
                             <button class="btn btn-sm btn-cb" onclick="viewSession(${s.id})">View</button>
+                            <button class="btn btn-sm btn-cb" onclick="exportSession(${s.id})">Export</button>
                         </td>
                     </tr>
                 `).join('');
@@ -945,6 +946,38 @@
                 alert(`Session ${id}\nProject: ${data.project_name}\nStarted: ${data.started_at}`);
             } catch (err) {
                 console.error('Error loading session:', err);
+            }
+        }
+
+        async function exportSession(sessionId) {
+            try {
+                const url = sessionId ? `/api/export?sessionId=${sessionId}` : '/api/export';
+                const response = await fetch(url);
+                if (!response.ok) {
+                    showFeedback('Export failed: ' + response.statusText);
+                    return false;
+                }
+                const markdown = await response.text();
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'show-notes.md';
+                if (contentDisposition) {
+                    const match = contentDisposition.match(/filename="?(.+?)"?$/);
+                    if (match) filename = match[1];
+                }
+                
+                const blob = new Blob([markdown], { type: 'text/markdown' });
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(blobUrl);
+                showFeedback('Export successful');
+                return true;
+            } catch (err) {
+                console.error('Export error:', err);
+                showFeedback('Export failed');
+                return false;
             }
         }
 
@@ -1281,24 +1314,10 @@
         document.getElementById('saveSessionBtn').addEventListener('click', saveCurrentSession);
 
         document.getElementById('exportNotesBtn').addEventListener('click', async () => {
-            try {
-                const response = await fetch('/api/export');
-                if (!response.ok) {
-                    showFeedback('Export failed: ' + response.statusText);
-                    return;
-                }
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'session-export.md';
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                a.remove();
-            } catch (err) {
-                console.error('Export error:', err);
-                showFeedback('Export failed');
+            const sessionId = currentSession ? currentSession.id : null;
+            const success = await exportSession(sessionId);
+            if (!success) {
+                console.error('Export failed for session:', sessionId);
             }
         });
 
@@ -1367,32 +1386,19 @@
             }
         }
 
-        async function showHelloPrompt() {
-            const user = prompt('Enter username:');
-            if (user) {
-                try {
-                    const response = await fetch('/Hello', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ user })
-                    });
-                    const result = await response.json();
-                    
-                    await fetch('/triggereffect', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            effectType: 'hello', 
-                            user: user,
-                            image: result.msg
-                        })
-                    });
-                    
-                    showFeedback(`Hello triggered for ${user}`);
-                } catch (err) {
-                    console.error('Error:', err);
-                    showFeedback('Error: ' + err.message);
-                }
+        async function toggleProjectBanner() {
+            try {
+                await fetch('/triggereffect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        effectType: 'toggleProjectBanner'
+                    })
+                });
+                showFeedback('Project banner toggled');
+            } catch (err) {
+                console.error('Error:', err);
+                showFeedback('Error: ' + err.message);
             }
         }
 
