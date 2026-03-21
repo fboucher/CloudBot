@@ -4,14 +4,8 @@ const fs = require('fs');
 const dateFormat = require('dateformat');
 const pkg = require('./package.json');
 const BUILD_DATE = new Date().toISOString().split('T')[0];
-let text2png;
-try {
-    text2png = require('text2png');
-} catch (e) {
-    console.warn('text2png not available, image generation disabled');
-}
+const text2png = require('text2png');
 const db = require('./db');
-
 const app = express();
 const port = 3000;
 
@@ -486,78 +480,115 @@ app.delete('/api/session/reminders/:id', async (req, res) => {
 
 // Helper function to generate and save show notes markdown
 async function generateAndSaveShowNotes(sessionId) {
-    const session = await db.getSessionById(sessionId);
-    if (!session) throw new Error(`Session ${sessionId} not found`);
+    const s = await db.loadSessionData(sessionId);
+    if (!s) throw new Error(`Session ${sessionId} not found`);
 
-    const [notes, todos, reminders, users] = await Promise.all([
-        db.getNotes(session.id),
-        db.getTodos(session.id),
-        db.getReminders(session.id),
-        db.getSessionUsers(session.id)
-    ]);
+    const date = s.DateTimeStart ? s.DateTimeStart.split('T')[0] : new Date().toISOString().split('T')[0];
+    const title = s.Title && s.Title.trim() ? s.Title : `_____ (stream ${sessionId})`;
 
-    const dateFormatted = session.started_at ? session.started_at.split('T')[0] : new Date().toISOString().split('T')[0];
-    
-    let md = `# Stream Notes — ${session.project_name || 'Untitled Project'}\n\n`;
-    md += `**Stream Title:** ${session.stream_title || 'No title'}\n`;
-    md += `**Date:** ${dateFormatted}\n`;
-    if (session.project_url && session.project_url.trim() !== '') {
-        md += `**Project:** All code for this project is available on GitHub: ${session.project_url}\n`;
-    }
-    md += `\n`;
+    // ── Front matter ──────────────────────────────────────────────────────────
+    let md = `---\nlayout: post\ntitle: ${title}\n`;
+    md += `featured-image: https://img.youtube.com/vi/_________/hqdefault.jpg\n`;
+    md += `date: ${date}  06:30 -0500\n`;
+    md += `categories:  ${s.Project}\n---\n\n## Summary\n\n\n\n`;
+    md += `📺 - Twitch archive - stream no. ${sessionId}\n\n`;
+    md += `\n## Replay\n\n{% include youtube.html id="_________" %}\n\n`;
+    md += `<br/><!--more-->\n`;
 
-    md += `## Notes\n`;
-    if (notes.length === 0) {
-        md += `No notes recorded.\n`;
-    } else {
-        notes.forEach(n => { md += `- ${n.text}\n`; });
-    }
-    md += `\n`;
+    // ── Project ───────────────────────────────────────────────────────────────
+    md += `\n### Project\n\n`;
+    const projectUrl = s.ProjectUrl && s.ProjectUrl.trim()
+        ? s.ProjectUrl
+        : `https://github.com/FBoucher/${s.Project}`;
+    md += `All the code for this project is available on GitHub: ${s.Project} - ${projectUrl}\n`;
 
-    md += `## To-Dos\n`;
-    if (todos.length === 0) {
-        md += `No to-dos recorded.\n`;
-    } else {
-        todos.forEach(t => {
+    // ── To-Dos ────────────────────────────────────────────────────────────────
+    if (s.Todos.length > 0) {
+        md += `\n### ToDos\n\n`;
+        s.Todos.forEach(t => {
             if (t.status === 'cancel') {
-                md += `- ~~${t.description}~~\n`;
+                md += `- ~~[ ] ${t.description}~~\n`;
             } else {
-                const check = t.status === 'done' ? 'x' : ' ';
-                md += `- [${check}] ${t.description}\n`;
+                const check = t.status === 'done' ? 'X' : ' ';
+                const bold  = t.status === 'inProgress' ? '**' : '';
+                md += `- [${check}] ${bold}${t.description}${bold}\n`;
             }
         });
     }
-    md += `\n`;
 
-    md += `## Reminders\n`;
-    if (reminders.length === 0) {
-        md += `No reminders recorded.\n`;
-    } else {
-        reminders.forEach(r => {
-            md += `- **${r.name}**: ${r.message}\n`;
-        });
-    }
-    md += `\n`;
-
-    md += `## Scores / Leaderboard\n`;
-    if (users.length === 0) {
-        md += `No scores recorded.\n`;
-    } else {
-        md += `| Username | High Score | Best Score | Drops |\n`;
-        md += `|----------|-----------|------------|-------|\n`;
-        users.forEach(u => {
-            md += `| ${u.username} | ${u.high_score} | ${u.best_high_score} | ${u.drop_count} |\n`;
-        });
+    // ── Time logs ─────────────────────────────────────────────────────────────
+    if (s.TimeLogs.length > 0) {
+        md += `\n### TimeLogs\n\n`;
+        md += `    00:00:00 Intro\n    00:00:10 Bonjour, Hi!\n`;
+        s.TimeLogs.forEach(l => { md += `    ${l.time} ${l.message}\n`; });
     }
 
-    const filename = `show-notes-${session.id}.md`;
+    // ── Cloudies ──────────────────────────────────────────────────────────────
+    if (s.NewFollowers.length > 0) {
+        md += `\n### New Followers\n\n`;
+        s.NewFollowers.forEach(u => { md += `- [@${u}](https://www.twitch.tv/${u})\n`; });
+    }
+
+    if (s.Raiders.length > 0) {
+        md += `\n### Raids\n\n`;
+        s.Raiders.forEach(r => { md += `- [@${r.user}](https://www.twitch.tv/${r.user}) has raided you with a party of ${r.viewers}\n`; });
+    }
+
+    if (s.Hosts.length > 0) {
+        md += `\n### Hosts\n\n`;
+        s.Hosts.forEach(u => { md += `- [@${u}](https://www.twitch.tv/${u})\n`; });
+    }
+
+    if (s.Cheerers.length > 0) {
+        md += `\n### Cheers\n\n`;
+        s.Cheerers.forEach(c => { md += `- [@${c.user}](https://www.twitch.tv/${c.user})  ${c.bits} bits\n`; });
+    }
+
+    // ── Game results ──────────────────────────────────────────────────────────
+    if (s.UserSession.length > 0) {
+        md += `\n### Game Results\n\n`;
+        const sorted = [...s.UserSession].sort((a, b) => b.highScore - a.highScore);
+        sorted.forEach(u => { md += `- [@${u.user}](https://www.twitch.tv/${u.user}): ${u.highScore}\n`; });
+
+        let bestScoreUser = null, biggestLoser = null, luckiest = null, superParticipant = null;
+        let maxScore = -Infinity, maxDrop = -Infinity, minDropForMaxScore = Infinity, maxDropLoser = -Infinity;
+
+        s.UserSession.forEach(u => {
+            if (u.highScore > maxScore) { maxScore = u.highScore; bestScoreUser = u; }
+            if (u.dropCount > maxDrop)  { maxDrop = u.dropCount;  superParticipant = u; }
+            if (u.bestHighScore == 0 && u.dropCount > maxDropLoser) { maxDropLoser = u.dropCount; biggestLoser = u; }
+        });
+        s.UserSession.forEach(u => {
+            if (u.highScore === maxScore && u.dropCount < minDropForMaxScore) {
+                minDropForMaxScore = u.dropCount; luckiest = u;
+            }
+        });
+
+        md += `\n#### Statistics\n\n`;
+        if (bestScoreUser)   md += `- 🏆Best score: [@${bestScoreUser.user}](https://www.twitch.tv/${bestScoreUser.user}) with ${bestScoreUser.highScore}\n`;
+        if (biggestLoser)    md += `- 😭Biggest loser: [@${biggestLoser.user}](https://www.twitch.tv/${biggestLoser.user}) with ${biggestLoser.dropCount} drops and no high score\n`;
+        if (luckiest)        md += `- 🍀Luckiest: [@${luckiest.user}](https://www.twitch.tv/${luckiest.user}) with best score ${luckiest.highScore} and only ${luckiest.dropCount} drops\n`;
+        if (superParticipant) md += `- 🎖️Super participant: [@${superParticipant.user}](https://www.twitch.tv/${superParticipant.user}) with ${superParticipant.dropCount} drops\n`;
+    }
+
+    // ── Notes / References ────────────────────────────────────────────────────
+    if (s.Notes.length > 0) {
+        md += `\n### Notes/ References / Snippets\n\n`;
+        s.Notes.forEach(n => { md += `- ${n}\n`; });
+    }
+
+    // ── Reminders (for record-keeping) ────────────────────────────────────────
+    if (s.Reminders.length > 0) {
+        md += `\n### Reminders\n\n`;
+        s.Reminders.forEach(r => { md += `- **${r.Name}**: ${r.Message}\n`; });
+    }
+
+    const filename = `${date}-${sessionId}-${s.Project}.md`;
     const ioDir = path.join(__dirname, 'io');
-    
     fs.mkdirSync(ioDir, { recursive: true });
-    
     const filepath = path.join(ioDir, filename);
     fs.writeFileSync(filepath, md, 'utf8');
-    
+
     return { filename, content: md, filepath };
 }
 

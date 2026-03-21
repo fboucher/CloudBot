@@ -1600,10 +1600,10 @@ function handleEffect(effect) {
             playSound('hmmhmm', SoundEnum.hmmhmm);
             break;
             
-        case 'drop':
-            cloud('Wow');
-            playSound('yeah', SoundEnum.yeah);
-            break;
+        // case 'drop':
+        //     cloud('Wow');
+        //     playSound('yeah', SoundEnum.yeah);
+        //     break;
             
         case 'rain':
             {
@@ -1622,7 +1622,6 @@ function handleEffect(effect) {
                 stopSound('rain', SoundEnum.rain, true);
                 const sky = document.getElementById('sky');
                 if (sky) sky.className = 'lightcloud';
-                cloud('Yeah');
             }
             break;
             
