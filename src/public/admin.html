@@ -567,6 +567,12 @@
                         <label class="form-label">Stream Title</label>
                         <input type="text" class="form-control bg-dark text-light border-secondary" id="modalTitleInput" placeholder="Stream title…">
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">Stream Counter</label>
+                        <input type="number" class="form-control bg-dark text-light border-secondary" id="modalCounterInput" min="1" step="1" placeholder="Stream counter…">
+                        <div class="form-text text-muted" id="modalCounterHint"></div>
+                        <div class="text-danger small mt-1 d-none" id="modalCounterError">Must be a positive integer.</div>
+                    </div>
                 </div>
                 <div class="modal-footer border-secondary">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -679,22 +685,65 @@
 
         function setupSessionConfigModal() {
             sessionConfigModal = new bootstrap.Modal(document.getElementById('sessionConfigModal'));
-            
-            document.getElementById('configureSessionBtn').addEventListener('click', () => {
+
+            document.getElementById('configureSessionBtn').addEventListener('click', async () => {
                 document.getElementById('modalProjectInput').value = sessionProjectName;
                 document.getElementById('modalTitleInput').value = sessionStreamTitle;
+
+                // Load current counter value
+                try {
+                    const resp = await fetch('/getstreamcounter');
+                    const data = await resp.json();
+                    const current = data.currentStreamNumber || 0;
+                    const counterInput = document.getElementById('modalCounterInput');
+                    counterInput.value = current;
+                    document.getElementById('modalCounterHint').textContent = `Next stream will be #${current + 1}`;
+                    // Lock during active session
+                    counterInput.disabled = !!currentSession;
+                } catch (e) {
+                    document.getElementById('modalCounterHint').textContent = '';
+                }
+                document.getElementById('modalCounterError').classList.add('d-none');
+
                 sessionConfigModal.show();
             });
 
-            document.getElementById('saveSessionConfigBtn').addEventListener('click', () => {
+            document.getElementById('modalCounterInput').addEventListener('input', () => {
+                const val = parseInt(document.getElementById('modalCounterInput').value, 10);
+                document.getElementById('modalCounterHint').textContent = Number.isInteger(val) && val >= 1
+                    ? `Next stream will be #${val + 1}`
+                    : '';
+            });
+
+            document.getElementById('saveSessionConfigBtn').addEventListener('click', async () => {
                 const project = document.getElementById('modalProjectInput').value.trim();
                 const title = document.getElementById('modalTitleInput').value.trim();
-                
+
                 if (!project || !title) {
                     alert('Both project name and stream title are required');
                     return;
                 }
-                
+
+                // Validate and save counter (only when not live)
+                if (!currentSession) {
+                    const counterVal = parseInt(document.getElementById('modalCounterInput').value, 10);
+                    if (!Number.isInteger(counterVal) || counterVal < 1) {
+                        document.getElementById('modalCounterError').classList.remove('d-none');
+                        return;
+                    }
+                    document.getElementById('modalCounterError').classList.add('d-none');
+                    try {
+                        await fetch('/api/stream/counter', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ value: counterVal })
+                        });
+                    } catch (e) {
+                        alert('Failed to save stream counter');
+                        return;
+                    }
+                }
+
                 sessionProjectName = project;
                 sessionStreamTitle = title;
                 updateSessionInfoDisplay();

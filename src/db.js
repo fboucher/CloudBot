@@ -356,6 +356,13 @@ async function incrementStreamCounter() {
   return { currentStreamNumber: newNumber, lastStreamDate: today };
 }
 
+async function setStreamCounter(value) {
+  if (!db) await initDb();
+  const today = new Date().toISOString().split('T')[0];
+  await db.prepare("UPDATE stream_counter SET current_stream_number = ?, last_stream_date = ? WHERE id = 1").run(value, today);
+  return { currentStreamNumber: value, lastStreamDate: today };
+}
+
 async function updateNotes(sessionId, notes) {
   if (!db) await initDb();
   await db.prepare("UPDATE stream_sessions SET notes = ? WHERE id = ?").run(JSON.stringify(notes), sessionId);
@@ -468,6 +475,7 @@ module.exports = {
   loadSessionData,
   getStreamCounter,
   incrementStreamCounter,
+  setStreamCounter,
   updateNotes,
   addNote,
   getNotes,

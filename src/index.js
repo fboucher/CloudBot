@@ -155,6 +155,21 @@ app.post('/incrementstreamcounter', async (req, res) => {
     }
 });
 
+app.patch('/api/stream/counter', async (req, res) => {
+    const { value } = req.body;
+    const parsed = parseInt(value, 10);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+        return res.status(400).json({ error: 'Value must be a positive integer.' });
+    }
+    try {
+        const counter = await db.setStreamCounter(parsed);
+        res.json({ currentStreamNumber: counter.currentStreamNumber, lastStreamDate: counter.lastStreamDate });
+    } catch (err) {
+        console.error('Error setting counter:', err);
+        res.status(500).json({ error: 'Failed to set counter.' });
+    }
+});
+
 app.post('/genstreamnotes', (req, res) => {
     console.log('..generating stream notes..');
     if (!req.body || !req.body.project || !req.body.id || !req.body.notes) {
