@@ -526,27 +526,36 @@ addReminder = function(name, message)
 
 
 
-SetReminderStatus = function(id, status)
+SetReminderStatus = function(reminderName, status)
 {
     let found = false;
     const max = _streamSession.Reminders.length;
+    const searchName = reminderName.trim();
 
-    console.log(`... searching for!: ${id}`);
+    console.log(`... searching for reminder: ${searchName}`);
 
     for(i = 0; i < max && !found; i++){
-        console.log(`Look at: ${_streamSession.Reminders[i].Name} - ${_streamSession.Reminders[i].Status}`);
-        if(_streamSession.Reminders[i].id == id){
-            console.log(`match!: ${_streamSession.Reminders[i].Name} - ${_streamSession.Reminders[i].Status}`);
-            _streamSession.Reminders[i].Status = status;
+        const r = _streamSession.Reminders[i];
+        console.log(`Look at: ${r.Name} - ${r.Status}`);
+        if(r.Name && r.Name.trim() === searchName){
+            console.log(`match!: ${r.Name} - ${r.Status}`);
+            r.Status = status;
             found = true;
-            
-            // Persist to DB
-            fetch(`/api/session/reminders/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status })
-            }).catch(err => console.error('Error updating reminder status:', err));
+
+            // Use the numeric DB id for the API call
+            const numericId = r.id;
+            if(numericId){
+                fetch(`/api/session/reminders/${numericId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                }).catch(err => console.error('Error updating reminder status:', err));
+            }
         }
+    }
+
+    if(!found){
+        console.log(`... reminder not found: ${searchName}`);
     }
 }
 
@@ -565,9 +574,8 @@ SaveToFile = function(verbose = true)
     fetch('/savetofile', options)
     .then(response => response.json())
     .then(result => {
-        //console.log('Success:', result);
-        if(verbose){
-            ChatBotSay(result.msg);
+        if(verbose && result.success){
+            ChatBotSay('Session saved!');
         }
     })
     .catch(error => {
@@ -752,53 +760,35 @@ ResetHightScore = function()
 
 StreamNoteStart = async function(projectName)
 {
+    const projectUrl = projectName ? `https://github.com/FBoucher/${projectName}` : '';
 
-    LoadFromFile(projectName, false, function(projectName){
-        //console.log('.. the project name: ', projectName);
-        //console.log('.. streamSession before : ', _streamSession);
-        
-        // Get the current stream counter and increment it
-        fetch('/incrementstreamcounter', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'}
-        })
-        .then(response => response.json())
-        .then(counterData => {
-            _streamSession.Id = counterData.currentStreamNumber;
-            _streamSession.Project = projectName;
-            _streamSession.DateTimeStart = new Date();
-            console.log('.. streamSession just after : ', _streamSession);
-            // Display banner immediately when project is set
-            showProjectBanner();
-        })
-        .catch(error => {
-            console.error('Error loading stream counter:', error);
-            // Fallback to random if counter fails
-            if(_streamSession.id == undefined || _streamSession.id == null || _streamSession.id == 0){
-                _streamSession.Id = Math.floor((Math.random() * 100));
-            }
-            _streamSession.Project = projectName;
-            _streamSession.DateTimeStart = new Date();
-            console.log('.. streamSession just after (fallback): ', _streamSession);
-            // Display banner immediately when project is set
-            showProjectBanner();
-        });
-
-        // Persist session start to DB via REST API
-        // Auto-generate GitHub URL using the same format as GenerateSessiontInfo()
-        const projectUrl = projectName ? `https://github.com/FBoucher/${projectName}` : '';
-        
-        fetch('/api/stream/start', {
+    try {
+        const response = await fetch('/api/stream/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                projectName: projectName || 'Chat Session', 
+            body: JSON.stringify({
+                projectName: projectName || 'Chat Session',
                 streamTitle: _streamSession.Title || '',
                 projectUrl: projectUrl
             })
-        }).catch(err => console.error('Failed to start session in DB:', err));
-    });
+        });
+        const data = await response.json();
 
+        _streamSession.Id = data.streamNumber;
+        _streamSession.Project = projectName;
+        _streamSession.DateTimeStart = new Date();
+        console.log('.. stream started, session:', data.sessionId, 'stream#', data.streamNumber);
+
+        // Load full session state from DB (scores, todos, etc.)
+        await loadSessionFromDb();
+        showProjectBanner();
+    } catch (err) {
+        console.error('Failed to start stream session:', err);
+        // Fallback: update local state and show banner anyway
+        _streamSession.Project = projectName;
+        _streamSession.DateTimeStart = new Date();
+        showProjectBanner();
+    }
 }
 
 
@@ -807,8 +797,8 @@ StreamNoteStart = async function(projectName)
 
 StreamNoteStop = function()
 {
-    _streamSession.DateTimeEnd = new Date(); 
-    SaveToFile();
+    _streamSession.DateTimeEnd = new Date();
+    SaveToFile(false); // false = no chat announcement; DB is source of truth
     console.log('_streamSession: ', _streamSession);
     let streamNotes = Generate_streamSession();
     console.log('Notes: ', streamNotes);
@@ -1638,18 +1628,25 @@ function handleEffect(effect) {
             
         case 'startproject':
             if (effect.project) {
+                // Admin panel already created the DB session via /api/stream/start.
+                // Just sync state from DB and show the banner — do NOT call
+                // StreamNoteStart here, which would create a duplicate session.
                 _streamSession.Project = effect.project;
-                StreamNoteStart(effect.project);
+                _streamSession.DateTimeStart = new Date().toISOString();
+                loadSessionFromDb().then(() => showProjectBanner());
             }
             break;
-            
+
         case 'stopproject':
             {
-                document.getElementById('streamNotesPanel').style.display = 'block';
-                let streamNotes = Generate_streamSession();
-                const content = document.getElementById('streamNotesContent');
-                content.innerHTML = markdownToHtml(streamNotes);
-                startStreamNotesScroll();
+                // Load latest state before generating notes, then show panel.
+                loadSessionFromDb().then(() => {
+                    document.getElementById('streamNotesPanel').style.display = 'block';
+                    let streamNotes = Generate_streamSession();
+                    const content = document.getElementById('streamNotesContent');
+                    content.innerHTML = markdownToHtml(streamNotes);
+                    startStreamNotesScroll();
+                });
             }
             break;
             
@@ -1711,14 +1708,13 @@ async function loadSessionFromDb() {
         }
         
         if (data.Reminders) {
-            _streamSession.Reminders = data.Reminders.map((o) => { 
-                const newReminder = new Reminder(); 
-                for (const [key, value] of Object.entries(o)) 
-                { 
-                    newReminder[key] = value; 
-                } return newReminder; 
+            _streamSession.Reminders = data.Reminders.map((o) => {
+                const newReminder = new Reminder();
+                for (const [key, value] of Object.entries(o))
+                {
+                    newReminder[key] = value;
+                } return newReminder;
             });
-            RefreshRemindersArea();
         }
         
         if (data.Notes) {

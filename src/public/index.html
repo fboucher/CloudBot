@@ -975,21 +975,6 @@
             }
 
 
-            //== SOUNDS Section =====================================
-            //== 
-            else if (flags.broadcaster && command === "ok-bye") {
-                ComfyJS.Disconnect();
-            }
-            else if (flags.broadcaster && command === "talk") {
-                ChatBotSay();
-            }
-            else if (command === "cloud") {
-                cloud("Thumbs-up");
-            }
-            else if (flags.broadcaster && command === "clean") {
-                console.log("!clean was typed in chat");
-                clean();
-            }
             else if (flags.broadcaster && command === "hello") {
                 console.log("-->streamSession: ", _streamSession);
                 hello(user);
