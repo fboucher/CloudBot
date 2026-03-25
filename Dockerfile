@@ -21,17 +21,16 @@ RUN npm install && npm ls text2png
 
 # Bundle app source
 COPY src/. .
-EXPOSE 80 3000
-RUN mkdir -p /usr/src/app/io
-VOLUME [ "/usr/src/app/io" ]
 
 # Create non-root user and switch
 RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 
-# Ensure writable dirs for runtime
-RUN mkdir -p /usr/src/app/public/medias/generated \
+# Ensure writable dirs for runtime (MUST be after COPY to not get overwritten)
+RUN mkdir -p /usr/src/app/public/medias/generated /usr/src/app/io \
   && chown -R appuser:appgroup /usr/src/app/public /usr/src/app/io
 
+EXPOSE 80 3000
+VOLUME [ "/usr/src/app/io" ]
 USER appuser
 
 # Healthcheck (simple: check if port 3000 is open)
