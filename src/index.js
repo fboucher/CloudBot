@@ -8,8 +8,33 @@ const text2png = require('text2png');
 const db = require('./db');
 const app = express();
 const port = 3000;
+const DEFAULT_GENERATED_DIR = path.join(__dirname, 'public', 'medias', 'generated');
+const FALLBACK_GENERATED_DIR = path.join('/tmp', 'cloudbot-generated');
+
+function resolveGeneratedDir() {
+    const preferredDir = process.env.CLOUDBOT_GENERATED_DIR || DEFAULT_GENERATED_DIR;
+    const candidates = [preferredDir, FALLBACK_GENERATED_DIR];
+
+    for (const dir of candidates) {
+        try {
+            fs.mkdirSync(dir, { recursive: true });
+            fs.accessSync(dir, fs.constants.W_OK);
+            if (dir !== preferredDir) {
+                console.warn(`Generated image directory is not writable: ${preferredDir}. Using fallback: ${dir}`);
+            }
+            return dir;
+        } catch (err) {
+            console.warn(`Generated image directory unavailable: ${dir} (${err.code || err.message})`);
+        }
+    }
+
+    throw new Error('No writable directory available for generated images.');
+}
+
+const GENERATED_DIR = resolveGeneratedDir();
 
 app.use('/public', express.static(path.join(__dirname, 'public')));
+app.use('/public/medias/generated', express.static(GENERATED_DIR));
 app.use('/io', express.static(path.join(__dirname, 'io')));
 app.use(express.json());
 
@@ -951,13 +976,8 @@ function createImage(imageName, message) {
         console.error('createImage: text2png is not available');
         return null;
     }
-    const dir = path.join(__dirname, 'public', 'medias', 'generated');
     try {
-        if (!fs.existsSync(dir)) {
-            console.log(`createImage: creating directory ${dir}`);
-            fs.mkdirSync(dir, { recursive: true });
-        }
-        const filePath = path.join(dir, imageName);
+        const filePath = path.join(GENERATED_DIR, imageName);
         console.log(`createImage: writing to ${filePath}`);
         const imageData = text2png(message, {
             color: 'white',
@@ -975,7 +995,7 @@ function createImage(imageName, message) {
 }
 
 function CleanUpGeneratedImages() {
-    const directory = path.join(__dirname, 'public', 'medias', 'generated');
+    const directory = GENERATED_DIR;
     if (!fs.existsSync(directory)) {
         console.log('--> trace: generated folder does not exist.');
         return;
