@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install app dependencies (tolerates older lockfiles)
 COPY ./src/package*.json ./
-RUN npm install --omit=dev
+RUN npm install && npm ls text2png
 
 # Bundle app source
 COPY src/. .

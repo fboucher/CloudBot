@@ -1414,6 +1414,14 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ user: 'Admin', message: msg })
                     });
+                    
+                    if (!response.ok) {
+                        const error = await response.json();
+                        console.error('Image generation failed:', error);
+                        showFeedback('Error: ' + (error.error || 'Failed to generate image'));
+                        return;
+                    }
+                    
                     const result = await response.json();
                     
                     await fetch('/triggereffect', {

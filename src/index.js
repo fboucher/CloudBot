@@ -27,12 +27,29 @@ app.post('/Hello', (req, res) => {
         let filename = dateFormat(new Date(), 'yyyy-mm-dd-HHMM') + `_hello-${user}.png`;
         console.log(`new image: ${filename}`);
         const msg = `Hello ${user}!`;
+        
+        if (!text2png) {
+            console.error('/Hello: text2png is not available');
+            return res.status(500).json({ error: 'Image generation is disabled. text2png is not installed.' });
+        }
+        
         try {
-            createImage(filename, msg);
+            const filePath = createImage(filename, msg);
+            if (!filePath) {
+                console.error('/Hello: createImage returned null');
+                return res.status(500).json({ error: 'Failed to create image file.' });
+            }
+            
+            if (!fs.existsSync(filePath)) {
+                console.error(`/Hello: Image file was not created: ${filePath}`);
+                return res.status(500).json({ error: 'Image file was not created.' });
+            }
+            
+            console.log(`/Hello: Image successfully created: ${filePath}`);
             res.json({ msg: filename });
         } catch (err) {
             console.error('Error creating image:', err);
-            res.status(500).json({ error: 'Failed to create image.' });
+            res.status(500).json({ error: 'Failed to create image: ' + err.message });
         }
     } else {
         res.status(400).json({ error: 'No user.' });
@@ -46,12 +63,29 @@ app.post('/Attention', (req, res) => {
         let filename = dateFormat(new Date(), 'yyyy-mm-dd-HHMM') + `_Att-${user}.png`;
         console.log(`new image: ${filename}`);
         const msg = `${user} said:\n${userMsg}`;
+        
+        if (!text2png) {
+            console.error('/Attention: text2png is not available');
+            return res.status(500).json({ error: 'Image generation is disabled. text2png is not installed.' });
+        }
+        
         try {
-            createImage(filename, msg);
+            const filePath = createImage(filename, msg);
+            if (!filePath) {
+                console.error('/Attention: createImage returned null');
+                return res.status(500).json({ error: 'Failed to create image file.' });
+            }
+            
+            if (!fs.existsSync(filePath)) {
+                console.error(`/Attention: Image file was not created: ${filePath}`);
+                return res.status(500).json({ error: 'Image file was not created.' });
+            }
+            
+            console.log(`/Attention: Image successfully created: ${filePath}`);
             res.json({ msg: filename });
         } catch (err) {
             console.error('Error creating image:', err);
-            res.status(500).json({ error: 'Failed to create image.' });
+            res.status(500).json({ error: 'Failed to create image: ' + err.message });
         }
     } else {
         res.status(400).json({ error: 'Missing user or message.' });
@@ -914,26 +948,29 @@ async function startServer() {
 
 function createImage(imageName, message) {
     if (!text2png) {
-        console.warn('Image generation disabled');
-        return;
+        console.error('createImage: text2png is not available');
+        return null;
     }
     const dir = path.join(__dirname, 'public', 'medias', 'generated');
     try {
         if (!fs.existsSync(dir)) {
+            console.log(`createImage: creating directory ${dir}`);
             fs.mkdirSync(dir, { recursive: true });
         }
         const filePath = path.join(dir, imageName);
-        fs.writeFileSync(
-            filePath,
-            text2png(message, {
-                color: 'white',
-                strokeWidth: 1.5,
-                strokeColor: 'gray',
-                font: '65px sans-serif',
-            })
-        );
+        console.log(`createImage: writing to ${filePath}`);
+        const imageData = text2png(message, {
+            color: 'white',
+            strokeWidth: 1.5,
+            strokeColor: 'gray',
+            font: '65px sans-serif',
+        });
+        fs.writeFileSync(filePath, imageData);
+        console.log(`createImage: successfully wrote ${imageData.length} bytes to ${filePath}`);
+        return filePath;
     } catch (err) {
         console.error('Error in createImage:', err);
+        return null;
     }
 }
 
