@@ -975,21 +975,6 @@
             }
 
 
-            //== SOUNDS Section =====================================
-            //== 
-            else if (flags.broadcaster && command === "ok-bye") {
-                ComfyJS.Disconnect();
-            }
-            else if (flags.broadcaster && command === "talk") {
-                ChatBotSay();
-            }
-            else if (command === "cloud") {
-                cloud("Thumbs-up");
-            }
-            else if (flags.broadcaster && command === "clean") {
-                console.log("!clean was typed in chat");
-                clean();
-            }
             else if (flags.broadcaster && command === "hello") {
                 console.log("-->streamSession: ", _streamSession);
                 hello(user);
@@ -1175,6 +1160,63 @@
                     startStreamNotesScroll();
                 });
             }); // Allow DOM to update
+        }
+
+        // FIX #15: SSE subscription to overlay events
+        (function initOverlaySSE() {
+            const evtSource = new EventSource('/api/stream/events');
+
+            evtSource.onmessage = function(e) {
+                try {
+                    const payload = JSON.parse(e.data);
+                    if (payload.event === 'note') {
+                        showOverlayNote(payload.content);
+                    } else if (payload.event === 'stream_started') {
+                        console.log('Stream started via SSE:', payload);
+                    } else if (payload.event === 'stream_stopped') {
+                        console.log('Stream stopped via SSE:', payload);
+                    }
+                } catch (err) {
+                    console.error('SSE parse error:', err);
+                }
+            };
+
+            evtSource.onerror = function() {
+                console.warn('SSE connection error, browser will reconnect automatically');
+            };
+        })();
+
+        function showOverlayNote(text) {
+            let noteEl = document.getElementById('overlayNoteDisplay');
+            if (!noteEl) {
+                noteEl = document.createElement('div');
+                noteEl.id = 'overlayNoteDisplay';
+                noteEl.style.cssText = [
+                    'position:fixed',
+                    'bottom:120px',
+                    'left:50%',
+                    'transform:translateX(-50%)',
+                    'background:rgba(0,0,0,0.82)',
+                    'color:#fff',
+                    'padding:16px 28px',
+                    'border-radius:12px',
+                    'font-size:1.4em',
+                    'z-index:9999',
+                    'max-width:80vw',
+                    'text-align:center',
+                    'transition:opacity 0.5s',
+                    'display:none'
+                ].join(';');
+                document.body.appendChild(noteEl);
+            }
+            noteEl.textContent = text;
+            noteEl.style.opacity = '1';
+            noteEl.style.display = 'block';
+            clearTimeout(noteEl._hideTimer);
+            noteEl._hideTimer = setTimeout(() => {
+                noteEl.style.opacity = '0';
+                setTimeout(() => { noteEl.style.display = 'none'; }, 500);
+            }, 5000);
         }
     </script>
 </body>

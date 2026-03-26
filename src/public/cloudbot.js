@@ -94,9 +94,15 @@ class StreamSession
         this.Id = value;
     }
 
+    Title = function(value)
+    {
+        this.Title = value;
+    }
+
     Init = function(){
         this.Id = 0;
         this.Project = "";
+        this.Title = "";
         this.DateTimeStart = "";
         this.DateTimeEnd = "";
         this.Notes = [];
@@ -114,6 +120,7 @@ class StreamSession
     constructor() {
         this.Id = 0;
         this.Project = "";
+        this.Title = "";
         this.DateTimeStart = "";
         this.DateTimeEnd = "";
         this.Notes = [];
@@ -137,7 +144,7 @@ const SoundEnum = {
     badFeeling : "public/medias/badfeeling.mp3",
     doorknock: "public/medias/knocking-on-door.mp3",
     hmmhmm: "public/medias/hmmhmm.mp3",
-    rain: "public/medias/rain.mp4",
+    rain: "public/medias/rain.mp3",
     rainUmbrella: "public/medias/Rain-On-Umbrella.com.mp3",
     previously: "public/medias/previously.mp3"
 };
@@ -266,6 +273,7 @@ UserLanded = function(user, curScore)
         else{
             console.log( "... no new highscore, try again");
         }
+        persistUserScore(_streamSession.UserSession[userPos]);
     }
     else
     {
@@ -273,7 +281,7 @@ UserLanded = function(user, curScore)
     }
 }
 
-        
+
 
 ParseMessage = function(message)
 {
@@ -353,11 +361,26 @@ ChatBotShout = function(message)
 
 
 
+async function persistUserScore(user) {
+    fetch('/api/users/score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            username: user.user,
+            dropCount: user.dropCount || 0,
+            landedCount: user.landedCount || 0,
+            highScore: user.highScore || 0,
+            bestHighScore: user.bestHighScore || 0
+        })
+    }).catch(err => console.error('Failed to persist score:', err));
+}
+
 IncrementDropCounter = function(user)
 {
     let userPos = getUserPosition(user);
     _streamSession.UserSession[userPos].dropCount++;
     _streamSession.UserSession[userPos].lastUpdate = new Date();
+    persistUserScore(_streamSession.UserSession[userPos]);
 }
 
 
@@ -418,10 +441,17 @@ Attention = function(user, message)
 
 addTodo = function(description)
 {
-    const cntTodos = _streamSession.Todos.length;
-
-    _streamSession.Todos.push(new Todo(cntTodos + 1, description, TodoStatusEnum.new));
-    RefreshTodosArea();
+    // API call first - the 5s polling will pick up the todo from DB and render it
+    fetch('/api/todos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description })
+    })
+    .then(() => {
+        // Force an immediate refresh from DB to show the new todo
+        loadSessionFromDb();
+    })
+    .catch(err => console.error('Error saving todo to DB:', err));
 }
 
 
@@ -468,6 +498,13 @@ SetTodoStatus = function(id, status)
             console.log(`match!: ${_streamSession.Todos[i].id} - ${_streamSession.Todos[i].status}`);
             _streamSession.Todos[i].status = status;
             found = true;
+            
+            // Persist to DB
+            fetch(`/api/todos/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            }).catch(err => console.error('Error updating todo status:', err));
         }
     }
     RefreshTodosArea();
@@ -479,24 +516,46 @@ SetTodoStatus = function(id, status)
 addReminder = function(name, message)
 { 
     _streamSession.Reminders.push(new Reminder(name, message));
+
+    fetch('/api/reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, message, interval: 0 })
+    }).catch(err => console.error('Error saving reminder to DB:', err));
 }
 
 
 
-SetReminderStatus = function(name, status)
+SetReminderStatus = function(reminderName, status)
 {
     let found = false;
     const max = _streamSession.Reminders.length;
+    const searchName = reminderName.trim();
 
-    console.log(`... searching for!: ${name}`);
+    console.log(`... searching for reminder: ${searchName}`);
 
     for(i = 0; i < max && !found; i++){
-        console.log(`Look at: ${_streamSession.Reminders[i].Name} - ${_streamSession.Reminders[i].Status}`);
-        if(_streamSession.Reminders[i].id == id){
-            console.log(`match!: ${_streamSession.Reminders[i].Name} - ${_streamSession.Reminders[i].Status}`);
-            _streamSession.Reminders[i].Status = status;
+        const r = _streamSession.Reminders[i];
+        console.log(`Look at: ${r.Name} - ${r.Status}`);
+        if(r.Name && r.Name.trim() === searchName){
+            console.log(`match!: ${r.Name} - ${r.Status}`);
+            r.Status = status;
             found = true;
+
+            // Use the numeric DB id for the API call
+            const numericId = r.id;
+            if(numericId){
+                fetch(`/api/session/reminders/${numericId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                }).catch(err => console.error('Error updating reminder status:', err));
+            }
         }
+    }
+
+    if(!found){
+        console.log(`... reminder not found: ${searchName}`);
     }
 }
 
@@ -515,9 +574,8 @@ SaveToFile = function(verbose = true)
     fetch('/savetofile', options)
     .then(response => response.json())
     .then(result => {
-        //console.log('Success:', result);
-        if(verbose){
-            ChatBotSay(result.msg);
+        if(verbose && result.success){
+            ChatBotSay('Session saved!');
         }
     })
     .catch(error => {
@@ -611,7 +669,7 @@ LoadStreamSession = function(data, projectName, isReload, callback)
 
         if(data.Reminders.length > 0){
             _streamSession.Reminders = data.Reminders.map((o) => { 
-                const newReminder = new Todo(); 
+                const newReminder = new Reminder(); 
                 for (const [key, value] of Object.entries(o)) 
                 { 
                     newReminder[key] = value; 
@@ -655,9 +713,14 @@ playSound = function(name, fileName)
 
 playSound = function(name, fileName, inLoop)
 {
-    let cbAudio = getCloudAudio(name, fileName, inLoop);
-    cbAudio.play();
-
+    try {
+        let cbAudio = getCloudAudio(name, fileName, inLoop);
+        cbAudio.play().catch(err => {
+            console.log('Audio play failed:', err.message);
+        });
+    } catch (err) {
+        console.log('Audio error:', err.message);
+    }
 }
 
 stopSound = function(name, fileName, inLoop)
@@ -697,39 +760,35 @@ ResetHightScore = function()
 
 StreamNoteStart = async function(projectName)
 {
+    const projectUrl = projectName ? `https://github.com/FBoucher/${projectName}` : '';
 
-    LoadFromFile(projectName, false, function(projectName){
-        //console.log('.. the project name: ', projectName);
-        //console.log('.. streamSession before : ', _streamSession);
-        
-        // Get the current stream counter and increment it
-        fetch('/incrementstreamcounter', {
+    try {
+        const response = await fetch('/api/stream/start', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'}
-        })
-        .then(response => response.json())
-        .then(counterData => {
-            _streamSession.Id = counterData.currentStreamNumber;
-            _streamSession.Project = projectName;
-            _streamSession.DateTimeStart = new Date();
-            console.log('.. streamSession just after : ', _streamSession);
-            // Display banner immediately when project is set
-            showProjectBanner();
-        })
-        .catch(error => {
-            console.error('Error loading stream counter:', error);
-            // Fallback to random if counter fails
-            if(_streamSession.id == undefined || _streamSession.id == null || _streamSession.id == 0){
-                _streamSession.Id = Math.floor((Math.random() * 100));
-            }
-            _streamSession.Project = projectName;
-            _streamSession.DateTimeStart = new Date();
-            console.log('.. streamSession just after (fallback): ', _streamSession);
-            // Display banner immediately when project is set
-            showProjectBanner();
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                projectName: projectName || 'Chat Session',
+                streamTitle: _streamSession.Title || '',
+                projectUrl: projectUrl
+            })
         });
-    });
+        const data = await response.json();
 
+        _streamSession.Id = data.streamNumber;
+        _streamSession.Project = projectName;
+        _streamSession.DateTimeStart = new Date();
+        console.log('.. stream started, session:', data.sessionId, 'stream#', data.streamNumber);
+
+        // Load full session state from DB (scores, todos, etc.)
+        await loadSessionFromDb();
+        showProjectBanner();
+    } catch (err) {
+        console.error('Failed to start stream session:', err);
+        // Fallback: update local state and show banner anyway
+        _streamSession.Project = projectName;
+        _streamSession.DateTimeStart = new Date();
+        showProjectBanner();
+    }
 }
 
 
@@ -738,12 +797,16 @@ StreamNoteStart = async function(projectName)
 
 StreamNoteStop = function()
 {
-    _streamSession.DateTimeEnd = new Date(); 
-    SaveToFile();
+    _streamSession.DateTimeEnd = new Date();
+    SaveToFile(false); // false = no chat announcement; DB is source of truth
     console.log('_streamSession: ', _streamSession);
     let streamNotes = Generate_streamSession();
     console.log('Notes: ', streamNotes);
     SaveNotesToFile(_streamSession, streamNotes);
+
+    // Persist session stop to DB via REST API
+    fetch('/api/stream/stop', { method: 'POST' })
+        .catch(err => console.error('Failed to stop session in DB:', err));
 }
 
 
@@ -773,7 +836,10 @@ Generate_streamSession = function()
 GenerateStreamNotetHeader = function()
 {
     let today = new Date().toISOString().split('T')[0];
-    let headerSection = "---\nlayout: post\ntitle: _____ (stream " + _streamSession.Id + ")\n";
+    let title = _streamSession.Title && _streamSession.Title.trim() 
+        ? _streamSession.Title 
+        : "_____ (stream " + _streamSession.Id + ")";
+    let headerSection = "---\nlayout: post\ntitle: " + title + "\n";
     headerSection += "featured-image: https://img.youtube.com/vi/_________/hqdefault.jpg\n";
     headerSection += "date: " + today + "  06:30 -0500\n";
     headerSection += "categories:  " + _streamSession.Project + "\n---\n\n## Summary\n\n\n\n📺 - Twitch archive - stream no. " + _streamSession.Id + "\n\n";
@@ -1048,6 +1114,12 @@ CreateTimeLog = function(message, user){
 
 SavingNote = function(message){
     _streamSession.Notes.push(message);
+
+    fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: message })
+    }).catch(err => console.error('Error saving note to DB:', err));
 }
 
 
@@ -1135,6 +1207,8 @@ makeItRain = function() {
 let bannerTimer = null;
 let githubCache = {};
 const GITHUB_OWNER = 'fboucher'; // Default GitHub owner
+let bannerManualMode = false; // Track if banner is under manual control
+let currentBannerTimeout = null; // Track the hide timeout
 
 const bannerVariants = [
     { name: 'pixel', className: 'banner-pixel', image: 'public/medias/CB-Yeah.gif', alt: 'CloudBot Yeah', pixelate: false, useMarquee: true },
@@ -1234,26 +1308,62 @@ showProjectBanner = async function() {
     // Show banner with animation
     banner.classList.add('show');
 
-    // Hide banner after 60 seconds
-    setTimeout(() => {
-        banner.classList.remove('show');
-    }, 60000);
+    // Clear any existing hide timeout
+    if (currentBannerTimeout) {
+        clearTimeout(currentBannerTimeout);
+        currentBannerTimeout = null;
+    }
+
+    // Only auto-hide if not in manual mode
+    if (!bannerManualMode) {
+        currentBannerTimeout = setTimeout(() => {
+            banner.classList.remove('show');
+            currentBannerTimeout = null;
+        }, 60000);
+    }
 }
 
 hideProjectBanner = function() {
     const banner = document.getElementById('projectBanner');
     banner.classList.remove('show');
+    // Clear any pending hide timeout
+    if (currentBannerTimeout) {
+        clearTimeout(currentBannerTimeout);
+        currentBannerTimeout = null;
+    }
+}
+
+toggleProjectBannerDisplay = async function() {
+    const banner = document.getElementById('projectBanner');
+    
+    if (!banner) return;
+    
+    const isVisible = banner.classList.contains('show');
+    
+    if (isVisible) {
+        // Hide it
+        hideProjectBanner();
+        bannerManualMode = false; // Allow auto-timer to work again
+    } else {
+        // Show it
+        bannerManualMode = true; // Prevent auto-hide
+        await showProjectBanner();
+    }
 }
 
 startBannerTimer = function() {
-    // Show banner immediately on start
+    // Show banner immediately on start (only if not in manual mode)
     setTimeout(() => {
-        showProjectBanner();
+        if (!bannerManualMode) {
+            showProjectBanner();
+        }
     }, 5000); // Wait 5 seconds after page load
 
-    // Then show every 15 minutes (900000 ms)
+    // Then show every 15 minutes (900000 ms) - only if not in manual mode
     bannerTimer = setInterval(() => {
-        showProjectBanner();
+        if (!bannerManualMode) {
+            showProjectBanner();
+        }
     }, 900000);
 }
 
@@ -1447,4 +1557,233 @@ if (typeof window !== 'undefined') {
     window.addEventListener('DOMContentLoaded', () => {
         startAnnouncementTimer();
     });
+}
+
+// ===== EFFECT SYSTEM - Poll for effects from admin panel =====
+let lastEffectTimestamp = 0;
+
+async function checkForEffects() {
+    try {
+        const response = await fetch('/currenteffect');
+        const effect = await response.json();
+        
+        if (effect && effect.timestamp && effect.timestamp > lastEffectTimestamp) {
+            lastEffectTimestamp = effect.timestamp;
+            console.log('New effect detected:', effect.type);
+            handleEffect(effect);
+        }
+    } catch (err) {
+        // Silent fail - effect polling should not spam console
+    }
+}
+
+function handleEffect(effect) {
+    console.log('Handling effect:', effect.type);
+    
+    // Clear the effect on server after handling
+    fetch('/cleareffect', { method: 'POST' }).catch(() => {});
+    
+    switch (effect.type) {
+        case 'hello':
+            if (effect.image) {
+                ChatBotShow('Thumbs-up', effect.image);
+            } else {
+                cloud('Thumbs-up');
+            }
+            playSound('yeah', SoundEnum.yeah);
+            break;
+            
+        case 'attention':
+            if (effect.image) {
+                ChatBotShow('Thumbs-up', effect.image);
+            }
+            playSound('hmmhmm', SoundEnum.hmmhmm);
+            break;
+            
+        // case 'drop':
+        //     cloud('Wow');
+        //     playSound('yeah', SoundEnum.yeah);
+        //     break;
+            
+        case 'rain':
+            {
+                const sky = document.getElementById('sky');
+                if (sky) sky.className = 'darkcloud';
+                setTimeout(() => {
+                    makeItRain();
+                    playSound('rain', SoundEnum.rain, true);
+                }, 5000);
+            }
+            break;
+            
+        case 'sun':
+            {
+                document.querySelectorAll('.rain').forEach(el => el.innerHTML = '');
+                stopSound('rain', SoundEnum.rain, true);
+                const sky = document.getElementById('sky');
+                if (sky) sky.className = 'lightcloud';
+            }
+            break;
+            
+        case 'startproject':
+            if (effect.project) {
+                // Admin panel already created the DB session via /api/stream/start.
+                // Just sync state from DB and show the banner — do NOT call
+                // StreamNoteStart here, which would create a duplicate session.
+                _streamSession.Project = effect.project;
+                _streamSession.DateTimeStart = new Date().toISOString();
+                loadSessionFromDb().then(() => showProjectBanner());
+            }
+            break;
+
+        case 'stopproject':
+            {
+                loadSessionFromDb().then(async () => {
+                    document.getElementById('streamNotesPanel').style.display = 'block';
+                    try {
+                        const response = await fetch(`/api/export?download=false&sessionId=${_streamSession.Id}`);
+                        if (response.ok) {
+                            const markdown = await response.text();
+                            const content = document.getElementById('streamNotesContent');
+                            content.innerHTML = markdownToHtml(markdown);
+                        } else {
+                            console.error('Failed to fetch stream notes:', response.status);
+                        }
+                    } catch (err) {
+                        console.error('Error fetching stream notes:', err);
+                    }
+                    startStreamNotesScroll();
+                });
+            }
+            break;
+            
+        case 'tododone':
+            {
+                cloud('Yeah');
+                playSound('yeah', SoundEnum.yeah);
+            }
+            break;
+            
+        case 'toggleProjectBanner':
+            toggleProjectBannerDisplay();
+            break;
+    }
+}
+
+// Poll for effects and session data every 2 seconds
+if (typeof window !== 'undefined') {
+    window.addEventListener('DOMContentLoaded', () => {
+        setInterval(checkForEffects, 2000);
+        setInterval(checkTodosVisibility, 2000);
+        
+        // COLD BOOT FIX: Load session data immediately, then poll every 5s
+        // Ensures overlay displays current state on page load without waiting
+        loadSessionFromDb();
+        setInterval(loadSessionFromDb, 5000);
+    });
+}
+
+async function loadSessionFromDb() {
+    try {
+        const response = await fetch('/loadfromfile');
+        const data = await response.json();
+        
+        // Load core session properties
+        if (data.Id !== undefined) {
+            _streamSession.Id = data.Id;
+        }
+        if (data.Project !== undefined) {
+            _streamSession.Project = data.Project;
+        }
+        if (data.Title !== undefined) {
+            _streamSession.Title = data.Title;
+        }
+        if (data.DateTimeStart !== undefined) {
+            _streamSession.DateTimeStart = data.DateTimeStart;
+        }
+        
+        // Load arrays
+        if (data.Todos) {
+            _streamSession.Todos = data.Todos.map((o) => { 
+                const newTodo = new Todo(); 
+                for (const [key, value] of Object.entries(o)) 
+                { 
+                    newTodo[key] = value; 
+                } return newTodo; 
+            });
+            RefreshTodosArea();
+        }
+        
+        if (data.Reminders) {
+            _streamSession.Reminders = data.Reminders.map((o) => {
+                const newReminder = new Reminder();
+                for (const [key, value] of Object.entries(o))
+                {
+                    newReminder[key] = value;
+                } return newReminder;
+            });
+        }
+        
+        if (data.Notes) {
+            _streamSession.Notes = data.Notes;
+        }
+        
+        if (data.UserSession) {
+            _streamSession.UserSession = data.UserSession.map((o) => { 
+                const newUser = new UserSession(); 
+                for (const [key, value] of Object.entries(o)) 
+                { 
+                    newUser[key] = value; 
+                } return newUser; 
+            });
+        }
+        
+        if (data.NewFollowers) {
+            _streamSession.NewFollowers = data.NewFollowers;
+        }
+        
+        if (data.Raiders) {
+            _streamSession.Raiders = data.Raiders.map((o) => { 
+                const newRaider = new Raider(); 
+                for (const [key, value] of Object.entries(o)) 
+                { 
+                    newRaider[key] = value; 
+                } return newRaider; 
+            });
+        }
+        
+        if (data.Subscribers) {
+            _streamSession.Subscribers = data.Subscribers;
+        }
+        
+        if (data.Hosts) {
+            _streamSession.Hosts = data.Hosts;
+        }
+        
+        if (data.Cheerers) {
+            _streamSession.Cheerers = data.Cheerers;
+        }
+        
+        if (data.TimeLogs) {
+            _streamSession.TimeLogs = data.TimeLogs.map((o) => { 
+                const newLog = new TimeLog(); 
+                for (const [key, value] of Object.entries(o)) 
+                { 
+                    newLog[key] = value; 
+                } return newLog; 
+            });
+        }
+    } catch (err) {
+        // Silent fail - session might not exist yet
+    }
+}
+
+async function checkTodosVisibility() {
+    try {
+        const response = await fetch('/gettodosvisibility');
+        const result = await response.json();
+        SetTodoVisibility(result.visible);
+    } catch (err) {
+        // Silent fail
+    }
 }

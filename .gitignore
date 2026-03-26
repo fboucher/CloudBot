@@ -141,3 +141,17 @@ src/io/streamSession_[0-9]*.json
 src/io/*.md
 
 src/io/streamCounter.json
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+src/io/cloudbot.db
+
+# Squad: ignore runtime state (logs, inbox, sessions)
+.squad/orchestration-log/
+.squad/log/
+.squad/decisions/inbox/
+.squad/sessions/
+# Squad: SubSquad activation file (local to this machine)
+.squad-workstream

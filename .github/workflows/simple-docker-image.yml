@@ -1,16 +1,15 @@
 name: Build Docker Images
-on: [push]
+
+on:
+  push:
+    branches:
+      - dev
+
 jobs:
   build:
     name: cloudbot-beta
     runs-on: ubuntu-latest
     steps:
-    - id: last_release
-      uses: InsonusK/get-latest-release@v1.0.1
-      with:
-          myToken: ${{ github.token }}
-          exclude_types: "release, prerelease"
-          view_top: 1  
     - uses: actions/checkout@v2
     - name: Publish to Registry
       uses: elgohr/Publish-Docker-Github-Action@master
@@ -18,4 +17,4 @@ jobs:
         name: ${{secrets.DOCKER_USER}}/cloudbot
         username: ${{ secrets.DOCKER_USER }}
         password: ${{ secrets.DOCKER_PASSWORD }}
-        tags: "${{ steps.last_release.outputs.tag_name }}-beta"
+        tags: "beta"
