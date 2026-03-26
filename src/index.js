@@ -553,21 +553,35 @@ app.delete('/api/session/reminders/:id', async (req, res) => {
 });
 
 // Helper function to generate and save show notes markdown
-async function generateAndSaveShowNotes(sessionId) {
+async function generateAndSaveShowNotes(sessionId, options = {}) {
+    const {
+        skipFrontMatter = false,
+        skipReminders = true,
+        download = true
+    } = options;
+
     const s = await db.loadSessionData(sessionId);
     if (!s) throw new Error(`Session ${sessionId} not found`);
 
     const date = s.DateTimeStart ? s.DateTimeStart.split('T')[0] : new Date().toISOString().split('T')[0];
     const title = s.Title && s.Title.trim() ? s.Title : `_____ (stream ${sessionId})`;
 
+    let md = '';
+
     // ── Front matter ──────────────────────────────────────────────────────────
-    let md = `---\nlayout: post\ntitle: ${title}\n`;
-    md += `featured-image: https://img.youtube.com/vi/_________/hqdefault.jpg\n`;
-    md += `date: ${date}  06:30 -0500\n`;
-    md += `categories:  ${s.Project}\n---\n\n## Summary\n\n\n\n`;
-    md += `📺 - Twitch archive - stream no. ${sessionId}\n\n`;
-    md += `\n## Replay\n\n{% include youtube.html id="_________" %}\n\n`;
-    md += `<br/><!--more-->\n`;
+    if (!skipFrontMatter) {
+        md = `---\nlayout: post\ntitle: ${title}\n`;
+        md += `featured-image: https://img.youtube.com/vi/_________/hqdefault.jpg\n`;
+        md += `date: ${date}  06:30 -0500\n`;
+        md += `categories:  ${s.Project}\n---\n\n`;
+    }
+
+    md += `## Summary\n\n📺 - Twitch archive - stream no. ${sessionId}\n\n`;
+
+    if (!skipFrontMatter) {
+        md += `\n## Replay\n\n{% include youtube.html id="_________" %}\n\n`;
+        md += `<br/><!--more-->\n`;
+    }
 
     // ── Project ───────────────────────────────────────────────────────────────
     md += `\n### Project\n\n`;
@@ -652,24 +666,28 @@ async function generateAndSaveShowNotes(sessionId) {
     }
 
     // ── Reminders (for record-keeping) ────────────────────────────────────────
-    if (s.Reminders.length > 0) {
+    if (!skipReminders && s.Reminders.length > 0) {
         md += `\n### Reminders\n\n`;
         s.Reminders.forEach(r => { md += `- **${r.Name}**: ${r.Message}\n`; });
     }
 
-    const filename = `${date}-${sessionId}-${s.Project}.md`;
-    const ioDir = path.join(__dirname, 'io');
-    fs.mkdirSync(ioDir, { recursive: true });
-    const filepath = path.join(ioDir, filename);
-    fs.writeFileSync(filepath, md, 'utf8');
+    if (download) {
+        const filename = `${date}-${sessionId}-${s.Project}.md`;
+        const ioDir = path.join(__dirname, 'io');
+        fs.mkdirSync(ioDir, { recursive: true });
+        const filepath = path.join(ioDir, filename);
+        fs.writeFileSync(filepath, md, 'utf8');
+        return { filename, content: md, filepath };
+    }
 
-    return { filename, content: md, filepath };
+    return { content: md };
 }
 
 app.get('/api/export', async (req, res) => {
     try {
         let session = null;
-        const { sessionId } = req.query;
+        const { sessionId, download } = req.query;
+        const shouldDownload = download !== 'false';
 
         if (sessionId) {
             session = await db.getSessionById(sessionId);
@@ -686,13 +704,20 @@ app.get('/api/export', async (req, res) => {
 
         if (!session) return res.status(404).json({ error: 'No session found to export' });
 
-        const { filename, content } = await generateAndSaveShowNotes(session.id);
+        const result = await generateAndSaveShowNotes(session.id, {
+            skipFrontMatter: !shouldDownload,
+            skipReminders: true,
+            download: shouldDownload
+        });
         
-        console.log(`Export saved to src/io/${filename}`);
-        
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        res.setHeader('Content-Type', 'text/markdown');
-        res.send(content);
+        if (shouldDownload) {
+            console.log(`Export saved to src/io/${result.filename}`);
+            res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+            res.setHeader('Content-Type', 'text/markdown');
+        } else {
+            res.setHeader('Content-Type', 'text/markdown');
+        }
+        res.send(result.content);
     } catch (err) {
         console.error('Error exporting session:', err);
         res.status(500).json({ error: 'Failed to export session.' });

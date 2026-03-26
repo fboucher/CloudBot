@@ -1638,12 +1638,20 @@ function handleEffect(effect) {
 
         case 'stopproject':
             {
-                // Load latest state before generating notes, then show panel.
-                loadSessionFromDb().then(() => {
+                loadSessionFromDb().then(async () => {
                     document.getElementById('streamNotesPanel').style.display = 'block';
-                    let streamNotes = Generate_streamSession();
-                    const content = document.getElementById('streamNotesContent');
-                    content.innerHTML = markdownToHtml(streamNotes);
+                    try {
+                        const response = await fetch(`/api/export?download=false&sessionId=${_streamSession.Id}`);
+                        if (response.ok) {
+                            const markdown = await response.text();
+                            const content = document.getElementById('streamNotesContent');
+                            content.innerHTML = markdownToHtml(markdown);
+                        } else {
+                            console.error('Failed to fetch stream notes:', response.status);
+                        }
+                    } catch (err) {
+                        console.error('Error fetching stream notes:', err);
+                    }
                     startStreamNotesScroll();
                 });
             }
