@@ -3,6 +3,7 @@ name: Release Docker Image CI
 on:
   release:
     types: [published]
+
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -10,11 +11,15 @@ jobs:
     - uses: actions/checkout@v2
     - name: Set outputs
       id: vars
-      run: echo ::set-output name=RELEASE_VERSION::$(echo ${GITHUB_REF:10})
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "MAJOR=${VERSION%%.*}" >> $GITHUB_OUTPUT
+        echo "MINOR=$(echo $VERSION | cut -d. -f2)" >> $GITHUB_OUTPUT
     - name: Publish to Registry
       uses: elgohr/Publish-Docker-Github-Action@master
       with:
         name: ${{secrets.DOCKER_USER}}/cloudbot
         username: ${{ secrets.DOCKER_USER }}
         password: ${{ secrets.DOCKER_PASSWORD }}
-        tags: "latest,${{ steps.vars.outputs.RELEASE_VERSION }}"
+        tags: "latest,${{ steps.vars.outputs.MAJOR }},${{ steps.vars.outputs.MAJOR }}.${{ steps.vars.outputs.MINOR:0:3 }},${{ steps.vars.outputs.VERSION }}"
