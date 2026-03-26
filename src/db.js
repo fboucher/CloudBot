@@ -19,6 +19,7 @@ async function createTables() {
       started_at TEXT,
       ended_at TEXT,
       notes TEXT DEFAULT '[]',
+      stream_number INTEGER,
       created_at TEXT DEFAULT (datetime('now'))
     )`,
     `CREATE TABLE IF NOT EXISTS users (
@@ -119,6 +120,14 @@ async function createTables() {
       // Column probably already exists, ignore
     }
 
+    // Migration: Add stream_number column to stream_sessions if it doesn't exist
+    try {
+      await db.exec("ALTER TABLE stream_sessions ADD COLUMN stream_number INTEGER");
+      console.log("Migration: Added stream_number column");
+    } catch (e) {
+      // Column probably already exists, ignore
+    }
+
     const counterRow = await db.prepare("SELECT * FROM stream_counter WHERE id = 1").get();
     if (!counterRow) {
       await db.prepare("INSERT INTO stream_counter (id, current_stream_number, last_stream_date) VALUES (?, ?, ?)").run(1, 0, "");
@@ -137,13 +146,13 @@ async function getClient() {
   return db;
 }
 
-async function startStreamSession(projectName, streamTitle = "", projectUrl = "") {
+async function startStreamSession(projectName, streamTitle = "", projectUrl = "", streamNumber = null) {
   if (!db) await initDb();
   const startedAt = new Date().toISOString();
 
   const result = await db.prepare(
-    "INSERT INTO stream_sessions (project_name, stream_title, project_url, started_at, notes) VALUES (?, ?, ?, ?, '[]')"
-  ).run(projectName, streamTitle, projectUrl, startedAt);
+    "INSERT INTO stream_sessions (project_name, stream_title, project_url, started_at, stream_number, notes) VALUES (?, ?, ?, ?, ?, '[]')"
+  ).run(projectName, streamTitle, projectUrl, startedAt, streamNumber);
 
   return result.lastInsertRowid;
 }
@@ -256,6 +265,7 @@ async function loadSessionData(sessionId) {
     Title: "",
     ProjectUrl: "",
     Id: sessionId,
+    StreamNumber: null,
     DateTimeStart: "",
     DateTimeEnd: "",
     Notes: [],
@@ -275,6 +285,7 @@ async function loadSessionData(sessionId) {
     data.Project = session.project_name;
     data.Title = session.stream_title || "";
     data.ProjectUrl = session.project_url || "";
+    data.StreamNumber = session.stream_number;
     data.DateTimeStart = session.started_at;
     data.DateTimeEnd = session.ended_at;
     

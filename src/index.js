@@ -258,8 +258,8 @@ app.post('/startstream', async (req, res) => {
         return res.status(400).json({ error: 'Missing project name.' });
     }
     try {
-        const sessionId = await db.startStreamSession(req.body.project, req.body.title || "");
         const counter = await db.incrementStreamCounter();
+        const sessionId = await db.startStreamSession(req.body.project, req.body.title || "", "", counter.currentStreamNumber);
         console.log(`Stream session started: ${sessionId}, stream #${counter.currentStreamNumber}`);
         res.json({ sessionId, streamNumber: counter.currentStreamNumber });
     } catch (err) {
@@ -576,7 +576,8 @@ async function generateAndSaveShowNotes(sessionId, options = {}) {
         md += `categories:  ${s.Project}\n---\n\n`;
     }
 
-    md += `## Summary\n\n📺 - Twitch archive - stream no. ${sessionId}\n\n`;
+    const streamNum = s.StreamNumber || sessionId;
+    md += `## Summary\n\n📺 - Twitch archive - stream no. ${streamNum}\n\n`;
 
     if (!skipFrontMatter) {
         md += `\n## Replay\n\n{% include youtube.html id="_________" %}\n\n`;
@@ -733,8 +734,8 @@ app.post('/api/stream/start', async (req, res) => {
         return res.status(400).json({ error: 'Missing projectName.' });
     }
     try {
-        const sessionId = await db.startStreamSession(projectName, streamTitle || '', projectUrl || '');
         const counter = await db.incrementStreamCounter();
+        const sessionId = await db.startStreamSession(projectName, streamTitle || '', projectUrl || '', counter.currentStreamNumber);
         const session = await db.getSessionById(sessionId);
         broadcastSSE({ event: 'stream_started', sessionId, streamNumber: counter.currentStreamNumber });
         console.log(`Stream started: session=${sessionId}, #${counter.currentStreamNumber}`);
