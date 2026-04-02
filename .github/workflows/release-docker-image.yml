@@ -22,4 +22,4 @@ jobs:
         name: ${{secrets.DOCKER_USER}}/cloudbot
         username: ${{ secrets.DOCKER_USER }}
         password: ${{ secrets.DOCKER_PASSWORD }}
-        tags: "latest,${{ steps.vars.outputs.MAJOR }},${{ steps.vars.outputs.MAJOR }}.${{ steps.vars.outputs.MINOR:0:3 }},${{ steps.vars.outputs.VERSION }}"
+        tags: "latest,${{ steps.vars.outputs.MAJOR }},${{ steps.vars.outputs.MAJOR }}.${{ steps.vars.outputs.MINOR }},${{ steps.vars.outputs.VERSION }}"
