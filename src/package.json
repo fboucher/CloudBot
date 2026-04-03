@@ -1,6 +1,6 @@
 {
   "name": "cloudbot",
-  "version": "1.7.3-beta",
+  "version": "1.7.2",
   "description": "Twitch ChatBot and Score keeper",
   "main": "index.js",
   "scripts": {
