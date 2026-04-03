@@ -396,6 +396,9 @@
                                 <button class="btn btn-cb btn-sm" onclick="toggleProjectBanner()">
                                     <i class="bi bi-folder"></i> Project
                                 </button>
+                                <button class="btn btn-cb btn-sm" onclick="toggleHide()">
+                                    <i class="bi bi-eye-slash"></i> Hide
+                                </button>
                                 <button class="btn btn-cb btn-sm" onclick="triggerDrop()">
                                     <i class="bi bi-arrow-down-circle"></i> Drop
                                 </button>
@@ -1470,6 +1473,23 @@
                     })
                 });
                 showFeedback('Drop triggered!');
+            } catch (err) {
+                console.error('Error:', err);
+                showFeedback('Error: ' + err.message);
+            }
+        }
+
+        async function toggleHide() {
+            try {
+                await fetch('/triggereffect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        effectType: 'hide', 
+                        user: 'Admin'
+                    })
+                });
+                showFeedback('Hide summary');
             } catch (err) {
                 console.error('Error:', err);
                 showFeedback('Error: ' + err.message);

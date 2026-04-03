@@ -673,7 +673,7 @@ async function generateAndSaveShowNotes(sessionId, options = {}) {
     }
 
     if (download) {
-        const filename = `${date}-${sessionId}-${s.Project}.md`;
+        const filename = `${date}-${streamNum}-${s.Project}.md`;
         const ioDir = path.join(__dirname, 'io');
         fs.mkdirSync(ioDir, { recursive: true });
         const filepath = path.join(ioDir, filename);
