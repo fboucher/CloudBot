@@ -3,6 +3,7 @@
 <head>
     <title>Cloud Stuff</title>
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tmi.js@1.8.5/dist/tmi.min.js"></script>
     <script src="/io/secret.js"></script>
     <script src="/public/cloudbot.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -932,7 +933,7 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data && data.response) {
-                        ChatBotSay(data.response);
+                        CeebeeSay(data.response);
                     }
                 })
                 .catch(err => {
@@ -1074,6 +1075,26 @@
                 ComfyJS.onCommand(bracketCommand.user, bracketCommand.command, bracketCommand.message, flags, self, extra);
             }
 
+            // Check if Ceebee is mentioned in normal chat
+            if (message.toLowerCase().includes("@ceebee_bot") && user.toLowerCase() !== "ceebee_bot") {
+                console.log("@ceebee_bot was mentioned in chat");
+                // Remove the mention from the message to save tokens and keep it clean
+                const cleanMessage = message.replace(/@ceebee_bot/gi, '').trim();
+                
+                fetch('/api/ceebee/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: cleanMessage, user: user })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.response) {
+                        CeebeeSay(data.response);
+                    }
+                })
+                .catch(err => console.error('Error calling Ceebee API:', err));
+            }
+
             if (flags.broadcaster) {
                 console.log("...broadcaster message");
                 ParseMessage(message);
@@ -1124,11 +1145,42 @@
         })();
 
         //
-        // Define a const authToken in secret.js get the token at
-        // https://twitchapps.com/tmi/
+        // Define a const authToken in secret.js (for fboucheros)
+        // Define a const botAuthToken in secret.js (for ceebee_bot)
+        // Generate them at: https://twitchtokengenerator.com/ (Use "Bot Chat Token")
         //
-
+        
+        // Connect the main ComfyJS client as fboucheros
         ComfyJS.Init("fboucheros", authToken);
+
+        // Connect a secondary raw tmi.js client as ceebee_bot to send AI responses
+        const ceebeeClient = new tmi.Client({
+            connection: {
+                reconnect: true,
+                secure: true
+            },
+            identity: {
+                username: "ceebee_bot",
+                password: typeof botAuthToken !== 'undefined' ? botAuthToken : ""
+            },
+            channels: [ "#fboucheros" ]
+        });
+        
+        // Only connect if the bot token is defined (so it doesn't break if missing)
+        if (typeof botAuthToken !== 'undefined' && botAuthToken !== "") {
+            ceebeeClient.connect().catch(console.error);
+        }
+
+        // Dedicated function to make the bot speak
+        function CeebeeSay(msg) {
+            console.log("CeebeeSay called with msg:", msg);
+            if (ceebeeClient.readyState() === "OPEN") {
+                ceebeeClient.say("#fboucheros", msg).catch(console.error);
+            } else {
+                console.warn("ceebee_bot is not connected. Falling back to fboucheros.");
+                ComfyJS.Say(msg);
+            }
+        }
         for (var i = 0; i < 25; i++)
             CreateCloud();
 
