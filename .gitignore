@@ -155,3 +155,5 @@ src/io/cloudbot.db
 .squad/sessions/
 # Squad: SubSquad activation file (local to this machine)
 .squad-workstream
+
+!src/io/soul_sample.md
