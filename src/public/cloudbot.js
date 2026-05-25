@@ -1625,6 +1625,13 @@ function handleEffect(effect) {
             }
             break;
             
+        case 'hide':
+            {
+                const panel = document.getElementById('streamNotesPanel');
+                if (panel) panel.style.display = 'none';
+            }
+            break;
+
         case 'startproject':
             if (effect.project) {
                 // Admin panel already created the DB session via /api/stream/start.

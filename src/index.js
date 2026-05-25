@@ -32,6 +32,12 @@ function resolveGeneratedDir() {
 }
 
 const GENERATED_DIR = resolveGeneratedDir();
+const CEEBEE_KNOWLEDGE_DIR = path.join(__dirname, 'io', 'knowledge');
+if (!fs.existsSync(CEEBEE_KNOWLEDGE_DIR)) {
+    fs.mkdirSync(CEEBEE_KNOWLEDGE_DIR, { recursive: true });
+}
+
+let ceebeeChatHistory = [];
 
 app.use('/public', express.static(path.join(__dirname, 'public')));
 app.use('/public/medias/generated', express.static(GENERATED_DIR));
@@ -979,6 +985,216 @@ app.delete('/api/reminders/:id', async (req, res) => {
     } catch (err) {
         console.error('Error deleting reminder:', err);
         res.status(500).json({ error: 'Failed to delete reminder.' });
+    }
+});
+
+// ─── Ceebee ───────────────────────────────────────────────────────────────────
+
+app.get('/api/ceebee/connections', async (req, res) => {
+    try {
+        const connections = await db.getCeebeeConnections();
+        res.json(connections);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/ceebee/connections', async (req, res) => {
+    try {
+        const { name, url, model, api_key, is_active } = req.body;
+        const connection = await db.addCeebeeConnection(name, url, model, api_key, is_active);
+        res.json(connection);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/ceebee/connections/:id', async (req, res) => {
+    try {
+        const { name, url, model, api_key, is_active } = req.body;
+        const connection = await db.updateCeebeeConnection(parseInt(req.params.id), name, url, model, api_key, is_active);
+        res.json(connection);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/ceebee/connections/:id', async (req, res) => {
+    try {
+        await db.deleteCeebeeConnection(parseInt(req.params.id));
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/ceebee/connections/:id/active', async (req, res) => {
+    try {
+        await db.setActiveCeebeeConnection(parseInt(req.params.id));
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+const STREAM_CONTEXT_FILE = path.join(__dirname, 'io', 'stream_context.md');
+
+app.get('/api/ceebee/context', async (req, res) => {
+    try {
+        let context = "";
+        if (fs.existsSync(STREAM_CONTEXT_FILE)) {
+            context = fs.readFileSync(STREAM_CONTEXT_FILE, 'utf-8');
+        }
+        res.json({ context });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/ceebee/context', async (req, res) => {
+    try {
+        const { context } = req.body;
+        fs.writeFileSync(STREAM_CONTEXT_FILE, context || "", 'utf-8');
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/ceebee/chat', async (req, res) => {
+    try {
+        const { message, user } = req.body;
+        if (!message) return res.status(400).json({ error: 'Missing message.' });
+        
+        const activeConnection = await db.getActiveCeebeeConnection();
+        if (!activeConnection) {
+            return res.json({ response: "Error: No active AI connection configured." });
+        }
+        
+        let streamContext = "";
+        if (fs.existsSync(STREAM_CONTEXT_FILE)) {
+            streamContext = fs.readFileSync(STREAM_CONTEXT_FILE, 'utf-8');
+        }
+        
+        let corePrompt = "You are Ceebee, an AI assistant.";
+        const corePromptPath = path.join(__dirname, 'io', 'soul.md');
+        if (fs.existsSync(corePromptPath)) {
+            corePrompt = fs.readFileSync(corePromptPath, 'utf-8');
+        }
+        
+        // Read knowledge files
+        let knowledgeContext = "";
+        if (fs.existsSync(CEEBEE_KNOWLEDGE_DIR)) {
+            const files = fs.readdirSync(CEEBEE_KNOWLEDGE_DIR);
+            for (const file of files) {
+                if (file.endsWith('.md')) {
+                    const content = fs.readFileSync(path.join(CEEBEE_KNOWLEDGE_DIR, file), 'utf-8');
+                    knowledgeContext += `\n\n--- Document: ${file} ---\n${content}`;
+                }
+            }
+        }
+        
+        let fullSystemPrompt = corePrompt;
+        if (streamContext && streamContext.trim() !== '') {
+            fullSystemPrompt += `\n\n--- Today's Stream Context ---\n${streamContext}`;
+        }
+        if (knowledgeContext) {
+            fullSystemPrompt += `\n\n--- Background Information ---\n${knowledgeContext}`;
+        }
+        
+        ceebeeChatHistory.push({ role: 'user', content: `${user ? user + ' says: ' : ''}${message}` });
+        if (ceebeeChatHistory.length > 20) {
+            ceebeeChatHistory.shift();
+        }
+        
+        const messages = [
+            { role: 'system', content: fullSystemPrompt },
+            ...ceebeeChatHistory
+        ];
+        
+        const payload = {
+            model: activeConnection.model || "default",
+            messages: messages
+        };
+        
+        const headers = { 'Content-Type': 'application/json' };
+        if (activeConnection.api_key) {
+            headers['Authorization'] = `Bearer ${activeConnection.api_key}`;
+        }
+        
+        let endpointUrl = activeConnection.url;
+        if (!endpointUrl.endsWith('/chat/completions')) {
+            endpointUrl = endpointUrl.replace(/\/+$/, '') + '/chat/completions';
+        }
+        
+        const response = await fetch(endpointUrl, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`API Error ${response.status}: ${errText}`);
+        }
+        
+        const data = await response.json();
+        const aiResponse = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : "Error: Invalid response from AI";
+        
+        ceebeeChatHistory.push({ role: 'assistant', content: aiResponse });
+        if (ceebeeChatHistory.length > 20) {
+            ceebeeChatHistory.shift();
+        }
+        
+        res.json({ response: aiResponse });
+    } catch (err) {
+        console.error('Error in /api/ceebee/chat:', err);
+        res.json({ response: `Error: ${err.message}` });
+    }
+});
+
+app.post('/api/ceebee/test', async (req, res) => {
+    try {
+        const { url, model, api_key } = req.body;
+        if (!url || !model) {
+            return res.status(400).json({ success: false, error: 'URL and Model are required' });
+        }
+        
+        const payload = {
+            model: model,
+            messages: [{ role: 'user', content: 'Hello! Please reply with a short greeting so I know you are working.' }]
+        };
+        
+        const headers = { 'Content-Type': 'application/json' };
+        if (api_key) {
+            headers['Authorization'] = `Bearer ${api_key}`;
+        }
+        
+        let endpointUrl = url;
+        if (!endpointUrl.endsWith('/chat/completions')) {
+            endpointUrl = endpointUrl.replace(/\/+$/, '') + '/chat/completions';
+        }
+        
+        const response = await fetch(endpointUrl, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`API Error ${response.status}: ${errText}`);
+        }
+        
+        const data = await response.json();
+        const aiResponse = data.choices && data.choices[0] && data.choices[0].message 
+            ? data.choices[0].message.content 
+            : "Error: Invalid response format from AI";
+            
+        res.json({ success: true, response: aiResponse });
+    } catch (err) {
+        console.error('Error testing connection:', err);
+        res.json({ success: false, error: err.message });
     }
 });
 
