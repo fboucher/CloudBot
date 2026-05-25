@@ -32,6 +32,12 @@ function resolveGeneratedDir() {
 }
 
 const GENERATED_DIR = resolveGeneratedDir();
+const CEEBEE_KNOWLEDGE_DIR = path.join(__dirname, 'io', 'knowledge');
+if (!fs.existsSync(CEEBEE_KNOWLEDGE_DIR)) {
+    fs.mkdirSync(CEEBEE_KNOWLEDGE_DIR, { recursive: true });
+}
+
+let ceebeeChatHistory = [];
 
 app.use('/public', express.static(path.join(__dirname, 'public')));
 app.use('/public/medias/generated', express.static(GENERATED_DIR));
@@ -979,6 +985,149 @@ app.delete('/api/reminders/:id', async (req, res) => {
     } catch (err) {
         console.error('Error deleting reminder:', err);
         res.status(500).json({ error: 'Failed to delete reminder.' });
+    }
+});
+
+// ─── Ceebee ───────────────────────────────────────────────────────────────────
+
+app.get('/api/ceebee/connections', async (req, res) => {
+    try {
+        const connections = await db.getCeebeeConnections();
+        res.json(connections);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/ceebee/connections', async (req, res) => {
+    try {
+        const { name, url, model, api_key, is_active } = req.body;
+        const connection = await db.addCeebeeConnection(name, url, model, api_key, is_active);
+        res.json(connection);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/ceebee/connections/:id', async (req, res) => {
+    try {
+        const { name, url, model, api_key, is_active } = req.body;
+        const connection = await db.updateCeebeeConnection(parseInt(req.params.id), name, url, model, api_key, is_active);
+        res.json(connection);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/ceebee/connections/:id', async (req, res) => {
+    try {
+        await db.deleteCeebeeConnection(parseInt(req.params.id));
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/ceebee/connections/:id/active', async (req, res) => {
+    try {
+        await db.setActiveCeebeeConnection(parseInt(req.params.id));
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/ceebee/soul', async (req, res) => {
+    try {
+        const system_prompt = await db.getCeebeeSoul();
+        res.json({ system_prompt });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/ceebee/soul', async (req, res) => {
+    try {
+        const { system_prompt } = req.body;
+        await db.setCeebeeSoul(system_prompt);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/ceebee/chat', async (req, res) => {
+    try {
+        const { message, user } = req.body;
+        if (!message) return res.status(400).json({ error: 'Missing message.' });
+        
+        const activeConnection = await db.getActiveCeebeeConnection();
+        if (!activeConnection) {
+            return res.json({ response: "Error: No active AI connection configured." });
+        }
+        
+        const systemPrompt = await db.getCeebeeSoul();
+        
+        // Read knowledge files
+        let knowledgeContext = "";
+        if (fs.existsSync(CEEBEE_KNOWLEDGE_DIR)) {
+            const files = fs.readdirSync(CEEBEE_KNOWLEDGE_DIR);
+            for (const file of files) {
+                if (file.endsWith('.md')) {
+                    const content = fs.readFileSync(path.join(CEEBEE_KNOWLEDGE_DIR, file), 'utf-8');
+                    knowledgeContext += `\n\n--- Document: ${file} ---\n${content}`;
+                }
+            }
+        }
+        
+        let fullSystemPrompt = systemPrompt || "You are Ceebee, an AI assistant.";
+        if (knowledgeContext) {
+            fullSystemPrompt += `\n\nHere is some background information you can use:\n${knowledgeContext}`;
+        }
+        
+        ceebeeChatHistory.push({ role: 'user', content: `${user ? user + ' says: ' : ''}${message}` });
+        if (ceebeeChatHistory.length > 20) {
+            ceebeeChatHistory.shift();
+        }
+        
+        const messages = [
+            { role: 'system', content: fullSystemPrompt },
+            ...ceebeeChatHistory
+        ];
+        
+        const payload = {
+            model: activeConnection.model || "default",
+            messages: messages
+        };
+        
+        const headers = { 'Content-Type': 'application/json' };
+        if (activeConnection.api_key) {
+            headers['Authorization'] = `Bearer ${activeConnection.api_key}`;
+        }
+        
+        const response = await fetch(activeConnection.url, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`API Error ${response.status}: ${errText}`);
+        }
+        
+        const data = await response.json();
+        const aiResponse = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : "Error: Invalid response from AI";
+        
+        ceebeeChatHistory.push({ role: 'assistant', content: aiResponse });
+        if (ceebeeChatHistory.length > 20) {
+            ceebeeChatHistory.shift();
+        }
+        
+        res.json({ response: aiResponse });
+    } catch (err) {
+        console.error('Error in /api/ceebee/chat:', err);
+        res.json({ response: `Error: ${err.message}` });
     }
 });
 
