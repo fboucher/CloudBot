@@ -82,6 +82,18 @@ async function createTables() {
       current_stream_number INTEGER DEFAULT 1,
       last_stream_date TEXT
     )`,
+    `CREATE TABLE IF NOT EXISTS ceebee_connections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT,
+      url TEXT,
+      model TEXT,
+      api_key TEXT,
+      is_active INTEGER DEFAULT 0
+    )`,
+    `CREATE TABLE IF NOT EXISTS ceebee_soul (
+      id INTEGER PRIMARY KEY,
+      system_prompt TEXT
+    )`,
     `CREATE INDEX IF NOT EXISTS idx_users_session ON users(session_id)`,
     `CREATE INDEX IF NOT EXISTS idx_todos_session ON todos(session_id)`,
     `CREATE INDEX IF NOT EXISTS idx_reminders_session ON reminders(session_id)`,
@@ -132,6 +144,12 @@ async function createTables() {
     if (!counterRow) {
       await db.prepare("INSERT INTO stream_counter (id, current_stream_number, last_stream_date) VALUES (?, ?, ?)").run(1, 0, "");
       console.log("Initialized stream_counter");
+    }
+
+    const soulRow = await db.prepare("SELECT * FROM ceebee_soul WHERE id = 1").get();
+    if (!soulRow) {
+      await db.prepare("INSERT INTO ceebee_soul (id, system_prompt) VALUES (?, ?)").run(1, "You are Ceebee, an AI assistant.");
+      console.log("Initialized ceebee_soul");
     }
   } catch (err) {
     console.error("Error creating tables:", err);
@@ -474,6 +492,61 @@ async function getSessionUsers(sessionId) {
   ).all(sessionId);
 }
 
+// Ceebee specific functions
+async function getCeebeeConnections() {
+  if (!db) await initDb();
+  return db.prepare("SELECT * FROM ceebee_connections").all();
+}
+
+async function addCeebeeConnection(name, url, model, api_key, is_active) {
+  if (!db) await initDb();
+  if (is_active) {
+    await db.prepare("UPDATE ceebee_connections SET is_active = 0").run();
+  }
+  const result = await db.prepare(
+    "INSERT INTO ceebee_connections (name, url, model, api_key, is_active) VALUES (?, ?, ?, ?, ?)"
+  ).run(name, url, model, api_key, is_active ? 1 : 0);
+  return db.prepare("SELECT * FROM ceebee_connections WHERE id = ?").get(result.lastInsertRowid);
+}
+
+async function updateCeebeeConnection(id, name, url, model, api_key, is_active) {
+  if (!db) await initDb();
+  if (is_active) {
+    await db.prepare("UPDATE ceebee_connections SET is_active = 0").run();
+  }
+  await db.prepare(
+    "UPDATE ceebee_connections SET name = ?, url = ?, model = ?, api_key = ?, is_active = ? WHERE id = ?"
+  ).run(name, url, model, api_key, is_active ? 1 : 0, id);
+  return db.prepare("SELECT * FROM ceebee_connections WHERE id = ?").get(id);
+}
+
+async function deleteCeebeeConnection(id) {
+  if (!db) await initDb();
+  await db.prepare("DELETE FROM ceebee_connections WHERE id = ?").run(id);
+}
+
+async function setActiveCeebeeConnection(id) {
+  if (!db) await initDb();
+  await db.prepare("UPDATE ceebee_connections SET is_active = 0").run();
+  await db.prepare("UPDATE ceebee_connections SET is_active = 1 WHERE id = ?").run(id);
+}
+
+async function getActiveCeebeeConnection() {
+  if (!db) await initDb();
+  return db.prepare("SELECT * FROM ceebee_connections WHERE is_active = 1").get();
+}
+
+async function getCeebeeSoul() {
+  if (!db) await initDb();
+  const row = await db.prepare("SELECT system_prompt FROM ceebee_soul WHERE id = 1").get();
+  return row ? row.system_prompt : "";
+}
+
+async function setCeebeeSoul(system_prompt) {
+  if (!db) await initDb();
+  await db.prepare("UPDATE ceebee_soul SET system_prompt = ? WHERE id = 1").run(system_prompt);
+}
+
 module.exports = {
   initDb,
   getClient,
@@ -500,5 +573,13 @@ module.exports = {
   updateReminderStatus,
   deleteReminder,
   upsertUser,
-  getSessionUsers
+  getSessionUsers,
+  getCeebeeConnections,
+  addCeebeeConnection,
+  updateCeebeeConnection,
+  deleteCeebeeConnection,
+  setActiveCeebeeConnection,
+  getActiveCeebeeConnection,
+  getCeebeeSoul,
+  setCeebeeSoul
 };

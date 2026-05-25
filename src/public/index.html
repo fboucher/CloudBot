@@ -922,6 +922,23 @@
             }
 
             //-- tools ---------
+            else if (command === "ceebee") {
+                console.log("!ceebee was typed in chat");
+                fetch('/api/ceebee/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message, user: user })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.response) {
+                        ChatBotSay(data.response);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error calling Ceebee API:', err);
+                });
+            }
             else if (command === "time") {
                 console.log("!time was typed in chat");
                 CreateTimeLog(message, user);
