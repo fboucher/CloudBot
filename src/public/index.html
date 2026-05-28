@@ -9,708 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
-    <style>
-        body,
-        h1,
-        p {
-            color: black;
-            /*font-size: 50px;*/
-            background-color: whitesmoke;
-        }
-
-        table {
-            font-size: 50px;
-        }
-
-        th {
-            font-weight: bold;
-            border: 1px solid #cccccc;
-            /* Change the border-color of heading here */
-            padding: 8px;
-        }
-
-        td {
-            border: 1px solid #cccccc;
-            /* Change the border-color of cells here */
-            padding: 8px;
-        }
-
-        .textBubble {
-            position: absolute;
-            top: 30px;
-            left: 600px;
-            z-index: 3;
-        }
-
-        .nuage {
-            z-index: 2;
-        }
-
-        #todoArea {
-            position: absolute;
-            right: 30px;
-            top: 30px;
-            width: 200px;
-            margin: 1px;
-            box-shadow: 5px 10px 5px #888888;
-            border: 3px solid rgb(187, 239, 255);
-            background-color: rgb(187, 239, 255);
-            display: none;
-        }
-
-        #todoArea,
-        h4 {
-            margin: 5px;
-        }
-
-        #todoList {
-            background-color: ghostwhite;
-            border-top: 2px solid rgb(187, 239, 255);
-        }
-
-        .todo.done {
-            text-decoration: line-through;
-        }
-
-        .todo.cancel {
-            color: dimgray;
-            background-color: #cccccc;
-        }
-
-        .todo.inProgress {
-            background-color: dodgerblue;
-        }
-
-        @keyframes Right2Left {
-            from {
-                left: 110%;
-            }
-
-            to {
-                left: -20%;
-            }
-        }
-
-        .movingCloud {
-            animation-name: Right2Left;
-            animation-iteration-count: infinite;
-            animation-timing-function: linear;
-            animation-fill-mode: backwards;
-            position: absolute;
-        }
-
-        @keyframes darkening {
-            0% {
-                filter: brightness(100%);
-            }
-
-            100% {
-                filter: brightness(30%);
-            }
-        }
-
-        .darkcloud {
-            animation-name: darkening;
-            /* animation-iteration-count: 1; */
-            animation-fill-mode: forwards;
-            animation-duration: 5s;
-        }
-
-        @keyframes brighten {
-            0% {
-                filter: brightness(30%);
-            }
-
-            100% {
-                filter: brightness(100%);
-            }
-        }
-
-        .lightcloud {
-            animation-name: brighten;
-            /* animation-iteration-count: 1; */
-            animation-fill-mode: forwards;
-            animation-duration: 5s;
-        }
-
-        /* Project Banner Styles */
-        #projectBanner {
-            position: fixed;
-            top: -180px;
-            left: 0;
-            width: 100%;
-            height: 140px;
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            padding: 0;
-            border-bottom: 4px solid #bbefff;
-            transition: top 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-            backdrop-filter: blur(4px);
-            overflow: visible;
-        }
-
-        #projectBanner.show {
-            top: 50px;
-        }
-
-        .banner-base {
-            width: 100%;
-        }
-
-        .banner-content {
-            display: flex;
-            align-items: center;
-            width: 100%;
-            height: 100%;
-            position: relative;
-        }
-
-        .banner-image-wrap {
-            width: 280px;
-            height: 360px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            position: relative;
-            z-index: 10;
-            padding: 0 20px;
-            margin-top: -110px;
-            margin-bottom: -110px;
-        }
-
-        .banner-image {
-            width: 280px;
-            height: 360px;
-            object-fit: contain;
-            filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.5));
-            border: none;
-            outline: none;
-        }
-
-        .banner-image.pixelate {
-            image-rendering: pixelated;
-        }
-
-        .banner-info {
-            flex: 1;
-            color: white;
-            min-width: 0;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-            z-index: 5;
-            padding-left: 20px;
-        }
-
-        .banner-title {
-            font-size: 58px;
-            font-weight: 800;
-            margin: 10px 0;
-            text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.4);
-            letter-spacing: 1px;
-            flex-shrink: 0;
-        }
-
-        .banner-scrolling-content {
-            flex: 1;
-            overflow: hidden;
-            position: relative;
-            width: 100%;
-        }
-
-        .banner-marquee-wrapper {
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            gap: 24px;
-            animation: marqueeVertical 20s linear infinite;
-        }
-
-        @keyframes marqueeVertical {
-            0% { transform: translateX(100%); }
-            100% { transform: translateX(-100%); }
-        }
-
-        .banner-url {
-            font-size: 36px;
-            margin: 0;
-            opacity: 0.98;
-            font-family: 'Courier New', monospace;
-            white-space: nowrap;
-        }
-
-        .banner-description {
-            font-size: 32px;
-            margin: 0;
-            opacity: 0.92;
-            font-style: italic;
-            white-space: nowrap;
-        }
-
-        .banner-github-icon {
-            margin-right: 8px;
-        }
-
-        /* Variant themes */
-        .banner-pixel {
-            background: repeating-linear-gradient(135deg, #0a2a43 0px, #0a2a43 14px, #0d3b5c 14px, #0d3b5c 28px);
-            border-bottom: 4px solid #59d6ff;
-        }
-
-        .banner-pixel .banner-title,
-        .banner-pixel .banner-url,
-        .banner-pixel .banner-description {
-            font-family: 'Press Start 2P', monospace;
-            letter-spacing: 1.5px;
-        }
-
-        .banner-pixel .banner-title {
-            font-size: 48px;
-        }
-
-        .banner-cb {
-            background: linear-gradient(120deg, #00b4d8 0%, #0091d1 50%, #005a9c 100%);
-            border-bottom: 4px solid #c5f3ff;
-            box-shadow: 0 8px 20px rgba(0, 146, 201, 0.45);
-        }
-
-        .banner-cb .banner-title {
-            font-size: 60px;
-            letter-spacing: 1.2px;
-        }
-
-        .banner-retro {
-            background: radial-gradient(circle at 20% 20%, #1b2135 0%, #0c0f1b 60%);
-            border-bottom: 4px solid #4affde;
-            box-shadow: inset 0 0 20px rgba(74, 255, 222, 0.25), 0 10px 26px rgba(0, 0, 0, 0.4);
-        }
-
-        .banner-retro .banner-title {
-            font-family: 'VT323', monospace;
-            color: #4affde;
-            text-shadow: 0 0 12px rgba(74, 255, 222, 0.8);
-            font-size: 60px;
-        }
-
-        .banner-retro .banner-url,
-        .banner-retro .banner-description {
-            color: #e0f7ff;
-        }
-
-        /* ===== ANNOUNCEMENT SYSTEM ===== */
-        #announcementContainer {
-            position: fixed;
-            top: 20px;
-            left: 0;
-            right: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            z-index: 1001;
-            pointer-events: none;
-        }
-
-        .announcement {
-            min-width: 450px;
-            max-width: 600px;
-            padding: 24px 30px;
-            margin: 0 20px;
-            border-radius: 8px;
-            backdrop-filter: blur(8px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-            font-size: 16px;
-            line-height: 1.5;
-            border-left: 5px solid;
-            pointer-events: auto;
-            cursor: pointer;
-        }
-
-        .announcement.from-right {
-            align-self: flex-end;
-            animation: slideInRight 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-
-        .announcement.from-left {
-            align-self: flex-start;
-            animation: slideInLeft 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-
-        @keyframes slideInRight {
-            from {
-                opacity: 0;
-                transform: translateX(400px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        @keyframes slideInLeft {
-            from {
-                opacity: 0;
-                transform: translateX(-400px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        @keyframes slideOutRight {
-            from {
-                opacity: 1;
-                transform: translateX(0);
-            }
-            to {
-                opacity: 0;
-                transform: translateX(400px);
-            }
-        }
-
-        @keyframes slideOutLeft {
-            from {
-                opacity: 1;
-                transform: translateX(0);
-            }
-            to {
-                opacity: 0;
-                transform: translateX(-400px);
-            }
-        }
-
-        .announcement.removing.from-right {
-            animation: slideOutRight 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-        }
-
-        .announcement.removing.from-left {
-            animation: slideOutLeft 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-        }
-
-        /* Pixel Theme */
-        .announcement.theme-pixel {
-            background: linear-gradient(135deg, #0a2a43 0%, #0d3b5c 100%);
-            border-color: #59d6ff;
-            color: #e0f7ff;
-            font-family: 'Press Start 2P', monospace;
-            font-size: 12px;
-            border: 2px solid #59d6ff;
-            border-left: 5px solid #59d6ff;
-            box-shadow: 0 0 20px rgba(89, 214, 255, 0.4), 0 8px 24px rgba(0, 0, 0, 0.5);
-        }
-
-        .announcement.theme-pixel .ann-title {
-            font-weight: bold;
-            color: #00ffff;
-            margin-bottom: 8px;
-            font-size: 18px;
-        }
-
-        .announcement.theme-pixel .ann-message {
-            color: #e0f7ff;
-            font-size: 15px;
-        }
-
-        /* CloudBot Theme */
-        .announcement.theme-cb {
-            background: linear-gradient(120deg, rgba(0, 180, 216, 0.9) 0%, rgba(0, 145, 209, 0.9) 100%);
-            border-color: #00d4ff;
-            color: #fff;
-            box-shadow: 0 0 20px rgba(0, 212, 255, 0.5), 0 8px 24px rgba(0, 0, 0, 0.3);
-        }
-
-        .announcement.theme-cb .ann-title {
-            font-weight: bold;
-            color: #fff;
-            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
-            margin-bottom: 8px;
-            font-size: 20px;
-        }
-
-        .announcement.theme-cb .ann-message {
-            color: rgba(255, 255, 255, 0.95);
-            font-size: 16px;
-        }
-
-        /* Retro Theme */
-        .announcement.theme-retro {
-            background: linear-gradient(135deg, rgba(27, 33, 53, 0.95) 0%, rgba(12, 15, 27, 0.95) 100%);
-            border-color: #4affde;
-            color: #e0f7ff;
-            box-shadow: 
-                inset 0 0 15px rgba(74, 255, 222, 0.15),
-                0 0 20px rgba(74, 255, 222, 0.4),
-                0 8px 24px rgba(0, 0, 0, 0.5);
-        }
-
-        .announcement.theme-retro .ann-title {
-            font-family: 'VT323', monospace;
-            font-weight: bold;
-            color: #4affde;
-            text-shadow: 0 0 8px rgba(74, 255, 222, 0.8);
-            margin-bottom: 6px;
-        }
-
-        .announcement.theme-retro .ann-message {
-            font-family: 'VT323', monospace;
-            color: #e0f7ff;
-            font-size: 14px;
-        }
-
-        .announcement.theme-retro::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #4affde, transparent);
-            pointer-events: none;
-        }
-
-        /* Sponsor Theme */
-        .announcement.theme-sponsor {
-            background: linear-gradient(120deg, rgba(255, 51, 102, 0.9) 0%, rgba(255, 102, 150, 0.9) 100%);
-            border-color: #ff66ff;
-            color: #fff;
-            box-shadow: 0 0 20px rgba(255, 102, 255, 0.5), 0 8px 24px rgba(0, 0, 0, 0.3);
-        }
-
-        .announcement.theme-sponsor .ann-title {
-            font-weight: bold;
-            color: #fff;
-            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
-            margin-bottom: 8px;
-            font-size: 20px;
-        }
-
-        .announcement.theme-sponsor .ann-message {
-            color: rgba(255, 255, 255, 0.95);
-            font-size: 16px;
-        }
-
-        .announcement.theme-sponsor::after {
-            content: '💖';
-            display: inline-block;
-            margin-left: 6px;
-            animation: heartbeat 1s infinite;
-        }
-
-        @keyframes heartbeat {
-            0%, 100% {
-                transform: scale(1);
-            }
-            50% {
-                transform: scale(1.2);
-            }
-        }
-
-        /* Social Theme */
-        .announcement.theme-social {
-            background: linear-gradient(120deg, rgba(0, 172, 193, 0.9) 0%, rgba(0, 188, 212, 0.9) 100%);
-            border-color: #4dd0e1;
-            color: #fff;
-            box-shadow: 0 0 20px rgba(77, 208, 225, 0.5), 0 8px 24px rgba(0, 0, 0, 0.3);
-        }
-
-        .announcement.theme-social .ann-title {
-            font-weight: bold;
-            color: #fff;
-            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
-            margin-bottom: 8px;
-            font-size: 20px;
-        }
-
-        .announcement.theme-social .ann-message {
-            color: rgba(255, 255, 255, 0.95);
-            font-size: 16px;
-        }
-
-        .ann-title {
-            margin: 0;
-            padding: 0;
-        }
-
-        .ann-message {
-            margin: 0;
-            padding: 0;
-        }
-
-        .rain {
-            position: absolute;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 2;
-        }
-
-        .rain.back-row {
-            display: none;
-            z-index: 1;
-            bottom: 60px;
-            opacity: 0.5;
-        }
-
-        div.back-row-toggle .rain.back-row {
-            display: block;
-        }
-
-        .drop {
-            position: absolute;
-            bottom: 100%;
-            width: 15px;
-            height: 120px;
-            pointer-events: none;
-            animation: drop 0.5s linear infinite;
-        }
-
-        @keyframes drop {
-            0% {
-                transform: translateY(0vh);
-            }
-
-            75% {
-                transform: translateY(90vh);
-            }
-
-            100% {
-                transform: translateY(90vh);
-            }
-        }
-
-        .stem {
-            width: 1px;
-            height: 60%;
-            margin-left: 7px;
-            background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.25));
-            animation: stem 0.5s linear infinite;
-        }
-
-        @keyframes stem {
-            0% {
-                opacity: 1;
-            }
-
-            65% {
-                opacity: 1;
-            }
-
-            75% {
-                opacity: 0;
-            }
-
-            100% {
-                opacity: 0;
-            }
-        }
-
-        .splat {
-            width: 15px;
-            height: 10px;
-            border-top: 2px dotted rgba(255, 255, 255, 0.5);
-            border-radius: 50%;
-            opacity: 1;
-            transform: scale(0);
-            animation: splat 0.5s linear infinite;
-            display: none;
-        }
-
-        div.splat-toggle .splat {
-            display: block;
-        }
-
-        @keyframes splat {
-            0% {
-                opacity: 1;
-                transform: scale(0);
-            }
-
-            80% {
-                opacity: 1;
-                transform: scale(0);
-            }
-
-            90% {
-                opacity: 0.5;
-                transform: scale(1);
-            }
-
-            100% {
-                opacity: 0;
-                transform: scale(1.5);
-            }
-        }
-
-        #streamNotesPanel {
-            display: none;
-            position: fixed;
-            top: 10%;
-            right: 8%;
-            left: auto;
-            width: 55%;
-            height: 80%;
-            background: linear-gradient(120deg, rgba(0, 180, 216, 0.95) 0%, rgba(0, 145, 209, 0.95) 60%, rgba(0, 90, 156, 0.95) 100%);
-            border: 4px solid #00d4ff;
-            box-shadow: 0 10px 26px rgba(0, 146, 201, 0.5), inset 0 0 18px rgba(255, 255, 255, 0.15);
-            border-radius: 14px;
-            z-index: 9999;
-            overflow: hidden;
-            padding: 20px;
-        }
-
-        #streamNotesPanel h2 {
-            margin: 0 0 12px 0;
-            font-family: 'VT323', monospace;
-            font-size: 2.6em;
-            color: #ffffff;
-            text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-            letter-spacing: 1px;
-        }
-
-        #streamNotesContent {
-            font-size: 2em;
-            line-height: 1.3;
-            color: #f0fbff;
-            white-space: normal;
-            margin: 0;
-            padding: 0;
-            position: absolute;
-            left: 0;
-            width: 90%;
-            will-change: transform;
-        }
-
-        #streamNotesContent h1,
-        #streamNotesContent h2,
-        #streamNotesContent h3,
-        #streamNotesContent h4,
-        #streamNotesContent h5,
-        #streamNotesContent h6 {
-            margin: 12px 0 6px;
-            color: #ffffff;
-            text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-        }
-
-        #streamNotesContent ul {
-            margin: 10px 0 10px 28px;
-            padding: 0;
-        }
-
-        #streamNotesContent li {
-            margin: 6px 0;
-        }
-
-        #streamNotesContent code {
-            background: rgba(12, 15, 27, 0.4);
-            border-radius: 6px;
-            padding: 2px 6px;
-            font-size: 0.8em;
-        }
-    </style>
+    <link rel="stylesheet" href="/public/style.css">
 </head>
 
 <body>
@@ -744,13 +43,13 @@
         <div id="sky">
         </div>
         <div class="rain front-row"></div>
-        <div class="rain back-row"></div>   
+        <div class="rain back-row"></div>
         <div class="toggles">
             <div class="splat-toggle toggle active"></div>
             <div class="back-row-toggle toggle active"></div>
-          </div> 
+        </div>
     </div>
-    
+
     <div id="streamNotesPanel">
         <h2 style="font-size:2em;">Stream Notes</h2>
         <pre id="streamNotesContent"></pre>
@@ -826,7 +125,7 @@
             html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
             html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
 
-            html = html.replace(/^(\s*[-*+]\s+.+(?:\n\s*[-*+]\s+.+)*)/gm, function(match) {
+            html = html.replace(/^(\s*[-*+]\s+.+(?:\n\s*[-*+]\s+.+)*)/gm, function (match) {
                 const items = match
                     .trim()
                     .split(/\n/)
@@ -930,15 +229,15 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: message, user: user })
                 })
-                .then(response => response.json())
-                .then(data => {
-                    if (data && data.response) {
-                        CeebeeSay(data.response);
-                    }
-                })
-                .catch(err => {
-                    console.error('Error calling Ceebee API:', err);
-                });
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data && data.response) {
+                            CeebeeSay(data.response);
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error calling Ceebee API:', err);
+                    });
             }
             else if (command === "time") {
                 console.log("!time was typed in chat");
@@ -1076,23 +375,23 @@
             }
 
             // Check if Ceebee is mentioned in normal chat
-            if (message.toLowerCase().includes("@ceebee_bot") && user.toLowerCase() !== "ceebee_bot") {
-                console.log("@ceebee_bot was mentioned in chat");
+            if (message.toLowerCase().includes("ceebee") && user.toLowerCase() !== "ceebee") {
+                console.log("@ceebee was mentioned in chat");
                 // Remove the mention from the message to save tokens and keep it clean
-                const cleanMessage = message.replace(/@ceebee_bot/gi, '').trim();
-                
+                const cleanMessage = message.replace(/ceebee/gi, '').trim();
+
                 fetch('/api/ceebee/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: cleanMessage, user: user })
                 })
-                .then(response => response.json())
-                .then(data => {
-                    if (data && data.response) {
-                        CeebeeSay(data.response);
-                    }
-                })
-                .catch(err => console.error('Error calling Ceebee API:', err));
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data && data.response) {
+                            CeebeeSay(data.response);
+                        }
+                    })
+                    .catch(err => console.error('Error calling Ceebee API:', err));
             }
 
             if (flags.broadcaster) {
@@ -1149,7 +448,7 @@
         // Define a const botAuthToken in secret.js (for ceebee_bot)
         // Generate them at: https://twitchtokengenerator.com/ (Use "Bot Chat Token")
         //
-        
+
         // Connect the main ComfyJS client as fboucheros
         ComfyJS.Init("fboucheros", authToken);
 
@@ -1163,9 +462,9 @@
                 username: "ceebee_bot",
                 password: typeof botAuthToken !== 'undefined' ? botAuthToken : ""
             },
-            channels: [ "#fboucheros" ]
+            channels: ["#fboucheros"]
         });
-        
+
         // Only connect if the bot token is defined (so it doesn't break if missing)
         if (typeof botAuthToken !== 'undefined' && botAuthToken !== "") {
             ceebeeClient.connect().catch(console.error);
@@ -1185,16 +484,16 @@
             CreateCloud();
 
         // Add event listener for hide button
-        document.addEventListener("DOMContentLoaded", function() {
+        document.addEventListener("DOMContentLoaded", function () {
             const hideBtn = document.getElementById("hideStreamNotesBtn");
             if (hideBtn) {
-                hideBtn.onclick = function() {
+                hideBtn.onclick = function () {
                     document.getElementById("streamNotesPanel").style.display = "none";
                 };
             }
 
             const panel = document.getElementById("streamNotesPanel");
-            panel.addEventListener("transitionend", function() {
+            panel.addEventListener("transitionend", function () {
                 if (panel.style.display === "none") {
                     const content = document.getElementById("streamNotesContent");
                     content.style.transition = 'none';
@@ -1207,22 +506,22 @@
             const panel = document.getElementById('streamNotesPanel');
             const content = document.getElementById('streamNotesContent');
             if (!panel || !content) return;
-            
+
             // Reset scroll position
             content.style.transition = 'none';
             content.style.transform = 'translateY(0)';
-            
+
             // Calculate scroll distance and duration
-            requestAnimationFrame (() => {
+            requestAnimationFrame(() => {
                 const panelHeight = panel.clientHeight;
                 const contentHeight = content.scrollHeight;
                 const distance = panelHeight + contentHeight;
                 const speed = 40; // pixels per second (adjust for slower/faster)
                 const duration = distance / speed;
-                
+
                 content.style.transition = `transform ${duration}s linear`;
                 content.style.transform = `translateY(-${contentHeight}px)`;
-                
+
                 // When animation ends, restart
                 content.addEventListener('transitionend', function handler() {
                     content.removeEventListener('transitionend', handler);
@@ -1235,7 +534,7 @@
         (function initOverlaySSE() {
             const evtSource = new EventSource('/api/stream/events');
 
-            evtSource.onmessage = function(e) {
+            evtSource.onmessage = function (e) {
                 try {
                     const payload = JSON.parse(e.data);
                     if (payload.event === 'note') {
@@ -1250,7 +549,7 @@
                 }
             };
 
-            evtSource.onerror = function() {
+            evtSource.onerror = function () {
                 console.warn('SSE connection error, browser will reconnect automatically');
             };
         })();
