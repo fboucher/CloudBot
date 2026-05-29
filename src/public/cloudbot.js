@@ -265,17 +265,17 @@ UserLanded = function (user, curScore) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: user })
         })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success && data.rolled) {
-                const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb' };
-                const itemStr = emojiMap[data.item];
-                setTimeout(() => {
-                    ChatBotSay(`@${user} landed successfully and discovered a ${itemStr}!`);
-                }, 1500); // delay announcement slightly so high score party displays first
-            }
-        })
-        .catch(err => console.error('Error rolling drop item:', err));
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.rolled) {
+                    const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb' };
+                    const itemStr = emojiMap[data.item];
+                    setTimeout(() => {
+                        ChatBotSay(`@${user} landed successfully and discovered a ${itemStr}!`);
+                    }, 1500); // delay announcement slightly so high score party displays first
+                }
+            })
+            .catch(err => console.error('Error rolling drop item:', err));
     }
     else {
         console.log("... User NOT found?!");
@@ -558,7 +558,7 @@ SetReminderStatus = function (reminderName, status) {
 
 
 
-SaveToFile = function (verbose = true) {
+SaveToFile = function (verbose = false) {
     const data = { streamSession: _streamSession };
     //console.log('..c. data: ', data);
     const options = {
