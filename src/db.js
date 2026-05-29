@@ -98,11 +98,14 @@ async function createTables() {
       id INTEGER PRIMARY KEY,
       auto_participate INTEGER DEFAULT 0,
       min_messages INTEGER DEFAULT 10,
-      max_messages INTEGER DEFAULT 15
+      max_messages INTEGER DEFAULT 15,
+      game_enabled INTEGER DEFAULT 1,
+      dynamic_weather_enabled INTEGER DEFAULT 1
     )`,
     `CREATE TABLE IF NOT EXISTS participants (
       username TEXT PRIMARY KEY,
       is_regular INTEGER DEFAULT 0,
+      inventory TEXT DEFAULT '[]',
       created_at TEXT DEFAULT (datetime('now'))
     )`,
     `CREATE INDEX IF NOT EXISTS idx_users_session ON users(session_id)`,
@@ -151,6 +154,30 @@ async function createTables() {
       // Column probably already exists, ignore
     }
 
+    // Migration: Add game_enabled column to ceebee_settings if it doesn't exist
+    try {
+      await db.exec("ALTER TABLE ceebee_settings ADD COLUMN game_enabled INTEGER DEFAULT 1");
+      console.log("Migration: Added game_enabled column to ceebee_settings");
+    } catch (e) {
+      // Column probably already exists, ignore
+    }
+
+    // Migration: Add dynamic_weather_enabled column to ceebee_settings if it doesn't exist
+    try {
+      await db.exec("ALTER TABLE ceebee_settings ADD COLUMN dynamic_weather_enabled INTEGER DEFAULT 1");
+      console.log("Migration: Added dynamic_weather_enabled column to ceebee_settings");
+    } catch (e) {
+      // Column probably already exists, ignore
+    }
+
+    // Migration: Add inventory column to participants if it doesn't exist
+    try {
+      await db.exec("ALTER TABLE participants ADD COLUMN inventory TEXT DEFAULT '[]'");
+      console.log("Migration: Added inventory column to participants");
+    } catch (e) {
+      // Column probably already exists, ignore
+    }
+
     const counterRow = await db.prepare("SELECT * FROM stream_counter WHERE id = 1").get();
     if (!counterRow) {
       await db.prepare("INSERT INTO stream_counter (id, current_stream_number, last_stream_date) VALUES (?, ?, ?)").run(1, 0, "");
@@ -165,7 +192,7 @@ async function createTables() {
 
     const settingsRow = await db.prepare("SELECT * FROM ceebee_settings WHERE id = 1").get();
     if (!settingsRow) {
-      await db.prepare("INSERT INTO ceebee_settings (id, auto_participate, min_messages, max_messages) VALUES (?, ?, ?, ?)").run(1, 0, 10, 15);
+      await db.prepare("INSERT INTO ceebee_settings (id, auto_participate, min_messages, max_messages, game_enabled, dynamic_weather_enabled) VALUES (?, ?, ?, ?, 1, 1)").run(1, 0, 10, 15);
       console.log("Initialized ceebee_settings");
     }
   } catch (err) {
@@ -566,15 +593,15 @@ async function setCeebeeSoul(system_prompt) {
 
 async function getCeebeeSettings() {
   if (!db) await initDb();
-  const row = await db.prepare("SELECT auto_participate, min_messages, max_messages FROM ceebee_settings WHERE id = 1").get();
-  return row || { auto_participate: 0, min_messages: 10, max_messages: 15 };
+  const row = await db.prepare("SELECT auto_participate, min_messages, max_messages, game_enabled, dynamic_weather_enabled FROM ceebee_settings WHERE id = 1").get();
+  return row || { auto_participate: 0, min_messages: 10, max_messages: 15, game_enabled: 1, dynamic_weather_enabled: 1 };
 }
 
-async function updateCeebeeSettings(auto_participate, min_messages, max_messages) {
+async function updateCeebeeSettings(auto_participate, min_messages, max_messages, game_enabled = 1, dynamic_weather_enabled = 1) {
   if (!db) await initDb();
   await db.prepare(
-    "UPDATE ceebee_settings SET auto_participate = ?, min_messages = ?, max_messages = ? WHERE id = 1"
-  ).run(auto_participate ? 1 : 0, min_messages, max_messages);
+    "UPDATE ceebee_settings SET auto_participate = ?, min_messages = ?, max_messages = ?, game_enabled = ?, dynamic_weather_enabled = ? WHERE id = 1"
+  ).run(auto_participate ? 1 : 0, min_messages, max_messages, game_enabled ? 1 : 0, dynamic_weather_enabled ? 1 : 0);
   return getCeebeeSettings();
 }
 
@@ -633,6 +660,46 @@ async function logGreetingEvent(sessionId, username) {
   ).run(sessionId, username);
 }
 
+async function getInventory(username) {
+  if (!db) await initDb();
+  const row = await db.prepare("SELECT inventory FROM participants WHERE username = ?").get(username.toLowerCase());
+  if (row && row.inventory) {
+    try {
+      return JSON.parse(row.inventory);
+    } catch (e) {
+      return [];
+    }
+  }
+  return [];
+}
+
+async function saveInventory(username, inventory) {
+  if (!db) await initDb();
+  await registerParticipant(username);
+  await db.prepare("UPDATE participants SET inventory = ? WHERE username = ?").run(JSON.stringify(inventory), username.toLowerCase());
+}
+
+async function addInventoryItem(username, item) {
+  let inv = await getInventory(username);
+  inv.push(item);
+  if (inv.length > 5) {
+    inv.shift();
+  }
+  await saveInventory(username, inv);
+  return inv;
+}
+
+async function removeInventoryItem(username, item) {
+  let inv = await getInventory(username);
+  const index = inv.indexOf(item);
+  if (index > -1) {
+    inv.splice(index, 1);
+    await saveInventory(username, inv);
+    return true;
+  }
+  return false;
+}
+
 module.exports = {
   initDb,
   getClient,
@@ -675,5 +742,8 @@ module.exports = {
   isParticipantRegular,
   getAllParticipantsWithStats,
   hasBeenGreetedInSession,
-  logGreetingEvent
+  logGreetingEvent,
+  getInventory,
+  addInventoryItem,
+  removeInventoryItem
 };

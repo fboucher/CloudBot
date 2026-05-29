@@ -418,6 +418,37 @@
                         </div>
                     </div>
 
+                    <!-- Overlay Test Sandbox -->
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="card-title">Overlay Test Sandbox</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <h6 class="text-light mb-2">Simulate RPG Items</h6>
+                                <div class="d-flex gap-2 mb-3 flex-wrap">
+                                    <button class="btn btn-outline-info btn-sm" onclick="triggerTestItem('potion')">🧪 Test Potion</button>
+                                    <button class="btn btn-outline-info btn-sm" onclick="triggerTestItem('shield')">🛡️ Test Shield</button>
+                                    <button class="btn btn-outline-info btn-sm" onclick="triggerTestItem('umbrella')">☔ Test Umbrella</button>
+                                    <button class="btn btn-outline-info btn-sm" onclick="triggerTestItem('bomb')">💣 Test Bomb</button>
+                                    <button class="btn btn-outline-info btn-sm" onclick="triggerTestItem('sun-stone')">☀️ Test Sun Stone</button>
+                                    <button class="btn btn-outline-info btn-sm" onclick="triggerTestItem('rain-stone')">🌧️ Test Rain Stone</button>
+                                </div>
+                                <h6 class="text-light mb-2">Simulate Weather Events</h6>
+                                <div class="d-flex gap-2 mb-3 flex-wrap">
+                                    <button class="btn btn-outline-warning btn-sm" onclick="triggerTestWeather('thunderstorm')">⛈️ Thunderstorm (Raid)</button>
+                                    <button class="btn btn-outline-warning btn-sm" onclick="triggerTestWeather('rainbow')">🌈 Rainbow Sunshine (Sub/Cheer)</button>
+                                </div>
+                                <h6 class="text-light mb-2">Simulate Chat Hype (MPM)</h6>
+                                <div class="d-flex align-items-center gap-2">
+                                    <button class="btn btn-outline-success btn-sm" onclick="triggerTestMpm(2)">Quiet (<5 MPM)</button>
+                                    <button class="btn btn-outline-success btn-sm" onclick="triggerTestMpm(10)">Moderate (10 MPM)</button>
+                                    <button class="btn btn-outline-success btn-sm" onclick="triggerTestMpm(25)">Spam/Hype (25 MPM)</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Notes Section -->
                     <div class="card mb-3">
                         <div class="card-header d-flex justify-content-between align-items-center">
@@ -547,7 +578,7 @@
 
                     <div class="card mb-4">
                         <div class="card-header d-flex justify-content-between align-items-center">
-                            <span class="card-title">Auto-Participation Settings</span>
+                            <span class="card-title">Auto-Participation & Game Settings</span>
                             <button class="btn btn-cb btn-sm" onclick="saveCeebeeSettings()">
                                 <i class="bi bi-save"></i> Save Settings
                             </button>
@@ -565,6 +596,21 @@
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label text-light">Max Messages Limit</label>
                                     <input type="number" class="form-control bg-dark text-light border-secondary" id="autoParticipateMax" min="1" step="1" value="15">
+                                </div>
+                            </div>
+                            <hr class="border-secondary my-3">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" role="switch" id="gameEnabledToggle">
+                                        <label class="form-check-label text-light" for="gameEnabledToggle">Enable RPG Loot Game (inventory & !use)</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" role="switch" id="weatherEnabledToggle">
+                                        <label class="form-check-label text-light" for="weatherEnabledToggle">Enable Hype-Driven Dynamic Weather</label>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1568,8 +1614,59 @@
 
         function showFeedback(msg) {
             const el = document.getElementById('actionFeedback');
-            el.textContent = msg;
-            setTimeout(() => { el.textContent = ''; }, 3000);
+            if (el) {
+                el.innerText = msg;
+                clearTimeout(el._timer);
+                el._timer = setTimeout(() => { el.innerText = ''; }, 3000);
+            }
+        }
+
+        async function triggerTestItem(itemName) {
+            try {
+                const response = await fetch('/api/stream/overlay', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ event: 'use_item', user: 'AdminSandbox', item: itemName })
+                });
+                if (response.ok) {
+                    showFeedback(`Simulated item use: ${itemName}`);
+                }
+            } catch (err) {
+                console.error(err);
+                showFeedback('Failed to trigger test item');
+            }
+        }
+
+        async function triggerTestWeather(weatherType) {
+            try {
+                const response = await fetch('/api/stream/overlay', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ event: 'test_weather', type: weatherType })
+                });
+                if (response.ok) {
+                    showFeedback(`Simulated weather event: ${weatherType}`);
+                }
+            } catch (err) {
+                console.error(err);
+                showFeedback('Failed to trigger test weather');
+            }
+        }
+
+        async function triggerTestMpm(mpmValue) {
+            try {
+                const response = await fetch('/api/stream/overlay', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ event: 'test_mpm', mpm: mpmValue })
+                });
+                if (response.ok) {
+                    showFeedback(`Simulated chat speed: ${mpmValue} messages/min`);
+                }
+            } catch (err) {
+                console.error(err);
+                showFeedback('Failed to trigger chat speed');
+            }
         }
 
         async function showAttentionPrompt() {
@@ -1885,6 +1982,8 @@
                 document.getElementById('autoParticipateMin').value = minVal;
                 document.getElementById('autoParticipateMax').value = maxVal;
                 updateLabelText(minVal, maxVal);
+                document.getElementById('gameEnabledToggle').checked = data.game_enabled !== undefined ? !!data.game_enabled : true;
+                document.getElementById('weatherEnabledToggle').checked = data.dynamic_weather_enabled !== undefined ? !!data.dynamic_weather_enabled : true;
             } catch (err) {
                 console.error('Error loading Ceebee settings:', err);
             }
@@ -1894,6 +1993,8 @@
             const auto_participate = document.getElementById('autoParticipateToggle').checked;
             const min_messages = parseInt(document.getElementById('autoParticipateMin').value, 10) || 10;
             const max_messages = parseInt(document.getElementById('autoParticipateMax').value, 10) || 15;
+            const game_enabled = document.getElementById('gameEnabledToggle').checked;
+            const dynamic_weather_enabled = document.getElementById('weatherEnabledToggle').checked;
 
             if (min_messages < 1 || max_messages < 1) {
                 alert('Message limits must be at least 1.');
@@ -1908,10 +2009,10 @@
                 await fetch('/api/ceebee/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ auto_participate, min_messages, max_messages })
+                    body: JSON.stringify({ auto_participate, min_messages, max_messages, game_enabled, dynamic_weather_enabled })
                 });
                 updateLabelText(min_messages, max_messages);
-                showFeedback('Auto-participation settings saved.');
+                showFeedback('Settings saved successfully.');
             } catch (err) {
                 console.error('Error saving Ceebee settings:', err);
                 alert('Error saving settings: ' + err.message);

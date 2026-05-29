@@ -1235,6 +1235,100 @@ app.post('/api/ceebee/context', async (req, res) => {
     }
 });
 
+// ─── RPG Loot Game ────────────────────────────────────────────────────────────
+const lootCooldowns = new Map();
+
+app.get('/api/loot/bag', async (req, res) => {
+    const { username } = req.query;
+    if (!username) return res.status(400).json({ error: 'Missing username.' });
+    try {
+        const inventory = await db.getInventory(username);
+        res.json({ success: true, inventory });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/loot/search', async (req, res) => {
+    const { username } = req.body;
+    if (!username) return res.status(400).json({ error: 'Missing username.' });
+    const lowerUser = username.toLowerCase();
+
+    try {
+        const settings = await db.getCeebeeSettings();
+        if (!settings.game_enabled) {
+            return res.json({ success: false, disabled: true, message: 'The RPG loot game is currently disabled by the streamer.' });
+        }
+
+        const now = Date.now();
+        const cooldownTime = 10 * 60 * 1000; // 10 minutes
+        if (lootCooldowns.has(lowerUser)) {
+            const lastSearch = lootCooldowns.get(lowerUser);
+            const elapsed = now - lastSearch;
+            if (elapsed < cooldownTime) {
+                const remainingMs = cooldownTime - elapsed;
+                const remainingMin = Math.ceil(remainingMs / 60000);
+                return res.json({ success: false, onCooldown: true, remainingMinutes: remainingMin });
+            }
+        }
+
+        const items = ['potion', 'shield', 'umbrella', 'rain-stone', 'sun-stone', 'bomb'];
+        const rolledItem = items[Math.floor(Math.random() * items.length)];
+        const inventory = await db.addInventoryItem(lowerUser, rolledItem);
+        lootCooldowns.set(lowerUser, now);
+
+        res.json({ success: true, item: rolledItem, inventory });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/loot/use', async (req, res) => {
+    const { username, item } = req.body;
+    if (!username || !item) return res.status(400).json({ error: 'Missing username or item.' });
+    const lowerUser = username.toLowerCase();
+
+    try {
+        const settings = await db.getCeebeeSettings();
+        if (!settings.game_enabled) {
+            return res.json({ success: false, disabled: true, message: 'The RPG loot game is currently disabled.' });
+        }
+
+        const removed = await db.removeInventoryItem(lowerUser, item);
+        if (removed) {
+            broadcastSSE({ event: 'use_item', user: lowerUser, item });
+            res.json({ success: true });
+        } else {
+            res.json({ success: false, noItem: true, message: `You do not have a ${item} in your inventory.` });
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/loot/add-drop-item', async (req, res) => {
+    const { username } = req.body;
+    if (!username) return res.status(400).json({ error: 'Missing username.' });
+    const lowerUser = username.toLowerCase();
+
+    try {
+        const settings = await db.getCeebeeSettings();
+        if (!settings.game_enabled) {
+            return res.json({ success: false, disabled: true });
+        }
+
+        if (Math.random() <= 0.25) {
+            const items = ['potion', 'shield', 'umbrella', 'rain-stone', 'sun-stone', 'bomb'];
+            const rolledItem = items[Math.floor(Math.random() * items.length)];
+            const inventory = await db.addInventoryItem(lowerUser, rolledItem);
+            return res.json({ success: true, rolled: true, item: rolledItem, inventory });
+        }
+        res.json({ success: true, rolled: false });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/api/ceebee/settings', async (req, res) => {
     console.log('..GET /api/ceebee/settings called');
     try {
@@ -1248,11 +1342,13 @@ app.get('/api/ceebee/settings', async (req, res) => {
 app.post('/api/ceebee/settings', async (req, res) => {
     console.log('..POST /api/ceebee/settings called with:', req.body);
     try {
-        const { auto_participate, min_messages, max_messages } = req.body;
+        const { auto_participate, min_messages, max_messages, game_enabled, dynamic_weather_enabled } = req.body;
         const settings = await db.updateCeebeeSettings(
             auto_participate !== undefined ? !!auto_participate : false,
             parseInt(min_messages, 10) || 10,
-            parseInt(max_messages, 10) || 15
+            parseInt(max_messages, 10) || 15,
+            game_enabled !== undefined ? !!game_enabled : true,
+            dynamic_weather_enabled !== undefined ? !!dynamic_weather_enabled : true
         );
         res.json(settings);
     } catch (err) {

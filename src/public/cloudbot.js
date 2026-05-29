@@ -258,6 +258,24 @@ UserLanded = function (user, curScore) {
             console.log("... no new highscore, try again");
         }
         persistUserScore(_streamSession.UserSession[userPos]);
+
+        // Roll for item drops on landed
+        fetch('/api/loot/add-drop-item', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: user })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success && data.rolled) {
+                const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb' };
+                const itemStr = emojiMap[data.item];
+                setTimeout(() => {
+                    ChatBotSay(`@${user} landed successfully and discovered a ${itemStr}!`);
+                }, 1500); // delay announcement slightly so high score party displays first
+            }
+        })
+        .catch(err => console.error('Error rolling drop item:', err));
     }
     else {
         console.log("... User NOT found?!");
@@ -310,7 +328,11 @@ StatsFor = function (user) {
 
 
     if (userPos >= 0) {
-        msg = `Tentative(s): ${_streamSession.UserSession[userPos].dropCount} <br />Landed: ${_streamSession.UserSession[userPos].landedCount} <br />Highest score: ${_streamSession.UserSession[userPos].highScore}`
+        const u = _streamSession.UserSession[userPos];
+        msg = `Tentative(s): ${u.dropCount} <br />Landed: ${u.landedCount} <br />Highest score: ${u.highScore}`;
+        if (u.dropCount >= 5 && (!u.landedCount || u.landedCount === 0)) {
+            msg += ' ... loser ;p';
+        }
     }
 
     // ComfyJS.Say( msg.replace(/<br \/>|<br\/>/g, "   ") );
