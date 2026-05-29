@@ -87,10 +87,39 @@ app.post('/Hello', (req, res) => {
     }
 });
 
+function wrapText(text, maxCharsPerLine = 30) {
+    if (!text) return '';
+    return text.split('\n').map(line => {
+        const words = line.split(' ');
+        let lines = [];
+        let currentLine = '';
+
+        for (const word of words) {
+            const lengthCheck = currentLine.length + word.length + (currentLine ? 1 : 0);
+            if (lengthCheck > maxCharsPerLine) {
+                if (currentLine) {
+                    lines.push(currentLine);
+                }
+                currentLine = word;
+            } else {
+                if (currentLine) {
+                    currentLine += ' ' + word;
+                } else {
+                    currentLine = word;
+                }
+            }
+        }
+        if (currentLine) {
+            lines.push(currentLine);
+        }
+        return lines.join('\n');
+    }).join('\n');
+}
+
 app.post('/Attention', (req, res) => {
     if (req.body && req.body.user && req.body.message) {
         const user = req.body.user;
-        const userMsg = req.body.message;
+        const userMsg = wrapText(req.body.message, 30);
         let filename = dateFormat(new Date(), 'yyyy-mm-dd-HHMM') + `_Att-${user}.png`;
         console.log(`new image: ${filename}`);
         const msg = `${user} said:\n${userMsg}`;
