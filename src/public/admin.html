@@ -554,7 +554,7 @@
                         <div class="card-body">
                             <div class="form-check form-switch mb-3">
                                 <input class="form-check-input" type="checkbox" role="switch" id="autoParticipateToggle">
-                                <label class="form-check-label text-light" for="autoParticipateToggle">Enable Auto-Participation (chime in every ~10-15 messages)</label>
+                                <label class="form-check-label text-light" for="autoParticipateToggle" id="autoParticipateLabel">Enable Auto-Participation (chime in every ~10-15 messages)</label>
                             </div>
                             <div class="row">
                                 <div class="col-md-6 mb-3">
@@ -738,6 +738,22 @@
             setInterval(renderSessionReminders, 5000);
             setInterval(renderSessionScores, 5000);
             renderSessionScores();
+
+            // Setup Ceebee settings auto-participation inputs real-time text updates
+            const APMin = document.getElementById('autoParticipateMin');
+            const APMax = document.getElementById('autoParticipateMax');
+            if (APMin && APMax) {
+                APMin.addEventListener('input', () => {
+                    const min = parseInt(APMin.value, 10) || 10;
+                    const max = parseInt(APMax.value, 10) || 15;
+                    updateLabelText(min, max);
+                });
+                APMax.addEventListener('input', () => {
+                    const min = parseInt(APMin.value, 10) || 10;
+                    const max = parseInt(APMax.value, 10) || 15;
+                    updateLabelText(min, max);
+                });
+            }
         });
 
         // Poll for effects from stream view
@@ -1815,13 +1831,27 @@
             }
         }
 
+        function updateLabelText(min, max) {
+            const label = document.getElementById('autoParticipateLabel');
+            if (label) {
+                if (min === max) {
+                    label.textContent = `Enable Auto-Participation (chime in every ~${min} messages)`;
+                } else {
+                    label.textContent = `Enable Auto-Participation (chime in every ~${min}-${max} messages)`;
+                }
+            }
+        }
+
         async function loadCeebeeSettings() {
             try {
                 const response = await fetch('/api/ceebee/settings');
                 const data = await response.json();
                 document.getElementById('autoParticipateToggle').checked = !!data.auto_participate;
-                document.getElementById('autoParticipateMin').value = data.min_messages ?? 10;
-                document.getElementById('autoParticipateMax').value = data.max_messages ?? 15;
+                const minVal = data.min_messages ?? 10;
+                const maxVal = data.max_messages ?? 15;
+                document.getElementById('autoParticipateMin').value = minVal;
+                document.getElementById('autoParticipateMax').value = maxVal;
+                updateLabelText(minVal, maxVal);
             } catch (err) {
                 console.error('Error loading Ceebee settings:', err);
             }
@@ -1847,6 +1877,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ auto_participate, min_messages, max_messages })
                 });
+                updateLabelText(min_messages, max_messages);
                 showFeedback('Auto-participation settings saved.');
             } catch (err) {
                 console.error('Error saving Ceebee settings:', err);

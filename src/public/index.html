@@ -91,7 +91,7 @@
 
         function shouldCountMessage(user, message, flags) {
             const lowerUser = user.toLowerCase();
-            if (lowerUser === 'ceebee_bot' || lowerUser === 'ceebee' || lowerUser === 'fboucheros') return false;
+            if (lowerUser === 'ceebee_bot' || lowerUser === 'ceebee') return false;
             if (lowerUser === 'streamlabs' || lowerUser === 'nightbot' || lowerUser === 'streamelements') return false;
             
             const trimmed = message.trim();
@@ -444,10 +444,11 @@
                 if (shouldCountMessage(user, message, flags)) {
                     ceebeeAccumulatedMessages.push(`${user}: ${message}`);
                     ceebeeChatCounter++;
-                    console.log(`Ceebee auto-participation count: ${ceebeeChatCounter}/${ceebeeTargetLimit}`);
+                    console.log(`[Ceebee Auto] Message counted from ${user}: "${message}". Count: ${ceebeeChatCounter}/${ceebeeTargetLimit}`);
                     
                     if (ceebeeChatCounter >= ceebeeTargetLimit) {
                         const transcript = ceebeeAccumulatedMessages.join('\n');
+                        console.log(`[Ceebee Auto] Threshold reached (${ceebeeTargetLimit}). Triggering participation API call...`);
                         
                         // Reset immediately to avoid duplicate triggers
                         ceebeeChatCounter = 0;
@@ -462,11 +463,16 @@
                         .then(res => res.json())
                         .then(data => {
                             if (data && data.response) {
+                                console.log('[Ceebee Auto] Received AI response:', data.response);
                                 CeebeeSay(data.response);
+                            } else {
+                                console.warn('[Ceebee Auto] Received empty response from API.');
                             }
                         })
-                        .catch(err => console.error('Error triggering auto-participation:', err));
+                        .catch(err => console.error('[Ceebee Auto] Error triggering auto-participation:', err));
                     }
+                } else {
+                    console.log(`[Ceebee Auto] Message from ${user} ignored by filter: "${message}"`);
                 }
             }
 
