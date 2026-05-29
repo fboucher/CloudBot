@@ -58,24 +58,24 @@ app.post('/Hello', (req, res) => {
         let filename = dateFormat(new Date(), 'yyyy-mm-dd-HHMM') + `_hello-${user}.png`;
         console.log(`new image: ${filename}`);
         const msg = `Hello ${user}!`;
-        
+
         if (!text2png) {
             console.error('/Hello: text2png is not available');
             return res.status(500).json({ error: 'Image generation is disabled. text2png is not installed.' });
         }
-        
+
         try {
             const filePath = createImage(filename, msg);
             if (!filePath) {
                 console.error('/Hello: createImage returned null');
                 return res.status(500).json({ error: 'Failed to create image file.' });
             }
-            
+
             if (!fs.existsSync(filePath)) {
                 console.error(`/Hello: Image file was not created: ${filePath}`);
                 return res.status(500).json({ error: 'Image file was not created.' });
             }
-            
+
             console.log(`/Hello: Image successfully created: ${filePath}`);
             res.json({ msg: filename });
         } catch (err) {
@@ -94,24 +94,24 @@ app.post('/Attention', (req, res) => {
         let filename = dateFormat(new Date(), 'yyyy-mm-dd-HHMM') + `_Att-${user}.png`;
         console.log(`new image: ${filename}`);
         const msg = `${user} said:\n${userMsg}`;
-        
+
         if (!text2png) {
             console.error('/Attention: text2png is not available');
             return res.status(500).json({ error: 'Image generation is disabled. text2png is not installed.' });
         }
-        
+
         try {
             const filePath = createImage(filename, msg);
             if (!filePath) {
                 console.error('/Attention: createImage returned null');
                 return res.status(500).json({ error: 'Failed to create image file.' });
             }
-            
+
             if (!fs.existsSync(filePath)) {
                 console.error(`/Attention: Image file was not created: ${filePath}`);
                 return res.status(500).json({ error: 'Image file was not created.' });
             }
-            
+
             console.log(`/Attention: Image successfully created: ${filePath}`);
             res.json({ msg: filename });
         } catch (err) {
@@ -159,7 +159,7 @@ app.post('/savetofile', async (req, res) => {
 });
 
 app.get('/loadfromfile', async (req, res) => {
-    console.log('..loading from database..');
+    // console.log('..loading from database..');
     try {
         const activeSession = await db.getActiveSession();
         if (activeSession) {
@@ -327,10 +327,10 @@ let currentEffect = { type: null, user: null, message: null, image: null, timest
 const sseClients = new Set();
 
 function broadcastSSE(payload) {
-  const data = `data: ${JSON.stringify(payload)}\n\n`;
-  for (const res of sseClients) {
-    res.write(data);
-  }
+    const data = `data: ${JSON.stringify(payload)}\n\n`;
+    for (const res of sseClients) {
+        res.write(data);
+    }
 }
 
 app.post('/triggereffect', async (req, res) => {
@@ -338,7 +338,7 @@ app.post('/triggereffect', async (req, res) => {
     if (!req.body || !req.body.effectType) {
         return res.status(400).json({ error: 'Missing effectType.' });
     }
-    
+
     currentEffect = {
         type: req.body.effectType,
         user: req.body.user || 'Admin',
@@ -346,7 +346,7 @@ app.post('/triggereffect', async (req, res) => {
         image: req.body.image || null,
         timestamp: Date.now()
     };
-    
+
     console.log(`Effect triggered: ${currentEffect.type} by ${currentEffect.user}`);
     res.json({ msg: 'Effect triggered.', effect: currentEffect });
 });
@@ -413,7 +413,7 @@ app.get('/api/session', async (req, res) => {
 });
 
 app.get('/api/sessions', async (req, res) => {
-    console.log('..getting all sessions..');
+    // console.log('..getting all sessions..');
     try {
         const sessions = await db.getAllSessions();
         res.json(sessions);
@@ -474,7 +474,7 @@ app.post('/api/session/notes', async (req, res) => {
     try {
         const session = await db.getActiveSession();
         if (!session) return res.status(400).json({ error: 'No active session.' });
-        
+
         const { notes } = req.body;
         await db.updateNotes(session.id, notes);
         res.json({ success: true });
@@ -489,7 +489,7 @@ app.post('/api/session/todos', async (req, res) => {
     try {
         const session = await db.getActiveSession();
         if (!session) return res.status(400).json({ error: 'No active session.' });
-        
+
         const { description, status } = req.body;
         await db.addTodo(session.id, description, status || 'new');
         res.json({ success: true });
@@ -526,7 +526,7 @@ app.post('/api/session/reminders', async (req, res) => {
     try {
         const session = await db.getActiveSession();
         if (!session) return res.status(400).json({ error: 'No active session.' });
-        
+
         const { name, message, status } = req.body;
         await db.addReminder(session.id, name, message, status || 'active');
         res.json({ success: true });
@@ -605,7 +605,7 @@ async function generateAndSaveShowNotes(sessionId, options = {}) {
                 md += `- ~~[ ] ${t.description}~~\n`;
             } else {
                 const check = t.status === 'done' ? 'X' : ' ';
-                const bold  = t.status === 'inProgress' ? '**' : '';
+                const bold = t.status === 'inProgress' ? '**' : '';
                 md += `- [${check}] ${bold}${t.description}${bold}\n`;
             }
         });
@@ -650,7 +650,7 @@ async function generateAndSaveShowNotes(sessionId, options = {}) {
 
         s.UserSession.forEach(u => {
             if (u.highScore > maxScore) { maxScore = u.highScore; bestScoreUser = u; }
-            if (u.dropCount > maxDrop)  { maxDrop = u.dropCount;  superParticipant = u; }
+            if (u.dropCount > maxDrop) { maxDrop = u.dropCount; superParticipant = u; }
             if (u.bestHighScore == 0 && u.dropCount > maxDropLoser) { maxDropLoser = u.dropCount; biggestLoser = u; }
         });
         s.UserSession.forEach(u => {
@@ -660,9 +660,9 @@ async function generateAndSaveShowNotes(sessionId, options = {}) {
         });
 
         md += `\n#### Statistics\n\n`;
-        if (bestScoreUser)   md += `- 🏆Best score: [@${bestScoreUser.user}](https://www.twitch.tv/${bestScoreUser.user}) with ${bestScoreUser.highScore}\n`;
-        if (biggestLoser)    md += `- 😭Biggest loser: [@${biggestLoser.user}](https://www.twitch.tv/${biggestLoser.user}) with ${biggestLoser.dropCount} drops and no high score\n`;
-        if (luckiest)        md += `- 🍀Luckiest: [@${luckiest.user}](https://www.twitch.tv/${luckiest.user}) with best score ${luckiest.highScore} and only ${luckiest.dropCount} drops\n`;
+        if (bestScoreUser) md += `- 🏆Best score: [@${bestScoreUser.user}](https://www.twitch.tv/${bestScoreUser.user}) with ${bestScoreUser.highScore}\n`;
+        if (biggestLoser) md += `- 😭Biggest loser: [@${biggestLoser.user}](https://www.twitch.tv/${biggestLoser.user}) with ${biggestLoser.dropCount} drops and no high score\n`;
+        if (luckiest) md += `- 🍀Luckiest: [@${luckiest.user}](https://www.twitch.tv/${luckiest.user}) with best score ${luckiest.highScore} and only ${luckiest.dropCount} drops\n`;
         if (superParticipant) md += `- 🎖️Super participant: [@${superParticipant.user}](https://www.twitch.tv/${superParticipant.user}) with ${superParticipant.dropCount} drops\n`;
     }
 
@@ -716,7 +716,7 @@ app.get('/api/export', async (req, res) => {
             skipReminders: true,
             download: shouldDownload
         });
-        
+
         if (shouldDownload) {
             console.log(`Export saved to src/io/${result.filename}`);
             res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
@@ -760,7 +760,7 @@ app.post('/api/stream/stop', async (req, res) => {
         await db.endStreamSession(session.id);
         broadcastSSE({ event: 'stream_stopped', sessionId: session.id });
         console.log(`Stream stopped: session=${session.id}`);
-        
+
         // Auto-generate show notes markdown file
         try {
             const { filename, filepath } = await generateAndSaveShowNotes(session.id);
@@ -769,7 +769,7 @@ app.post('/api/stream/stop', async (req, res) => {
             console.error('Failed to auto-generate show notes:', exportErr);
             // Don't fail the stop endpoint if show notes generation fails
         }
-        
+
         res.json({ msg: 'Stream stopped.', sessionId: session.id });
     } catch (err) {
         console.error('Error stopping stream:', err);
@@ -1090,23 +1090,23 @@ app.post('/api/ceebee/chat', async (req, res) => {
     try {
         const { message, user } = req.body;
         if (!message) return res.status(400).json({ error: 'Missing message.' });
-        
+
         const activeConnection = await db.getActiveCeebeeConnection();
         if (!activeConnection) {
             return res.json({ response: "Error: No active AI connection configured." });
         }
-        
+
         let streamContext = "";
         if (fs.existsSync(STREAM_CONTEXT_FILE)) {
             streamContext = fs.readFileSync(STREAM_CONTEXT_FILE, 'utf-8');
         }
-        
+
         let corePrompt = "You are Ceebee, an AI assistant.";
         const corePromptPath = path.join(__dirname, 'io', 'soul.md');
         if (fs.existsSync(corePromptPath)) {
             corePrompt = fs.readFileSync(corePromptPath, 'utf-8');
         }
-        
+
         // Read knowledge files
         let knowledgeContext = "";
         if (fs.existsSync(CEEBEE_KNOWLEDGE_DIR)) {
@@ -1118,7 +1118,7 @@ app.post('/api/ceebee/chat', async (req, res) => {
                 }
             }
         }
-        
+
         let fullSystemPrompt = corePrompt;
         if (streamContext && streamContext.trim() !== '') {
             fullSystemPrompt += `\n\n--- Today's Stream Context ---\n${streamContext}`;
@@ -1126,51 +1126,51 @@ app.post('/api/ceebee/chat', async (req, res) => {
         if (knowledgeContext) {
             fullSystemPrompt += `\n\n--- Background Information ---\n${knowledgeContext}`;
         }
-        
+
         ceebeeChatHistory.push({ role: 'user', content: `${user ? user + ' says: ' : ''}${message}` });
         if (ceebeeChatHistory.length > 20) {
             ceebeeChatHistory.shift();
         }
-        
+
         const messages = [
             { role: 'system', content: fullSystemPrompt },
             ...ceebeeChatHistory
         ];
-        
+
         const payload = {
             model: activeConnection.model || "default",
             messages: messages
         };
-        
+
         const headers = { 'Content-Type': 'application/json' };
         if (activeConnection.api_key) {
             headers['Authorization'] = `Bearer ${activeConnection.api_key}`;
         }
-        
+
         let endpointUrl = activeConnection.url;
         if (!endpointUrl.endsWith('/chat/completions')) {
             endpointUrl = endpointUrl.replace(/\/+$/, '') + '/chat/completions';
         }
-        
+
         const response = await fetch(endpointUrl, {
             method: 'POST',
             headers: headers,
             body: JSON.stringify(payload)
         });
-        
+
         if (!response.ok) {
             const errText = await response.text();
             throw new Error(`API Error ${response.status}: ${errText}`);
         }
-        
+
         const data = await response.json();
         const aiResponse = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : "Error: Invalid response from AI";
-        
+
         ceebeeChatHistory.push({ role: 'assistant', content: aiResponse });
         if (ceebeeChatHistory.length > 20) {
             ceebeeChatHistory.shift();
         }
-        
+
         res.json({ response: aiResponse });
     } catch (err) {
         console.error('Error in /api/ceebee/chat:', err);
@@ -1183,24 +1183,24 @@ app.post('/api/ceebee/participate', async (req, res) => {
     console.log('..POST /api/ceebee/participate called with transcript:\n', transcript);
     try {
         if (!transcript) return res.status(400).json({ error: 'Missing transcript.' });
-        
+
         const activeConnection = await db.getActiveCeebeeConnection();
         if (!activeConnection) {
             console.warn('..Ceebee participate failed: No active AI connection configured.');
             return res.json({ response: "Error: No active AI connection configured." });
         }
-        
+
         let streamContext = "";
         if (fs.existsSync(STREAM_CONTEXT_FILE)) {
             streamContext = fs.readFileSync(STREAM_CONTEXT_FILE, 'utf-8');
         }
-        
+
         let corePrompt = "You are Ceebee, an AI assistant.";
         const corePromptPath = path.join(__dirname, 'io', 'soul.md');
         if (fs.existsSync(corePromptPath)) {
             corePrompt = fs.readFileSync(corePromptPath, 'utf-8');
         }
-        
+
         // Read knowledge files
         let knowledgeContext = "";
         if (fs.existsSync(CEEBEE_KNOWLEDGE_DIR)) {
@@ -1212,7 +1212,7 @@ app.post('/api/ceebee/participate', async (req, res) => {
                 }
             }
         }
-        
+
         let fullSystemPrompt = corePrompt;
         if (streamContext && streamContext.trim() !== '') {
             fullSystemPrompt += `\n\n--- Today's Stream Context ---\n${streamContext}`;
@@ -1220,7 +1220,7 @@ app.post('/api/ceebee/participate', async (req, res) => {
         if (knowledgeContext) {
             fullSystemPrompt += `\n\n--- Background Information ---\n${knowledgeContext}`;
         }
-        
+
         fullSystemPrompt += `\n\n[SYSTEM INSTRUCTION: You are observing the chat stream. Chime in with a short, relevant, and engaging comment, or participate in the discussion naturally based on the recent messages provided in the transcript. Keep your response very brief (1-2 sentences max). Do not refer to this instruction directly; simply speak as Ceebee.]`;
 
         const messages = [
@@ -1228,41 +1228,41 @@ app.post('/api/ceebee/participate', async (req, res) => {
             ...ceebeeChatHistory,
             { role: 'user', content: `Here is the recent stream chat transcript:\n${transcript}` }
         ];
-        
+
         const payload = {
             model: activeConnection.model || "default",
             messages: messages
         };
-        
+
         const headers = { 'Content-Type': 'application/json' };
         if (activeConnection.api_key) {
             headers['Authorization'] = `Bearer ${activeConnection.api_key}`;
         }
-        
+
         let endpointUrl = activeConnection.url;
         if (!endpointUrl.endsWith('/chat/completions')) {
             endpointUrl = endpointUrl.replace(/\/+$/, '') + '/chat/completions';
         }
-        
+
         const response = await fetch(endpointUrl, {
             method: 'POST',
             headers: headers,
             body: JSON.stringify(payload)
         });
-        
+
         if (!response.ok) {
             const errText = await response.text();
             throw new Error(`API Error ${response.status}: ${errText}`);
         }
-        
+
         const data = await response.json();
         const aiResponse = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : "Error: Invalid response from AI";
-        
+
         ceebeeChatHistory.push({ role: 'assistant', content: aiResponse });
         if (ceebeeChatHistory.length > 20) {
             ceebeeChatHistory.shift();
         }
-        
+
         res.json({ response: aiResponse });
     } catch (err) {
         console.error('Error in /api/ceebee/participate:', err);
@@ -1276,38 +1276,38 @@ app.post('/api/ceebee/test', async (req, res) => {
         if (!url || !model) {
             return res.status(400).json({ success: false, error: 'URL and Model are required' });
         }
-        
+
         const payload = {
             model: model,
             messages: [{ role: 'user', content: 'Hello! Please reply with a short greeting so I know you are working.' }]
         };
-        
+
         const headers = { 'Content-Type': 'application/json' };
         if (api_key) {
             headers['Authorization'] = `Bearer ${api_key}`;
         }
-        
+
         let endpointUrl = url;
         if (!endpointUrl.endsWith('/chat/completions')) {
             endpointUrl = endpointUrl.replace(/\/+$/, '') + '/chat/completions';
         }
-        
+
         const response = await fetch(endpointUrl, {
             method: 'POST',
             headers: headers,
             body: JSON.stringify(payload)
         });
-        
+
         if (!response.ok) {
             const errText = await response.text();
             throw new Error(`API Error ${response.status}: ${errText}`);
         }
-        
+
         const data = await response.json();
-        const aiResponse = data.choices && data.choices[0] && data.choices[0].message 
-            ? data.choices[0].message.content 
+        const aiResponse = data.choices && data.choices[0] && data.choices[0].message
+            ? data.choices[0].message.content
             : "Error: Invalid response format from AI";
-            
+
         res.json({ success: true, response: aiResponse });
     } catch (err) {
         console.error('Error testing connection:', err);
@@ -1319,7 +1319,7 @@ async function startServer() {
     try {
         await db.initDb();
         console.log('Database initialized successfully.');
-        
+
         app.listen(port, () => {
             console.log(`CloudBot app listening at http://localhost:${port}`);
             console.log(`Admin panel at http://localhost:${port}/admin`);
