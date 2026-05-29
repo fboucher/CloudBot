@@ -1061,6 +1061,29 @@ app.post('/api/ceebee/context', async (req, res) => {
     }
 });
 
+app.get('/api/ceebee/settings', async (req, res) => {
+    try {
+        const settings = await db.getCeebeeSettings();
+        res.json(settings);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/ceebee/settings', async (req, res) => {
+    try {
+        const { auto_participate, min_messages, max_messages } = req.body;
+        const settings = await db.updateCeebeeSettings(
+            auto_participate !== undefined ? !!auto_participate : false,
+            parseInt(min_messages, 10) || 10,
+            parseInt(max_messages, 10) || 15
+        );
+        res.json(settings);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post('/api/ceebee/chat', async (req, res) => {
     try {
         const { message, user } = req.body;
@@ -1149,6 +1172,96 @@ app.post('/api/ceebee/chat', async (req, res) => {
         res.json({ response: aiResponse });
     } catch (err) {
         console.error('Error in /api/ceebee/chat:', err);
+        res.json({ response: `Error: ${err.message}` });
+    }
+});
+
+app.post('/api/ceebee/participate', async (req, res) => {
+    try {
+        const { transcript } = req.body;
+        if (!transcript) return res.status(400).json({ error: 'Missing transcript.' });
+        
+        const activeConnection = await db.getActiveCeebeeConnection();
+        if (!activeConnection) {
+            return res.json({ response: "Error: No active AI connection configured." });
+        }
+        
+        let streamContext = "";
+        if (fs.existsSync(STREAM_CONTEXT_FILE)) {
+            streamContext = fs.readFileSync(STREAM_CONTEXT_FILE, 'utf-8');
+        }
+        
+        let corePrompt = "You are Ceebee, an AI assistant.";
+        const corePromptPath = path.join(__dirname, 'io', 'soul.md');
+        if (fs.existsSync(corePromptPath)) {
+            corePrompt = fs.readFileSync(corePromptPath, 'utf-8');
+        }
+        
+        // Read knowledge files
+        let knowledgeContext = "";
+        if (fs.existsSync(CEEBEE_KNOWLEDGE_DIR)) {
+            const files = fs.readdirSync(CEEBEE_KNOWLEDGE_DIR);
+            for (const file of files) {
+                if (file.endsWith('.md')) {
+                    const content = fs.readFileSync(path.join(CEEBEE_KNOWLEDGE_DIR, file), 'utf-8');
+                    knowledgeContext += `\n\n--- Document: ${file} ---\n${content}`;
+                }
+            }
+        }
+        
+        let fullSystemPrompt = corePrompt;
+        if (streamContext && streamContext.trim() !== '') {
+            fullSystemPrompt += `\n\n--- Today's Stream Context ---\n${streamContext}`;
+        }
+        if (knowledgeContext) {
+            fullSystemPrompt += `\n\n--- Background Information ---\n${knowledgeContext}`;
+        }
+        
+        fullSystemPrompt += `\n\n[SYSTEM INSTRUCTION: You are observing the chat stream. Chime in with a short, relevant, and engaging comment, or participate in the discussion naturally based on the recent messages provided in the transcript. Keep your response very brief (1-2 sentences max). Do not refer to this instruction directly; simply speak as Ceebee.]`;
+
+        const messages = [
+            { role: 'system', content: fullSystemPrompt },
+            ...ceebeeChatHistory,
+            { role: 'user', content: `Here is the recent stream chat transcript:\n${transcript}` }
+        ];
+        
+        const payload = {
+            model: activeConnection.model || "default",
+            messages: messages
+        };
+        
+        const headers = { 'Content-Type': 'application/json' };
+        if (activeConnection.api_key) {
+            headers['Authorization'] = `Bearer ${activeConnection.api_key}`;
+        }
+        
+        let endpointUrl = activeConnection.url;
+        if (!endpointUrl.endsWith('/chat/completions')) {
+            endpointUrl = endpointUrl.replace(/\/+$/, '') + '/chat/completions';
+        }
+        
+        const response = await fetch(endpointUrl, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`API Error ${response.status}: ${errText}`);
+        }
+        
+        const data = await response.json();
+        const aiResponse = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : "Error: Invalid response from AI";
+        
+        ceebeeChatHistory.push({ role: 'assistant', content: aiResponse });
+        if (ceebeeChatHistory.length > 20) {
+            ceebeeChatHistory.shift();
+        }
+        
+        res.json({ response: aiResponse });
+    } catch (err) {
+        console.error('Error in /api/ceebee/participate:', err);
         res.json({ response: `Error: ${err.message}` });
     }
 });

@@ -94,6 +94,12 @@ async function createTables() {
       id INTEGER PRIMARY KEY,
       system_prompt TEXT
     )`,
+    `CREATE TABLE IF NOT EXISTS ceebee_settings (
+      id INTEGER PRIMARY KEY,
+      auto_participate INTEGER DEFAULT 0,
+      min_messages INTEGER DEFAULT 10,
+      max_messages INTEGER DEFAULT 15
+    )`,
     `CREATE INDEX IF NOT EXISTS idx_users_session ON users(session_id)`,
     `CREATE INDEX IF NOT EXISTS idx_todos_session ON todos(session_id)`,
     `CREATE INDEX IF NOT EXISTS idx_reminders_session ON reminders(session_id)`,
@@ -150,6 +156,12 @@ async function createTables() {
     if (!soulRow) {
       await db.prepare("INSERT INTO ceebee_soul (id, system_prompt) VALUES (?, ?)").run(1, "You are Ceebee, an AI assistant.");
       console.log("Initialized ceebee_soul");
+    }
+
+    const settingsRow = await db.prepare("SELECT * FROM ceebee_settings WHERE id = 1").get();
+    if (!settingsRow) {
+      await db.prepare("INSERT INTO ceebee_settings (id, auto_participate, min_messages, max_messages) VALUES (?, ?, ?, ?)").run(1, 0, 10, 15);
+      console.log("Initialized ceebee_settings");
     }
   } catch (err) {
     console.error("Error creating tables:", err);
@@ -547,6 +559,20 @@ async function setCeebeeSoul(system_prompt) {
   await db.prepare("UPDATE ceebee_soul SET system_prompt = ? WHERE id = 1").run(system_prompt);
 }
 
+async function getCeebeeSettings() {
+  if (!db) await initDb();
+  const row = await db.prepare("SELECT auto_participate, min_messages, max_messages FROM ceebee_settings WHERE id = 1").get();
+  return row || { auto_participate: 0, min_messages: 10, max_messages: 15 };
+}
+
+async function updateCeebeeSettings(auto_participate, min_messages, max_messages) {
+  if (!db) await initDb();
+  await db.prepare(
+    "UPDATE ceebee_settings SET auto_participate = ?, min_messages = ?, max_messages = ? WHERE id = 1"
+  ).run(auto_participate ? 1 : 0, min_messages, max_messages);
+  return getCeebeeSettings();
+}
+
 module.exports = {
   initDb,
   getClient,
@@ -581,5 +607,7 @@ module.exports = {
   setActiveCeebeeConnection,
   getActiveCeebeeConnection,
   getCeebeeSoul,
-  setCeebeeSoul
+  setCeebeeSoul,
+  getCeebeeSettings,
+  updateCeebeeSettings
 };
