@@ -543,6 +543,31 @@
                             </table>
                         </div>
                     </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="card-title">Auto-Participation Settings</span>
+                            <button class="btn btn-cb btn-sm" onclick="saveCeebeeSettings()">
+                                <i class="bi bi-save"></i> Save Settings
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" role="switch" id="autoParticipateToggle">
+                                <label class="form-check-label text-light" for="autoParticipateToggle">Enable Auto-Participation (chime in every ~10-15 messages)</label>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label text-light">Min Messages Limit</label>
+                                    <input type="number" class="form-control bg-dark text-light border-secondary" id="autoParticipateMin" min="1" step="1" value="10">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label text-light">Max Messages Limit</label>
+                                    <input type="number" class="form-control bg-dark text-light border-secondary" id="autoParticipateMax" min="1" step="1" value="15">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     
                     <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center">
@@ -772,6 +797,7 @@
             if (pageName === 'ceebee') {
                 loadCeebeeConnections();
                 loadStreamContext();
+                loadCeebeeSettings();
             }
         }
 
@@ -1786,6 +1812,45 @@
             } catch (err) {
                 console.error(err);
                 alert('Test error: ' + err.message);
+            }
+        }
+
+        async function loadCeebeeSettings() {
+            try {
+                const response = await fetch('/api/ceebee/settings');
+                const data = await response.json();
+                document.getElementById('autoParticipateToggle').checked = !!data.auto_participate;
+                document.getElementById('autoParticipateMin').value = data.min_messages ?? 10;
+                document.getElementById('autoParticipateMax').value = data.max_messages ?? 15;
+            } catch (err) {
+                console.error('Error loading Ceebee settings:', err);
+            }
+        }
+
+        async function saveCeebeeSettings() {
+            const auto_participate = document.getElementById('autoParticipateToggle').checked;
+            const min_messages = parseInt(document.getElementById('autoParticipateMin').value, 10) || 10;
+            const max_messages = parseInt(document.getElementById('autoParticipateMax').value, 10) || 15;
+
+            if (min_messages < 1 || max_messages < 1) {
+                alert('Message limits must be at least 1.');
+                return;
+            }
+            if (min_messages > max_messages) {
+                alert('Minimum limit cannot be greater than Maximum limit.');
+                return;
+            }
+
+            try {
+                await fetch('/api/ceebee/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ auto_participate, min_messages, max_messages })
+                });
+                showFeedback('Auto-participation settings saved.');
+            } catch (err) {
+                console.error('Error saving Ceebee settings:', err);
+                alert('Error saving settings: ' + err.message);
             }
         }
     </script>
