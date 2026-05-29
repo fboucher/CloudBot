@@ -1,13 +1,11 @@
-class Note
-{
+class Note {
     constructor(text) {
         this.time = new Date();
         this.text = text;
     }
 }
 
-class UserSession
-{
+class UserSession {
     constructor(user) {
         this.lastUpdate = "";
         this.dropCount = 0;
@@ -19,7 +17,7 @@ class UserSession
     }
 }
 
-class Raider{
+class Raider {
 
     constructor(user, viewers) {
         this.user = user;
@@ -28,7 +26,7 @@ class Raider{
 }
 
 
-class Subscriber{
+class Subscriber {
 
     constructor(user, viewers) {
         this.user = user;
@@ -37,7 +35,7 @@ class Subscriber{
 }
 
 
-class Cheerer{
+class Cheerer {
 
     constructor(user, bits) {
         this.user = user;
@@ -45,7 +43,7 @@ class Cheerer{
     }
 }
 
-class Todo{
+class Todo {
 
     constructor(id, description, status) {
         this.id = id;
@@ -54,10 +52,10 @@ class Todo{
     }
 }
 
-class Reminder{
+class Reminder {
 
     constructor(name, message) {
-        
+
         this.Name = name;
         this.Message = message;
         this.Status = ReminderStatusEnum.active;
@@ -65,8 +63,8 @@ class Reminder{
     }
 }
 
-class TimeLog{
-    
+class TimeLog {
+
     constructor(user, message, time) {
         this.user = user;
         this.message = message;
@@ -74,33 +72,35 @@ class TimeLog{
     }
 }
 
-compareHightScore = function(a, b) {
+compareHightScore = function (a, b) {
     return a.highScore - b.highScore;
 }
 
-compareBestHightScore = function(a, b) {
+compareBestHightScore = function (a, b) {
     return a.bestHighScore - b.bestHighScore;
 }
 
-class StreamSession
-{
-    Project = function(value)
-    {
+class StreamSession {
+    Project = function (value) {
         this.Project = value;
     }
 
-    Id = function(value)
-    {
+    Id = function (value) {
         this.Id = value;
     }
 
-    Init = function(){
+    Title = function (value) {
+        this.Title = value;
+    }
+
+    Init = function () {
         this.Id = 0;
         this.Project = "";
+        this.Title = "";
         this.DateTimeStart = "";
         this.DateTimeEnd = "";
         this.Notes = [];
-        this.UserSession =  [];
+        this.UserSession = [];
         this.NewFollowers = [];
         this.Raiders = [];
         this.Subscribers = [];
@@ -114,10 +114,11 @@ class StreamSession
     constructor() {
         this.Id = 0;
         this.Project = "";
+        this.Title = "";
         this.DateTimeStart = "";
         this.DateTimeEnd = "";
         this.Notes = [];
-        this.UserSession =  [];
+        this.UserSession = [];
         this.NewFollowers = [];
         this.Raiders = [];
         this.Subscribers = [];
@@ -130,38 +131,37 @@ class StreamSession
 }
 
 const SoundEnum = {
-    yeah : "public/medias/yeah.mp3",
-    bonjourHi : "public/medias/BonjourHi.mp3",
-    sirbonjour : "public/medias/sir-bonjour-hi.mp3",
-    sirbonjourhowareyou : "public/medias/sir-bonjour-hi-how-are-you.mp3",
-    badFeeling : "public/medias/badfeeling.mp3",
+    yeah: "public/medias/yeah.mp3",
+    bonjourHi: "public/medias/BonjourHi.mp3",
+    sirbonjour: "public/medias/sir-bonjour-hi.mp3",
+    sirbonjourhowareyou: "public/medias/sir-bonjour-hi-how-are-you.mp3",
+    badFeeling: "public/medias/badfeeling.mp3",
     doorknock: "public/medias/knocking-on-door.mp3",
     hmmhmm: "public/medias/hmmhmm.mp3",
-    rain: "public/medias/rain.mp4",
+    rain: "public/medias/rain.mp3",
     rainUmbrella: "public/medias/Rain-On-Umbrella.com.mp3",
     previously: "public/medias/previously.mp3"
 };
 
 const TodoStatusEnum = {
-    new : "new",
-    inProgress : "inProgress",
-    done : "done",
+    new: "new",
+    inProgress: "inProgress",
+    done: "done",
     cancel: "cancel"
 };
 
 const ReminderStatusEnum = {
-    active : "active",
-    inactive : "inactive",
-    done : "done"
+    active: "active",
+    inactive: "inactive",
+    done: "done"
 };
 
-getUserPosition = function(userName)
-{
-    console.log( "... Searching for: " + userName );
-    for (i=0; i < _streamSession.UserSession.length; i++) {
-        console.log( "... looking at : " + _streamSession.UserSession[i].user );
+getUserPosition = function (userName) {
+    console.log("... Searching for: " + userName);
+    for (i = 0; i < _streamSession.UserSession.length; i++) {
+        console.log("... looking at : " + _streamSession.UserSession[i].user);
         if (_streamSession.UserSession[i].user === userName) {
-            console.log( "... found in position: " + i );
+            console.log("... found in position: " + i);
             return i;
         }
     }
@@ -171,15 +171,13 @@ getUserPosition = function(userName)
 
 
 
-updateTrace = function(message)
-{
+updateTrace = function (message) {
     document.querySelector("#cbTitle").innerHTML = message;
 }
 
 
 
-clean = function()
-{
+clean = function () {
     document.querySelector("#imageViewer").innerHTML = "";
     document.querySelector("#lastChatMsg").innerHTML = "";
     document.querySelector("#cbTitle").innerHTML = "";
@@ -187,43 +185,40 @@ clean = function()
 
 
 
-cloud = function(expression)
-{
+cloud = function (expression) {
 
     const fileName = "CB-" + expression + ".gif";
     document.querySelector("#imageViewer").innerHTML = "<img src='public/medias/" + fileName + "' class='nuage'>";
-    setTimeout(() => {  clean(); }, 5000);
+    setTimeout(() => { clean(); }, 5000);
 }
 
-ChatBotShow = function(expression, imgText)
-{
+ChatBotShow = function (expression, imgText) {
 
     const fileName = "CB-" + expression + ".gif";
     document.querySelector("#imageViewer").innerHTML = "<img src='public/medias/" + fileName + "' class='nuage'>";
     document.querySelector("#imageViewer").innerHTML += "<img src='public/medias/generated/" + imgText + "' class='textBubble'>";
-    setTimeout(() => {  clean(); }, 5000);
+    setTimeout(() => { clean(); }, 5000);
 }
 
 sleep = function (ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-scores = function()
-{
-    console.log( "!scores was typed in chat" );
+scores = function () {
+    console.log("!scores was typed in chat");
     const today = new Date();
     let cntScoreDisplayed = 1;
 
     var sortedUsers = _streamSession.UserSession.sort(compareHightScore);
-    
-    for ( i=0; i < sortedUsers.length; i++) {
+
+    for (i = 0; i < sortedUsers.length; i++) {
         //console.log(`... checking: ${sortedUsers[i].user} --- d2: ${sortedUsers[i].lastUpdate}`);
 
-        if(isSameDay(today, new Date(sortedUsers[i].lastUpdate))){
+        if (isSameDay(today, new Date(sortedUsers[i].lastUpdate))) {
             const msg = `${sortedUsers[i].user} --> ${sortedUsers[i].highScore}`;
             setTimeout(() => {
-                DisplayNotification( msg );
-            }, cntScoreDisplayed++ * 1000); 
+                DisplayNotification(msg);
+            }, cntScoreDisplayed++ * 1000);
         }
         // else{
         //     console.log( `... Skipping ${sortedUsers[i].user}, didn't play today.`);
@@ -233,78 +228,70 @@ scores = function()
 }
 
 
-isSameDay = function(d1, d2) {
+isSameDay = function (d1, d2) {
 
-    if((d1 instanceof Date) && (d2 instanceof Date)){
+    if ((d1 instanceof Date) && (d2 instanceof Date)) {
         return d1.getFullYear() === d2.getFullYear() &&
-        d1.getMonth() === d2.getMonth() &&
-        d1.getDate() === d2.getDate();
+            d1.getMonth() === d2.getMonth() &&
+            d1.getDate() === d2.getDate();
     }
     return false;
 }
 
 
-UserLanded = function(user, curScore)
-{
+UserLanded = function (user, curScore) {
     let userPos = getUserPosition(user);
 
-    if(userPos >= 0)
-    {
+    if (userPos >= 0) {
         _streamSession.UserSession[userPos].landedCount++;
 
-        if(_streamSession.UserSession[userPos].highScore < curScore)
-        {
-            console.log( "... New highscore " + curScore);
+        if (_streamSession.UserSession[userPos].highScore < curScore) {
+            console.log("... New highscore " + curScore);
             _streamSession.UserSession[userPos].highScore = curScore;
 
-            if(_streamSession.UserSession[userPos].bestHighScore < curScore)
-            {
+            if (_streamSession.UserSession[userPos].bestHighScore < curScore) {
                 _streamSession.UserSession[userPos].bestHighScore = curScore;
             }
             HightScoreParty(user, curScore);
         }
-        else{
-            console.log( "... no new highscore, try again");
+        else {
+            console.log("... no new highscore, try again");
         }
+        persistUserScore(_streamSession.UserSession[userPos]);
     }
-    else
-    {
-        console.log( "... User NOT found?!");
+    else {
+        console.log("... User NOT found?!");
     }
 }
 
-        
 
-ParseMessage = function(message)
-{
+
+ParseMessage = function (message) {
     // FBoucheros: FBoucheros landed for 86.60!
     let splitedMsg = message.split(" ");
-   
-    if(splitedMsg.length > 1 && splitedMsg[1] === "landed")
-    {
+
+    if (splitedMsg.length > 1 && splitedMsg[1] === "landed") {
         let user = splitedMsg[0].toLowerCase();
         let curScore = splitedMsg[3].slice(0, -1);
 
         UserLanded(user, curScore);
     }
-    else if( message.startsWith("Thank you for following") )
-    {
+    else if (message.startsWith("Thank you for following")) {
         let user = splitedMsg[4].toLowerCase().slice(0, -1);
         _streamSession.NewFollowers.push(user);
     }
 }
 
 
-DisplayNotification = function(title, message)
-{
-    console.log( "... displaying notification: " + message);
+DisplayNotification = function (title, message) {
+    console.log("... displaying notification: " + message);
     displayAnnouncement(title, message, 'theme-cb');
 }
 
 
-HightScoreParty = function(user, score){
+HightScoreParty = function (user, score) {
     let msg = `${user} just beat his/her highest score! now at: ${score}`
-    console.log( "... " + msg);
+    console.log("... " + msg);
     //ChatBotShout(msg);
     DisplayNotification("New high score!", msg);
     cloud("Yeah");
@@ -313,161 +300,188 @@ HightScoreParty = function(user, score){
 
 
 
-StatsFor = function(user){
-    
-    console.log( "... looking stats for: " + user);
+StatsFor = function (user) {
+
+    console.log("... looking stats for: " + user);
     let userPos = getUserPosition(user);
-    console.log( "... userPos: " + userPos);
+    console.log("... userPos: " + userPos);
 
     let msg = `${user} sorry no stats yet...`
 
 
-    if(userPos >= 0)
-    {
+    if (userPos >= 0) {
         msg = `Tentative(s): ${_streamSession.UserSession[userPos].dropCount} <br />Landed: ${_streamSession.UserSession[userPos].landedCount} <br />Highest score: ${_streamSession.UserSession[userPos].highScore}`
     }
 
-    //console.log( "... " + msg.replace(/<br \/>/g, "   "));
-    ComfyJS.Say( msg.replace(/<br \/>|<br\/>/g, "   ") );
+    // ComfyJS.Say( msg.replace(/<br \/>|<br\/>/g, "   ") );
+    if (typeof CeebeeSay !== 'undefined') {
+        CeebeeSay(msg.replace(/<br \/>|<br\/>/g, "   "));
+    } else {
+        ComfyJS.Say(msg.replace(/<br \/>|<br\/>/g, "   "));
+    }
     DisplayNotification(`${user} Stats`, msg)
-    //document.querySelector("#cbTitle").innerHTML = msg;
-    setTimeout(() => {  clean(); }, 5000);
+
+    setTimeout(() => { clean(); }, 5000);
 }
 
 
 
-ChatBotSay = function(msg)
-{
-    ComfyJS.Say( msg );
+ChatBotSay = function (msg) {
+    // ComfyJS.Say(msg);
+
+    if (typeof CeebeeSay !== 'undefined') {
+        CeebeeSay(msg);
+    } else {
+        ComfyJS.Say(msg);
+    }
 }
 
 
 
 
-ChatBotShout = function(message)
-{
-    console.log( "!ChatBotShout was typed in chat" );
-    document.querySelector("#cbTitle").innerText = message 
+ChatBotShout = function (message) {
+    console.log("!ChatBotShout was typed in chat");
+    document.querySelector("#cbTitle").innerText = message
     setTimeout(() => { document.querySelector("#cbTitle").innerText = ""; }, 5000);
 }
 
 
 
-IncrementDropCounter = function(user)
-{
+async function persistUserScore(user) {
+    fetch('/api/users/score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            username: user.user,
+            dropCount: user.dropCount || 0,
+            landedCount: user.landedCount || 0,
+            highScore: user.highScore || 0,
+            bestHighScore: user.bestHighScore || 0
+        })
+    }).catch(err => console.error('Failed to persist score:', err));
+}
+
+IncrementDropCounter = function (user) {
     let userPos = getUserPosition(user);
     _streamSession.UserSession[userPos].dropCount++;
     _streamSession.UserSession[userPos].lastUpdate = new Date();
+    persistUserScore(_streamSession.UserSession[userPos]);
 }
 
 
 
-hello = function(user)
-{
-    const data = {user: user};
+hello = function (user) {
+    const data = { user: user };
     const options = {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     }
 
     fetch('/Hello', options)
-    .then(response => response.json())
-    .then(result => {
-        console.log('Success:', result);
-        //ChatBotSay(result.msg);
+        .then(response => response.json())
+        .then(result => {
+            console.log('Success:', result);
+            //ChatBotSay(result.msg);
 
-        setTimeout(() => {
-            ChatBotShow('Thumbs-up', result.msg)
-        }, 1000); 
-        
-    })
-    .catch(error => {
-        console.error('Error:', error);
-    });
+            setTimeout(() => {
+                ChatBotShow('Thumbs-up', result.msg)
+            }, 1000);
+
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
 
 }
 
 
 
-Attention = function(user, message)
-{
-    const data = {user: user, message: message};
+Attention = function (user, message) {
+    const data = { user: user, message: message };
     const options = {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     }
 
     fetch('/Attention', options)
-    .then(response => response.json())
-    .then(result => {
-        console.log('Success:', result);
-  
-        setTimeout(() => {
-            ChatBotShow('Thumbs-up', result.msg)
-            playSound("hmmhmm", SoundEnum.hmmhmm);
-        }, 1000); 
-        
+        .then(response => response.json())
+        .then(result => {
+            console.log('Success:', result);
+
+            setTimeout(() => {
+                ChatBotShow('Thumbs-up', result.msg)
+                playSound("hmmhmm", SoundEnum.hmmhmm);
+            }, 1000);
+
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+
+}
+
+addTodo = function (description) {
+    // API call first - the 5s polling will pick up the todo from DB and render it
+    fetch('/api/todos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description })
     })
-    .catch(error => {
-        console.error('Error:', error);
-    });
-
-}
-
-addTodo = function(description)
-{
-    const cntTodos = _streamSession.Todos.length;
-
-    _streamSession.Todos.push(new Todo(cntTodos + 1, description, TodoStatusEnum.new));
-    RefreshTodosArea();
+        .then(() => {
+            // Force an immediate refresh from DB to show the new todo
+            loadSessionFromDb();
+        })
+        .catch(err => console.error('Error saving todo to DB:', err));
 }
 
 
-SetTodoVisibility = function(isVisible)
-{
+SetTodoVisibility = function (isVisible) {
     const todoArea = document.getElementById("todoArea");
-    if(!todoArea){
+    if (!todoArea) {
         return;
     }
 
     todoArea.style.display = isVisible ? "block" : "none";
 }
 
-ShowTodoArea = function()
-{
+ShowTodoArea = function () {
     SetTodoVisibility(true);
 }
 
-HideTodoArea = function()
-{
+HideTodoArea = function () {
     SetTodoVisibility(false);
 }
 
 
-RefreshTodosArea = function()
-{
+RefreshTodosArea = function () {
     let htmlTodos = "";
     _streamSession.Todos.forEach(element => {
         htmlTodos += `<div class="todo ${element.status}">${element.id} - ${element.description}</div>`
-    });  
+    });
     document.querySelector("#todoList").innerHTML = htmlTodos;
 }
 
-SetTodoStatus = function(id, status)
-{
+SetTodoStatus = function (id, status) {
     let found = false;
     const max = _streamSession.Todos.length;
 
     console.log(`... searching for!: ${id}`);
 
-    for(i = 0; i < max && !found; i++){
+    for (i = 0; i < max && !found; i++) {
         console.log(`Look at: ${_streamSession.Todos[i].id} - ${_streamSession.Todos[i].status}`);
-        if(_streamSession.Todos[i].id == id){
+        if (_streamSession.Todos[i].id == id) {
             console.log(`match!: ${_streamSession.Todos[i].id} - ${_streamSession.Todos[i].status}`);
             _streamSession.Todos[i].status = status;
             found = true;
+
+            // Persist to DB
+            fetch(`/api/todos/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            }).catch(err => console.error('Error updating todo status:', err));
         }
     }
     RefreshTodosArea();
@@ -476,146 +490,157 @@ SetTodoStatus = function(id, status)
 
 
 
-addReminder = function(name, message)
-{ 
+addReminder = function (name, message) {
     _streamSession.Reminders.push(new Reminder(name, message));
+
+    fetch('/api/reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, message, interval: 0 })
+    }).catch(err => console.error('Error saving reminder to DB:', err));
 }
 
 
 
-SetReminderStatus = function(name, status)
-{
+SetReminderStatus = function (reminderName, status) {
     let found = false;
     const max = _streamSession.Reminders.length;
+    const searchName = reminderName.trim();
 
-    console.log(`... searching for!: ${name}`);
+    console.log(`... searching for reminder: ${searchName}`);
 
-    for(i = 0; i < max && !found; i++){
-        console.log(`Look at: ${_streamSession.Reminders[i].Name} - ${_streamSession.Reminders[i].Status}`);
-        if(_streamSession.Reminders[i].id == id){
-            console.log(`match!: ${_streamSession.Reminders[i].Name} - ${_streamSession.Reminders[i].Status}`);
-            _streamSession.Reminders[i].Status = status;
+    for (i = 0; i < max && !found; i++) {
+        const r = _streamSession.Reminders[i];
+        console.log(`Look at: ${r.Name} - ${r.Status}`);
+        if (r.Name && r.Name.trim() === searchName) {
+            console.log(`match!: ${r.Name} - ${r.Status}`);
+            r.Status = status;
             found = true;
+
+            // Use the numeric DB id for the API call
+            const numericId = r.id;
+            if (numericId) {
+                fetch(`/api/session/reminders/${numericId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                }).catch(err => console.error('Error updating reminder status:', err));
+            }
         }
+    }
+
+    if (!found) {
+        console.log(`... reminder not found: ${searchName}`);
     }
 }
 
 
 
-SaveToFile = function(verbose = true)
-{
-    const data = {streamSession: _streamSession};
+SaveToFile = function (verbose = true) {
+    const data = { streamSession: _streamSession };
     //console.log('..c. data: ', data);
     const options = {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     }
 
     fetch('/savetofile', options)
-    .then(response => response.json())
-    .then(result => {
-        //console.log('Success:', result);
-        if(verbose){
-            ChatBotSay(result.msg);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        ChatBotSay('Error: ' + error);
-    });
+        .then(response => response.json())
+        .then(result => {
+            if (verbose && result.success) {
+                ChatBotSay('Session saved!');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            ChatBotSay('Error: ' + error);
+        });
 
 }
 
 
 
-LoadFromFile = async function(projectName, isReload, callback)
-{
-    
+LoadFromFile = async function (projectName, isReload, callback) {
+
     const options = {
         method: 'GET',
-        headers: {'Content-Type': 'application/json'}
+        headers: { 'Content-Type': 'application/json' }
     }
 
     fetch('/loadfromfile', options)
-    .then(response => response.json())
-    .then(result => {
-        console.log('session reveived from server side:', result);
-        //console.log('...Trace:', Object.values(result));
-        //_streamSession = Object.values(result);
-        LoadStreamSession(result, projectName, isReload, callback);
-    })
-    .catch(error => {
-        console.error('Error:', error);
-    });
+        .then(response => response.json())
+        .then(result => {
+            console.log('session reveived from server side:', result);
+            //console.log('...Trace:', Object.values(result));
+            //_streamSession = Object.values(result);
+            LoadStreamSession(result, projectName, isReload, callback);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
 
 }
 
 
-LoadStreamSession = function(data, projectName, isReload, callback)
-{
+LoadStreamSession = function (data, projectName, isReload, callback) {
     _streamSession.Init();
 
-    if(isReload == undefined || isReload == null){
+    if (isReload == undefined || isReload == null) {
         isReload = false;
         console.log('... this is not a reload!');
     }
-        
-    
+
+
     // loading users scores
-    _streamSession.UserSession = data.UserSession.map((o) => { 
-        const newUser = new UserSession(); 
-        for (const [key, value] of Object.entries(o)) 
-        { 
-            newUser[key] = value; 
-        } return newUser; 
+    _streamSession.UserSession = data.UserSession.map((o) => {
+        const newUser = new UserSession();
+        for (const [key, value] of Object.entries(o)) {
+            newUser[key] = value;
+        } return newUser;
     });
 
-    if(callback !== undefined && callback !== null){
+    if (callback !== undefined && callback !== null) {
         callback(projectName);
     }
-        
-    if(isReload){
+
+    if (isReload) {
         // loading NewFollowers
         _streamSession.NewFollowers = data.NewFollowers;
 
-        if(data.Raiders.length > 0){
-            _streamSession.Raiders = data.Raiders.map((o) => { 
-                const newRaider = new Raider(); 
-                for (const [key, value] of Object.entries(o)) 
-                { 
-                    newRaider[key] = value; 
-                } return newRaider; 
+        if (data.Raiders.length > 0) {
+            _streamSession.Raiders = data.Raiders.map((o) => {
+                const newRaider = new Raider();
+                for (const [key, value] of Object.entries(o)) {
+                    newRaider[key] = value;
+                } return newRaider;
             });
         }
 
-        if(data.TimeLogs.length > 0){
-            _streamSession.TimeLogs = data.TimeLogs.map((o) => { 
-                const newTimeLog = new TimeLog(); 
-                for (const [key, value] of Object.entries(o)) 
-                { 
-                    newTimeLog[key] = value; 
-                } return newTimeLog; 
+        if (data.TimeLogs.length > 0) {
+            _streamSession.TimeLogs = data.TimeLogs.map((o) => {
+                const newTimeLog = new TimeLog();
+                for (const [key, value] of Object.entries(o)) {
+                    newTimeLog[key] = value;
+                } return newTimeLog;
             });
         }
 
-        if(data.Todos.length > 0){
-            _streamSession.Todos = data.Todos.map((o) => { 
-                const newTodo = new Todo(); 
-                for (const [key, value] of Object.entries(o)) 
-                { 
-                    newTodo[key] = value; 
-                } return newTodo; 
+        if (data.Todos.length > 0) {
+            _streamSession.Todos = data.Todos.map((o) => {
+                const newTodo = new Todo();
+                for (const [key, value] of Object.entries(o)) {
+                    newTodo[key] = value;
+                } return newTodo;
             });
         }
 
-        if(data.Reminders.length > 0){
-            _streamSession.Reminders = data.Reminders.map((o) => { 
-                const newReminder = new Todo(); 
-                for (const [key, value] of Object.entries(o)) 
-                { 
-                    newReminder[key] = value; 
-                } return newReminder; 
+        if (data.Reminders.length > 0) {
+            _streamSession.Reminders = data.Reminders.map((o) => {
+                const newReminder = new Reminder();
+                for (const [key, value] of Object.entries(o)) {
+                    newReminder[key] = value;
+                } return newReminder;
             });
         }
 
@@ -627,20 +652,20 @@ LoadStreamSession = function(data, projectName, isReload, callback)
         _streamSession.Notes = data.Notes;
         _streamSession.Id = data.Id;
     }
-    else{
+    else {
         ResetHightScore();
     }
 
     console.log('done loading:', _streamSession);
 }
 
-getCloudAudio = function(name, fileName, inLoop){
+getCloudAudio = function (name, fileName, inLoop) {
 
     let cbAudio = document.getElementById(name);
-    if(cbAudio){
+    if (cbAudio) {
         return cbAudio;
     }
-        
+
     let audio = new Audio(fileName);
     audio.id = name;
     audio.loop = inLoop;
@@ -648,30 +673,31 @@ getCloudAudio = function(name, fileName, inLoop){
     return getCloudAudio(name);
 }
 
-playSound = function(name, fileName)
-{
+playSound = function (name, fileName) {
     playSound(name, fileName, false);
 }
 
-playSound = function(name, fileName, inLoop)
-{
-    let cbAudio = getCloudAudio(name, fileName, inLoop);
-    cbAudio.play();
-
+playSound = function (name, fileName, inLoop) {
+    try {
+        let cbAudio = getCloudAudio(name, fileName, inLoop);
+        cbAudio.play().catch(err => {
+            console.log('Audio play failed:', err.message);
+        });
+    } catch (err) {
+        console.log('Audio error:', err.message);
+    }
 }
 
-stopSound = function(name, fileName, inLoop)
-{
+stopSound = function (name, fileName, inLoop) {
     let cbAudio = getCloudAudio(name, fileName, inLoop);
     cbAudio.pause();
 }
 
 
-CheckReminders = function()
-{
+CheckReminders = function () {
     _streamSession.Reminders.forEach(reminder => {
         console.log(`... looking at: ${reminder.Name}`);
-        if( reminder.Status == ReminderStatusEnum.active){
+        if (reminder.Status == ReminderStatusEnum.active) {
             console.log(`... ${reminder.Name} is active`);
             reminder.LastCheck = new Date();
             ChatBotSay(reminder.Message);
@@ -680,10 +706,9 @@ CheckReminders = function()
 }
 
 
-ResetHightScore = function()
-{
+ResetHightScore = function () {
     console.log('... Resetting highScores');
-    for (i=0; i < _streamSession.UserSession.length; i++) {
+    for (i = 0; i < _streamSession.UserSession.length; i++) {
         _streamSession.UserSession[i].highScore = 0;
     }
 }
@@ -695,60 +720,57 @@ ResetHightScore = function()
 // == Generate files =========================================
 // ===
 
-StreamNoteStart = async function(projectName)
-{
+StreamNoteStart = async function (projectName) {
+    const projectUrl = projectName ? `https://github.com/FBoucher/${projectName}` : '';
 
-    LoadFromFile(projectName, false, function(projectName){
-        //console.log('.. the project name: ', projectName);
-        //console.log('.. streamSession before : ', _streamSession);
-        
-        // Get the current stream counter and increment it
-        fetch('/incrementstreamcounter', {
+    try {
+        const response = await fetch('/api/stream/start', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'}
-        })
-        .then(response => response.json())
-        .then(counterData => {
-            _streamSession.Id = counterData.currentStreamNumber;
-            _streamSession.Project = projectName;
-            _streamSession.DateTimeStart = new Date();
-            console.log('.. streamSession just after : ', _streamSession);
-            // Display banner immediately when project is set
-            showProjectBanner();
-        })
-        .catch(error => {
-            console.error('Error loading stream counter:', error);
-            // Fallback to random if counter fails
-            if(_streamSession.id == undefined || _streamSession.id == null || _streamSession.id == 0){
-                _streamSession.Id = Math.floor((Math.random() * 100));
-            }
-            _streamSession.Project = projectName;
-            _streamSession.DateTimeStart = new Date();
-            console.log('.. streamSession just after (fallback): ', _streamSession);
-            // Display banner immediately when project is set
-            showProjectBanner();
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                projectName: projectName || 'Chat Session',
+                streamTitle: _streamSession.Title || '',
+                projectUrl: projectUrl
+            })
         });
-    });
+        const data = await response.json();
 
+        _streamSession.Id = data.streamNumber;
+        _streamSession.Project = projectName;
+        _streamSession.DateTimeStart = new Date();
+        console.log('.. stream started, session:', data.sessionId, 'stream#', data.streamNumber);
+
+        // Load full session state from DB (scores, todos, etc.)
+        await loadSessionFromDb();
+        showProjectBanner();
+    } catch (err) {
+        console.error('Failed to start stream session:', err);
+        // Fallback: update local state and show banner anyway
+        _streamSession.Project = projectName;
+        _streamSession.DateTimeStart = new Date();
+        showProjectBanner();
+    }
 }
 
 
 
 
 
-StreamNoteStop = function()
-{
-    _streamSession.DateTimeEnd = new Date(); 
-    SaveToFile();
+StreamNoteStop = function () {
+    _streamSession.DateTimeEnd = new Date();
+    SaveToFile(false); // false = no chat announcement; DB is source of truth
     console.log('_streamSession: ', _streamSession);
     let streamNotes = Generate_streamSession();
     console.log('Notes: ', streamNotes);
     SaveNotesToFile(_streamSession, streamNotes);
+
+    // Persist session stop to DB via REST API
+    fetch('/api/stream/stop', { method: 'POST' })
+        .catch(err => console.error('Failed to stop session in DB:', err));
 }
 
 
-Generate_streamSession = function()
-{
+Generate_streamSession = function () {
     let streamNotes = "";
 
     // Header
@@ -759,7 +781,7 @@ Generate_streamSession = function()
 
     // Stream Details
     streamNotes += GenerateTimeLogSection();
-    
+
     // Cloudies info
     streamNotes += GenerateCloudiesInfo();
 
@@ -770,10 +792,12 @@ Generate_streamSession = function()
 
 
 
-GenerateStreamNotetHeader = function()
-{
+GenerateStreamNotetHeader = function () {
     let today = new Date().toISOString().split('T')[0];
-    let headerSection = "---\nlayout: post\ntitle: _____ (stream " + _streamSession.Id + ")\n";
+    let title = _streamSession.Title && _streamSession.Title.trim()
+        ? _streamSession.Title
+        : "_____ (stream " + _streamSession.Id + ")";
+    let headerSection = "---\nlayout: post\ntitle: " + title + "\n";
     headerSection += "featured-image: https://img.youtube.com/vi/_________/hqdefault.jpg\n";
     headerSection += "date: " + today + "  06:30 -0500\n";
     headerSection += "categories:  " + _streamSession.Project + "\n---\n\n## Summary\n\n\n\n📺 - Twitch archive - stream no. " + _streamSession.Id + "\n\n";
@@ -785,8 +809,7 @@ GenerateStreamNotetHeader = function()
 
 
 
-GenerateSessiontInfo = function()
-{
+GenerateSessiontInfo = function () {
     let sessionSection = "\n### Project\n\n"
     sessionSection += "All the code for this project is available on GitHub: " + _streamSession.Project + " - https://github.com/FBoucher/" + _streamSession.Project + "\n";
 
@@ -796,25 +819,22 @@ GenerateSessiontInfo = function()
 
 
 
-GenerateCloudiesInfo = function()
-{
-    let cloudiesSection = GenerateNewFollowerSection(); 
-    cloudiesSection     += GenerateRaidersSection();
-    cloudiesSection     += GenerateHostSection();
-    cloudiesSection     += GenerateCheersSection();
-    cloudiesSection     += GenerateParachuteSection();
+GenerateCloudiesInfo = function () {
+    let cloudiesSection = GenerateNewFollowerSection();
+    cloudiesSection += GenerateRaidersSection();
+    cloudiesSection += GenerateHostSection();
+    cloudiesSection += GenerateCheersSection();
+    cloudiesSection += GenerateParachuteSection();
 
     return cloudiesSection;
 }
 
 
-GenerateNewFollowerSection = function()
-{
-    if(_streamSession.NewFollowers.length > 0){
+GenerateNewFollowerSection = function () {
+    if (_streamSession.NewFollowers.length > 0) {
         let followerSection = "\n### New Followers\n\n"
 
-        for(userName of _streamSession.NewFollowers)
-        {
+        for (userName of _streamSession.NewFollowers) {
             followerSection += `- [@${userName}](https://www.twitch.tv/${userName})\n`;
         }
 
@@ -824,13 +844,11 @@ GenerateNewFollowerSection = function()
 }
 
 
-GenerateRaidersSection = function()
-{
-    if(_streamSession.Raiders.length > 0){
+GenerateRaidersSection = function () {
+    if (_streamSession.Raiders.length > 0) {
         let raidersSection = "\n### Raids\n\n"
 
-        for(raider of _streamSession.Raiders)
-        {
+        for (raider of _streamSession.Raiders) {
             raidersSection += `- [@${raider.user}](https://www.twitch.tv/${raider.user}) has raided you with a party of ${raider.viewers}\n`;
         }
 
@@ -841,13 +859,11 @@ GenerateRaidersSection = function()
 }
 
 
-GenerateHostSection = function()
-{
-    if(_streamSession.Hosts.length > 0){
+GenerateHostSection = function () {
+    if (_streamSession.Hosts.length > 0) {
         let hostSection = "\n### Hosts\n\n"
 
-        for(userName of _streamSession.Hosts)
-        {
+        for (userName of _streamSession.Hosts) {
             hostSection += `- [@${userName}](https://www.twitch.tv/${userName})\n`;
         }
 
@@ -858,15 +874,14 @@ GenerateHostSection = function()
 
 
 
-GenerateTodoSection = function()
-{
-    if(_streamSession.Todos.length > 0){
+GenerateTodoSection = function () {
+    if (_streamSession.Todos.length > 0) {
         let todoSection = "\n### TodDos\n\n"
 
         _streamSession.Todos.forEach(element => {
-            const checkbox = (element.status == TodoStatusEnum.done) ? "[X]": "[ ]";
-            const isCancelled = (element.status == TodoStatusEnum.cancel) ? "~": "";
-            const isInProgress = (element.status == TodoStatusEnum.inProgress) ? "**": "";
+            const checkbox = (element.status == TodoStatusEnum.done) ? "[X]" : "[ ]";
+            const isCancelled = (element.status == TodoStatusEnum.cancel) ? "~" : "";
+            const isInProgress = (element.status == TodoStatusEnum.inProgress) ? "**" : "";
             todoSection += `- ${isCancelled}${checkbox} ${isInProgress}${element.description}${isInProgress}${isCancelled}\n`;
         });
 
@@ -878,13 +893,11 @@ GenerateTodoSection = function()
 
 
 
-GenerateCheersSection = function()
-{
-    if(_streamSession.Cheerers.length > 0){
+GenerateCheersSection = function () {
+    if (_streamSession.Cheerers.length > 0) {
         let cheerersSection = "\n### Cheers\n\n"
 
-        for(cheerer of _streamSession.Cheerers)
-        {
+        for (cheerer of _streamSession.Cheerers) {
             cheerersSection += `- [@${cheerer.user}](https://www.twitch.tv/${cheerer.user})  ${cheerer.bits} bits\n`;
         }
 
@@ -895,14 +908,12 @@ GenerateCheersSection = function()
 }
 
 
-GenerateTimeLogSection = function()
-{
-    if(_streamSession.TimeLogs.length > 0){
+GenerateTimeLogSection = function () {
+    if (_streamSession.TimeLogs.length > 0) {
         let timeLogsSection = "\n### TimeLogs\n\n"
         timeLogsSection += `    00:00:00 Intro\n    00:00:10 Bonjour, Hi!\n`;
 
-        for(timeLog of _streamSession.TimeLogs)
-        {
+        for (timeLog of _streamSession.TimeLogs) {
             timeLogsSection += `    ${timeLog.time} ${timeLog.message}\n`;
         }
 
@@ -913,16 +924,16 @@ GenerateTimeLogSection = function()
 }
 
 
-GenerateParachuteSection = function(){
+GenerateParachuteSection = function () {
 
-    if(_streamSession.UserSession.length > 0){
+    if (_streamSession.UserSession.length > 0) {
         const today = new Date();
         let parachuteSection = "\n### Game Results\n\n"
-        
+
         var sortedUsers = _streamSession.UserSession.sort(compareHightScore);
 
-        for ( i=0; i < sortedUsers.length; i++) {
-            if(isSameDay(today, new Date(sortedUsers[i].lastUpdate))){
+        for (i = 0; i < sortedUsers.length; i++) {
+            if (isSameDay(today, new Date(sortedUsers[i].lastUpdate))) {
                 parachuteSection += `- [@${sortedUsers[i].user}](https://www.twitch.tv/${sortedUsers[i].user}): ${sortedUsers[i].highScore}\n`;
             }
         }
@@ -986,12 +997,12 @@ GenerateParachuteSection = function(){
 }
 
 
-GenerateExtraInfo = function(){
+GenerateExtraInfo = function () {
 
-    if(_streamSession.Notes.length > 0){
+    if (_streamSession.Notes.length > 0) {
         let noteSection = "\n### Notes/ References / Snippets\n\n"
 
-        for(note of _streamSession.Notes){
+        for (note of _streamSession.Notes) {
             noteSection += `- ${note}\n`;
         }
         return noteSection;
@@ -1002,65 +1013,70 @@ GenerateExtraInfo = function(){
 
 
 
-SaveNotesToFile = function(streamSession, streamNotes)
-{
-    const data = {id: streamSession.Id, project: streamSession.Project, notes: streamNotes};
+SaveNotesToFile = function (streamSession, streamNotes) {
+    const data = { id: streamSession.Id, project: streamSession.Project, notes: streamNotes };
     console.log('..g. data: ', data);
     const options = {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     }
 
     fetch('/genstreamnotes', options)
-    .then(response => response.json())
-    .then(result => {
-        console.log('Success:', result);
-        ChatBotSay(result.msg);
-    })
-    .catch(error => {
-        console.error('Error:', error);
-    });
+        .then(response => response.json())
+        .then(result => {
+            console.log('Success:', result);
+            ChatBotSay(result.msg);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
 }
 
 
-CreateTimeLog = function(message, user){
+CreateTimeLog = function (message, user) {
 
     const now = new Date();
     const startTime = Date.parse(_streamSession.DateTimeStart);
     //console.log('startTime: ', startTime);
 
-    const msec = Math.abs(now - startTime);   
+    const msec = Math.abs(now - startTime);
     const seconds = Math.floor(msec / 1000);
-    const minutes = Math.floor(seconds / 60 );
-    const hours = Math.floor(minutes / 60 );
-    
-    const strHH = ("0" + hours% 60).substr(-2,2);
-    const strMM = ("0" + minutes% 60).substr(-2,2);
-    const strSS = ("0" + seconds% 60).substr(-2,2);
-    
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+
+    const strHH = ("0" + hours % 60).substr(-2, 2);
+    const strMM = ("0" + minutes % 60).substr(-2, 2);
+    const strSS = ("0" + seconds % 60).substr(-2, 2);
+
     const strTime = `${strHH}:${strMM}:${strSS}`
- 
+
     console.log('strTime: ', strTime);
 
     _streamSession.TimeLogs.push(new TimeLog(user, message, strTime));
 }
 
-SavingNote = function(message){
+SavingNote = function (message) {
     _streamSession.Notes.push(message);
+
+    fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: message })
+    }).catch(err => console.error('Error saving note to DB:', err));
 }
 
 
 
 // Twitch Events handling
 
-LogRaid = function(user, viewers){
-    
+LogRaid = function (user, viewers) {
+
     _streamSession.Raiders.push(new Raider(user, viewers));
 }
 
 
-LogSub = function(user, message, subTierInfo, streamMonths, cumulativeMonths){
+LogSub = function (user, message, subTierInfo, streamMonths, cumulativeMonths) {
 
     cloud("Yeah");
     playSound("yeah", SoundEnum.yeah);
@@ -1068,23 +1084,23 @@ LogSub = function(user, message, subTierInfo, streamMonths, cumulativeMonths){
 }
 
 
-LogHost = function(user, viewers, autohost, extra ){
+LogHost = function (user, viewers, autohost, extra) {
     _streamSession.Hosts.push(user);
 }
 
 
-LogCheer = function( user, message, bits, flags, extra ){
-    _streamSession.Cheerers.push( new Cheerer(user, bits));
+LogCheer = function (user, message, bits, flags, extra) {
+    _streamSession.Cheerers.push(new Cheerer(user, bits));
 }
 
-CreateCloud = function(){
+CreateCloud = function () {
 
-    const animDuration = getRndInt(50,200); 
-    const animDelay = getRndInt(0,30);
-    const animTop = getRndInt(0,300);
-    const animZ = getRndInt(100,105);
-    const cloudImage = getRndInt(1,4);
-    const fliped = (Math.random() < 0.5)?1:-1;
+    const animDuration = getRndInt(50, 200);
+    const animDelay = getRndInt(0, 30);
+    const animTop = getRndInt(0, 300);
+    const animZ = getRndInt(100, 105);
+    const cloudImage = getRndInt(1, 4);
+    const fliped = (Math.random() < 0.5) ? 1 : -1;
     const animSize = Math.random() * (1.2 - 0.2) + 0.2;
     const opacity = Math.random() * (0.5 - 0.2) + 0.2;
 
@@ -1102,39 +1118,41 @@ CreateCloud = function(){
 }
 
 
-getRndInt = function(min, max) {
-    return Math.floor(Math.random() * (max - min) ) + min;
+getRndInt = function (min, max) {
+    return Math.floor(Math.random() * (max - min)) + min;
 }
 
 
-makeItRain = function() {
+makeItRain = function () {
 
     // Clear existing rain elements
     document.querySelectorAll('.rain').forEach(el => el.innerHTML = '');
-  
+
     var increment = 0;
     var drops = "";
     var backDrops = "";
-  
+
     while (increment < 100) {
-      var randoHundo = (Math.floor(Math.random() * (98 - 1 + 1) + 1));
-      var randoFiver = (Math.floor(Math.random() * (5 - 2 + 1) + 2));
-      increment += randoFiver;
-      drops += '<div class="drop" style="left: ' + increment + '%; bottom: ' + (randoFiver + randoFiver - 1 + 100) + '%; animation-delay: 0.' + randoHundo + 's; animation-duration: 0.5' + randoHundo + 's;"><div class="stem" style="animation-delay: 0.' + randoHundo + 's; animation-duration: 0.5' + randoHundo + 's;"></div><div class="splat" style="animation-delay: 0.' + randoHundo + 's; animation-duration: 0.5' + randoHundo + 's;"></div></div>';
-      backDrops += '<div class="drop" style="right: ' + increment + '%; bottom: ' + (randoFiver + randoFiver - 1 + 100) + '%; animation-delay: 0.' + randoHundo + 's; animation-duration: 0.5' + randoHundo + 's;"><div class="stem" style="animation-delay: 0.' + randoHundo + 's; animation-duration: 0.5' + randoHundo + 's;"></div><div class="splat" style="animation-delay: 0.' + randoHundo + 's; animation-duration: 0.5' + randoHundo + 's;"></div></div>';
+        var randoHundo = (Math.floor(Math.random() * (98 - 1 + 1) + 1));
+        var randoFiver = (Math.floor(Math.random() * (5 - 2 + 1) + 2));
+        increment += randoFiver;
+        drops += '<div class="drop" style="left: ' + increment + '%; bottom: ' + (randoFiver + randoFiver - 1 + 100) + '%; animation-delay: 0.' + randoHundo + 's; animation-duration: 0.5' + randoHundo + 's;"><div class="stem" style="animation-delay: 0.' + randoHundo + 's; animation-duration: 0.5' + randoHundo + 's;"></div><div class="splat" style="animation-delay: 0.' + randoHundo + 's; animation-duration: 0.5' + randoHundo + 's;"></div></div>';
+        backDrops += '<div class="drop" style="right: ' + increment + '%; bottom: ' + (randoFiver + randoFiver - 1 + 100) + '%; animation-delay: 0.' + randoHundo + 's; animation-duration: 0.5' + randoHundo + 's;"><div class="stem" style="animation-delay: 0.' + randoHundo + 's; animation-duration: 0.5' + randoHundo + 's;"></div><div class="splat" style="animation-delay: 0.' + randoHundo + 's; animation-duration: 0.5' + randoHundo + 's;"></div></div>';
     }
-  
+
     const frontRow = document.querySelector('.rain.front-row');
     const backRow = document.querySelector('.rain.back-row');
     if (frontRow) frontRow.innerHTML += drops;
     if (backRow) backRow.innerHTML += backDrops;
-  }
+}
 
 
 // Project Banner Functions
 let bannerTimer = null;
 let githubCache = {};
 const GITHUB_OWNER = 'fboucher'; // Default GitHub owner
+let bannerManualMode = false; // Track if banner is under manual control
+let currentBannerTimeout = null; // Track the hide timeout
 
 const bannerVariants = [
     { name: 'pixel', className: 'banner-pixel', image: 'public/medias/CB-Yeah.gif', alt: 'CloudBot Yeah', pixelate: false, useMarquee: true },
@@ -1143,9 +1161,9 @@ const bannerVariants = [
 ];
 let bannerVariantIndex = -1;
 
-showProjectBanner = async function() {
+showProjectBanner = async function () {
     const projectName = _streamSession.Project;
-    
+
     // Check if project is not set or null
     if (!projectName || projectName === "" || projectName === null) {
         console.log("Project not set, calling !attention");
@@ -1191,14 +1209,14 @@ showProjectBanner = async function() {
     if (githubUrl) {
         try {
             const repoPath = githubUrl.replace('https://github.com/', '');
-            
+
             // Check cache first
             if (githubCache[repoPath]) {
                 description = githubCache[repoPath];
             } else {
                 const apiUrl = `https://api.github.com/repos/${repoPath}`;
                 const response = await fetch(apiUrl);
-                
+
                 if (response.ok) {
                     const data = await response.json();
                     description = data.description || '';
@@ -1234,26 +1252,62 @@ showProjectBanner = async function() {
     // Show banner with animation
     banner.classList.add('show');
 
-    // Hide banner after 60 seconds
-    setTimeout(() => {
-        banner.classList.remove('show');
-    }, 60000);
+    // Clear any existing hide timeout
+    if (currentBannerTimeout) {
+        clearTimeout(currentBannerTimeout);
+        currentBannerTimeout = null;
+    }
+
+    // Only auto-hide if not in manual mode
+    if (!bannerManualMode) {
+        currentBannerTimeout = setTimeout(() => {
+            banner.classList.remove('show');
+            currentBannerTimeout = null;
+        }, 60000);
+    }
 }
 
-hideProjectBanner = function() {
+hideProjectBanner = function () {
     const banner = document.getElementById('projectBanner');
     banner.classList.remove('show');
+    // Clear any pending hide timeout
+    if (currentBannerTimeout) {
+        clearTimeout(currentBannerTimeout);
+        currentBannerTimeout = null;
+    }
 }
 
-startBannerTimer = function() {
-    // Show banner immediately on start
+toggleProjectBannerDisplay = async function () {
+    const banner = document.getElementById('projectBanner');
+
+    if (!banner) return;
+
+    const isVisible = banner.classList.contains('show');
+
+    if (isVisible) {
+        // Hide it
+        hideProjectBanner();
+        bannerManualMode = false; // Allow auto-timer to work again
+    } else {
+        // Show it
+        bannerManualMode = true; // Prevent auto-hide
+        await showProjectBanner();
+    }
+}
+
+startBannerTimer = function () {
+    // Show banner immediately on start (only if not in manual mode)
     setTimeout(() => {
-        showProjectBanner();
+        if (!bannerManualMode) {
+            showProjectBanner();
+        }
     }, 5000); // Wait 5 seconds after page load
 
-    // Then show every 15 minutes (900000 ms)
+    // Then show every 15 minutes (900000 ms) - only if not in manual mode
     bannerTimer = setInterval(() => {
-        showProjectBanner();
+        if (!bannerManualMode) {
+            showProjectBanner();
+        }
     }, 900000);
 }
 
@@ -1290,7 +1344,7 @@ const announcements = [
         message: "Loving the stream? Follow to catch more live coding action!",
         themes: ['theme-cb', 'theme-retro', 'theme-social']
     },
-    
+
     // GitHub Sponsor messages
     {
         title: "💖 Support Frank's Work",
@@ -1307,7 +1361,7 @@ const announcements = [
         message: "Help Frank continue creating amazing open source projects!",
         themes: ['theme-sponsor', 'theme-retro']
     },
-    
+
     // Social media messages
     {
         title: "📱 Find Frank Online",
@@ -1329,7 +1383,7 @@ const announcements = [
         message: "Visit github.com/fboucher for all the cool stuff we're building!",
         themes: ['theme-social', 'theme-cb']
     },
-    
+
     // Channel description
     {
         title: "☁️ Behind My Cloud",
@@ -1352,7 +1406,7 @@ let announcementTimer = null;
 const announcementQueue = [];
 let isDisplayingAnnouncement = false;
 
-displayAnnouncement = function(title, message, themeClass) {
+displayAnnouncement = function (title, message, themeClass) {
     const container = document.getElementById('announcementContainer');
     if (!container) return;
 
@@ -1396,22 +1450,22 @@ displayAnnouncement = function(title, message, themeClass) {
     announcement.dismissTimeout = dismissTimeout;
 }
 
-showRandomAnnouncement = function() {
+showRandomAnnouncement = function () {
     // Pick a random announcement
     const randomAnnouncement = announcements[Math.floor(Math.random() * announcements.length)];
-    
+
     // Pick a random theme from the announcement's allowed themes
     const randomTheme = randomAnnouncement.themes[Math.floor(Math.random() * randomAnnouncement.themes.length)];
-    
+
     displayAnnouncement(randomAnnouncement.title, randomAnnouncement.message, randomTheme);
 }
 
-queueAnnouncement = function(title, message, themeClass) {
+queueAnnouncement = function (title, message, themeClass) {
     announcementQueue.push({ title, message, themeClass });
     processNextAnnouncement();
 }
 
-processNextAnnouncement = function() {
+processNextAnnouncement = function () {
     if (announcementQueue.length > 0 && !isDisplayingAnnouncement) {
         isDisplayingAnnouncement = true;
         const ann = announcementQueue.shift();
@@ -1422,41 +1476,260 @@ processNextAnnouncement = function() {
     }
 }
 
-startAnnouncementTimer = function() {
+startAnnouncementTimer = function () {
     // Show first announcement after 3 minutes
     setTimeout(() => {
         showRandomAnnouncement();
     }, 180000);
-    
-    // Then show a random announcement every 20 minutes
+
+    // Then show a random announcement every 10 minutes
     announcementTimer = setInterval(() => {
         showRandomAnnouncement();
-    }, 1200000);
+    }, 600000);
 }
 
-stopAnnouncementTimer = function() {
+stopAnnouncementTimer = function () {
     if (announcementTimer) {
         clearInterval(announcementTimer);
         announcementTimer = null;
     }
 }
 
-// Test function to visualize all announcement variants
-testAllAnnouncements = function() {
-    let delay = 0;
-    announcements.forEach((announcement, index) => {
-        announcement.themes.forEach(theme => {
-            setTimeout(() => {
-                displayAnnouncement(announcement.title, announcement.message, theme);
-            }, delay);
-            delay += 2000; // 2 seconds between each announcement
-        });
-    });
-}
 
 // Auto-start announcement timer when page loads
 if (typeof window !== 'undefined') {
     window.addEventListener('DOMContentLoaded', () => {
         startAnnouncementTimer();
     });
+}
+
+// ===== EFFECT SYSTEM - Poll for effects from admin panel =====
+let lastEffectTimestamp = 0;
+
+async function checkForEffects() {
+    try {
+        const response = await fetch('/currenteffect');
+        const effect = await response.json();
+
+        if (effect && effect.timestamp && effect.timestamp > lastEffectTimestamp) {
+            lastEffectTimestamp = effect.timestamp;
+            console.log('New effect detected:', effect.type);
+            handleEffect(effect);
+        }
+    } catch (err) {
+        // Silent fail - effect polling should not spam console
+    }
+}
+
+function handleEffect(effect) {
+    console.log('Handling effect:', effect.type);
+
+    // Clear the effect on server after handling
+    fetch('/cleareffect', { method: 'POST' }).catch(() => { });
+
+    switch (effect.type) {
+        case 'hello':
+            if (effect.image) {
+                ChatBotShow('Thumbs-up', effect.image);
+            } else {
+                cloud('Thumbs-up');
+            }
+            playSound('yeah', SoundEnum.yeah);
+            break;
+
+        case 'attention':
+            if (effect.image) {
+                ChatBotShow('Thumbs-up', effect.image);
+            }
+            playSound('hmmhmm', SoundEnum.hmmhmm);
+            break;
+
+        // case 'drop':
+        //     cloud('Wow');
+        //     playSound('yeah', SoundEnum.yeah);
+        //     break;
+
+        case 'rain':
+            {
+                const sky = document.getElementById('sky');
+                if (sky) sky.className = 'darkcloud';
+                setTimeout(() => {
+                    makeItRain();
+                    playSound('rain', SoundEnum.rain, true);
+                }, 5000);
+            }
+            break;
+
+        case 'sun':
+            {
+                document.querySelectorAll('.rain').forEach(el => el.innerHTML = '');
+                stopSound('rain', SoundEnum.rain, true);
+                const sky = document.getElementById('sky');
+                if (sky) sky.className = 'lightcloud';
+            }
+            break;
+
+        case 'hide':
+            {
+                const panel = document.getElementById('streamNotesPanel');
+                if (panel) panel.style.display = 'none';
+            }
+            break;
+
+        case 'startproject':
+            if (effect.project) {
+                // Admin panel already created the DB session via /api/stream/start.
+                // Just sync state from DB and show the banner — do NOT call
+                // StreamNoteStart here, which would create a duplicate session.
+                _streamSession.Project = effect.project;
+                _streamSession.DateTimeStart = new Date().toISOString();
+                loadSessionFromDb().then(() => showProjectBanner());
+            }
+            break;
+
+        case 'stopproject':
+            {
+                loadSessionFromDb().then(async () => {
+                    document.getElementById('streamNotesPanel').style.display = 'block';
+                    try {
+                        const response = await fetch(`/api/export?download=false&sessionId=${_streamSession.Id}`);
+                        if (response.ok) {
+                            const markdown = await response.text();
+                            const content = document.getElementById('streamNotesContent');
+                            content.innerHTML = markdownToHtml(markdown);
+                        } else {
+                            console.error('Failed to fetch stream notes:', response.status);
+                        }
+                    } catch (err) {
+                        console.error('Error fetching stream notes:', err);
+                    }
+                    startStreamNotesScroll();
+                });
+            }
+            break;
+
+        case 'tododone':
+            {
+                cloud('Yeah');
+                playSound('yeah', SoundEnum.yeah);
+            }
+            break;
+
+        case 'toggleProjectBanner':
+            toggleProjectBannerDisplay();
+            break;
+    }
+}
+
+// Poll for effects and session data every 2 seconds
+if (typeof window !== 'undefined') {
+    window.addEventListener('DOMContentLoaded', () => {
+        setInterval(checkForEffects, 2000);
+        setInterval(checkTodosVisibility, 2000);
+
+        // COLD BOOT FIX: Load session data immediately, then poll every 5s
+        // Ensures overlay displays current state on page load without waiting
+        loadSessionFromDb();
+        setInterval(loadSessionFromDb, 5000);
+    });
+}
+
+async function loadSessionFromDb() {
+    try {
+        const response = await fetch('/loadfromfile');
+        const data = await response.json();
+
+        // Load core session properties
+        if (data.Id !== undefined) {
+            _streamSession.Id = data.Id;
+        }
+        if (data.Project !== undefined) {
+            _streamSession.Project = data.Project;
+        }
+        if (data.Title !== undefined) {
+            _streamSession.Title = data.Title;
+        }
+        if (data.DateTimeStart !== undefined) {
+            _streamSession.DateTimeStart = data.DateTimeStart;
+        }
+
+        // Load arrays
+        if (data.Todos) {
+            _streamSession.Todos = data.Todos.map((o) => {
+                const newTodo = new Todo();
+                for (const [key, value] of Object.entries(o)) {
+                    newTodo[key] = value;
+                } return newTodo;
+            });
+            RefreshTodosArea();
+        }
+
+        if (data.Reminders) {
+            _streamSession.Reminders = data.Reminders.map((o) => {
+                const newReminder = new Reminder();
+                for (const [key, value] of Object.entries(o)) {
+                    newReminder[key] = value;
+                } return newReminder;
+            });
+        }
+
+        if (data.Notes) {
+            _streamSession.Notes = data.Notes;
+        }
+
+        if (data.UserSession) {
+            _streamSession.UserSession = data.UserSession.map((o) => {
+                const newUser = new UserSession();
+                for (const [key, value] of Object.entries(o)) {
+                    newUser[key] = value;
+                } return newUser;
+            });
+        }
+
+        if (data.NewFollowers) {
+            _streamSession.NewFollowers = data.NewFollowers;
+        }
+
+        if (data.Raiders) {
+            _streamSession.Raiders = data.Raiders.map((o) => {
+                const newRaider = new Raider();
+                for (const [key, value] of Object.entries(o)) {
+                    newRaider[key] = value;
+                } return newRaider;
+            });
+        }
+
+        if (data.Subscribers) {
+            _streamSession.Subscribers = data.Subscribers;
+        }
+
+        if (data.Hosts) {
+            _streamSession.Hosts = data.Hosts;
+        }
+
+        if (data.Cheerers) {
+            _streamSession.Cheerers = data.Cheerers;
+        }
+
+        if (data.TimeLogs) {
+            _streamSession.TimeLogs = data.TimeLogs.map((o) => {
+                const newLog = new TimeLog();
+                for (const [key, value] of Object.entries(o)) {
+                    newLog[key] = value;
+                } return newLog;
+            });
+        }
+    } catch (err) {
+        // Silent fail - session might not exist yet
+    }
+}
+
+async function checkTodosVisibility() {
+    try {
+        const response = await fetch('/gettodosvisibility');
+        const result = await response.json();
+        SetTodoVisibility(result.visible);
+    } catch (err) {
+        // Silent fail
+    }
 }

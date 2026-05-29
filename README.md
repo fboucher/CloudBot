@@ -95,34 +95,21 @@ This project is now available in a container. You can find it on: [https://hub.d
     const authToken = "oauth:____________________";
     ```
 
-  - a file `streamSession.json` To initialize the sessions.
+  - The database (`cloudbot.db`) is created automatically on first run — no manual setup needed.
 
-    ```json
-    {
-      "Project": "",
-      "Id": 42,
-      "DateTimeStart": "",
-      "DateTimeEnd": "",
-      "Notes": [],
-      "UserSession": [],
-      "NewFollowers": [],
-      "Raiders": [],
-      "Subscribers": [],
-      "Hosts": [],
-      "Cheerers": [],
-      "TimeLogs": [],
-      "Todos": [],
-      "Reminders": []
-    }
-    ```
-
-Here an example how to instantiate the chatbot.
+Here is how to run with **podman** (use `--userns=keep-id` so the container can write to your local `io` folder):
 
 ```bash
-docker run -p 3001:3000 -d -v ${PWD}:/usr/src/app/io  --name ceebee fboucher/cloudbot:latest
+podman run -p 3001:3000 -d --userns=keep-id -v ${PWD}/src/io:/usr/src/app/io --name cloudbot cloudbot:local
 ```
 
-Then on stream in the chat type !start [projectName]
+Or with Docker:
+
+```bash
+docker run -p 3001:3000 -d -v ${PWD}/src/io:/usr/src/app/io --name cloudbot fboucher/cloudbot:latest
+```
+
+Then open `http://localhost:3001/admin` in your browser to start a stream session, or type `!start [projectName]` in Twitch chat.
 
 ~ **Have fun!**
 
