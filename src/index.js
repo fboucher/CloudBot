@@ -169,7 +169,7 @@ app.get('/loadfromfile', async (req, res) => {
         const activeSession = await db.getActiveSession();
         if (activeSession) {
             const sessionData = await db.loadSessionData(activeSession.id);
-            console.log('Session data loaded from database:', activeSession.id);
+            // console.log('Session data loaded from database:', activeSession.id);
             res.json(sessionData);
         } else {
             res.json({
@@ -1081,16 +1081,16 @@ app.post('/api/chat-event', async (req, res) => {
         }
 
         const data = await response.json();
-        const greetingMessage = data.choices && data.choices[0] && data.choices[0].message 
-            ? data.choices[0].message.content 
+        const greetingMessage = data.choices && data.choices[0] && data.choices[0].message
+            ? data.choices[0].message.content
             : `Hello @${username}, welcome back to the stream!`;
 
         return res.json({ shouldGreet: true, greetingMessage });
     } catch (err) {
         console.error('Error handling chat event/greeting:', err);
-        return res.json({ 
-            shouldGreet: true, 
-            greetingMessage: `Hello @${username}, welcome back!` 
+        return res.json({
+            shouldGreet: true,
+            greetingMessage: `Hello @${username}, welcome back!`
         });
     }
 });
