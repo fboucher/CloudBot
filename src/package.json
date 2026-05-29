@@ -1,6 +1,6 @@
 {
   "name": "cloudbot",
-  "version": "1.8.0",
+  "version": "1.8.3",
   "description": "Twitch ChatBot and Score keeper",
   "main": "index.js",
   "scripts": {
@@ -19,7 +19,7 @@
   "dependencies": {
     "@tursodatabase/database": "^0.5.1",
     "dateformat": "^3.0.3",
-    "express": "^4.21.1",
+    "express": "^4.22.1",
     "text2png": "^2.3.0",
     "toastr": "^2.1.4"
   },
