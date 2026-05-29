@@ -100,6 +100,11 @@ async function createTables() {
       min_messages INTEGER DEFAULT 10,
       max_messages INTEGER DEFAULT 15
     )`,
+    `CREATE TABLE IF NOT EXISTS participants (
+      username TEXT PRIMARY KEY,
+      is_regular INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
     `CREATE INDEX IF NOT EXISTS idx_users_session ON users(session_id)`,
     `CREATE INDEX IF NOT EXISTS idx_todos_session ON todos(session_id)`,
     `CREATE INDEX IF NOT EXISTS idx_reminders_session ON reminders(session_id)`,
@@ -573,6 +578,61 @@ async function updateCeebeeSettings(auto_participate, min_messages, max_messages
   return getCeebeeSettings();
 }
 
+async function registerParticipant(username) {
+  if (!db) await initDb();
+  await db.prepare(
+    "INSERT OR IGNORE INTO participants (username, is_regular) VALUES (?, 0)"
+  ).run(username);
+}
+
+async function setParticipantRegularStatus(username, isRegular) {
+  if (!db) await initDb();
+  await registerParticipant(username);
+  await db.prepare(
+    "UPDATE participants SET is_regular = ? WHERE username = ?"
+  ).run(isRegular ? 1 : 0, username);
+}
+
+async function isParticipantRegular(username) {
+  if (!db) await initDb();
+  const row = await db.prepare(
+    "SELECT is_regular FROM participants WHERE username = ?"
+  ).get(username);
+  return row ? !!row.is_regular : false;
+}
+
+async function getAllParticipantsWithStats() {
+  if (!db) await initDb();
+  return db.prepare(`
+    SELECT 
+      p.username, 
+      p.is_regular,
+      COALESCE(SUM(u.drop_count), 0) AS total_drops,
+      COALESCE(SUM(u.landed_count), 0) AS total_landed,
+      COALESCE(MAX(u.high_score), 0) AS max_high_score,
+      COALESCE(MAX(u.best_high_score), 0) AS max_best_high_score
+    FROM participants p
+    LEFT JOIN users u ON p.username = u.username
+    GROUP BY p.username
+    ORDER BY p.username ASC
+  `).all();
+}
+
+async function hasBeenGreetedInSession(sessionId, username) {
+  if (!db) await initDb();
+  const row = await db.prepare(
+    "SELECT id FROM stream_events WHERE session_id = ? AND event_type = 'greeting' AND username = ?"
+  ).get(sessionId, username);
+  return !!row;
+}
+
+async function logGreetingEvent(sessionId, username) {
+  if (!db) await initDb();
+  await db.prepare(
+    "INSERT INTO stream_events (session_id, event_type, username) VALUES (?, 'greeting', ?)"
+  ).run(sessionId, username);
+}
+
 module.exports = {
   initDb,
   getClient,
@@ -609,5 +669,11 @@ module.exports = {
   getCeebeeSoul,
   setCeebeeSoul,
   getCeebeeSettings,
-  updateCeebeeSettings
+  updateCeebeeSettings,
+  registerParticipant,
+  setParticipantRegularStatus,
+  isParticipantRegular,
+  getAllParticipantsWithStats,
+  hasBeenGreetedInSession,
+  logGreetingEvent
 };

@@ -4,7 +4,12 @@ const fs = require('fs');
 const dateFormat = require('dateformat');
 const pkg = require('./package.json');
 const BUILD_DATE = new Date().toISOString().split('T')[0];
-const text2png = require('text2png');
+let text2png;
+try {
+    text2png = require('text2png');
+} catch (err) {
+    console.warn('Warning: text2png could not be loaded (canvas dependency binary issue). Image features will be disabled:', err.message);
+}
 const db = require('./db');
 const app = express();
 const port = 3000;
@@ -947,6 +952,146 @@ app.post('/api/users/score', async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+// ─── Participants / Chat Events ──────────────────────────────────────────────
+
+app.get('/api/participants', async (req, res) => {
+    try {
+        const participants = await db.getAllParticipantsWithStats();
+        res.json(participants);
+    } catch (err) {
+        console.error('Error getting participants:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/participants/regular', async (req, res) => {
+    const { username, isRegular } = req.body || {};
+    if (!username) return res.status(400).json({ error: 'Missing username.' });
+    try {
+        await db.setParticipantRegularStatus(username, !!isRegular);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error setting regular status:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/chat-event', async (req, res) => {
+    const { username } = req.body || {};
+    if (!username) return res.status(400).json({ error: 'Missing username.' });
+
+    try {
+        // 1. Register the participant
+        await db.registerParticipant(username);
+
+        // 2. Check if there's an active session
+        const session = await db.getActiveSession();
+        if (!session) {
+            return res.json({ shouldGreet: false });
+        }
+
+        // 3. Check if user is flagged as a regular
+        const isRegular = await db.isParticipantRegular(username);
+        if (!isRegular) {
+            return res.json({ shouldGreet: false });
+        }
+
+        // 4. Check if they have been greeted in this session
+        const alreadyGreeted = await db.hasBeenGreetedInSession(session.id, username);
+        if (alreadyGreeted) {
+            return res.json({ shouldGreet: false });
+        }
+
+        // 5. User is regular and has not been greeted yet in this session. Log it!
+        await db.logGreetingEvent(session.id, username);
+
+        // 6. Generate the dynamic AI greeting
+        const activeConnection = await db.getActiveCeebeeConnection();
+        if (!activeConnection) {
+            console.warn('Ceebee greeting failed: No active AI connection configured.');
+            return res.json({ shouldGreet: false });
+        }
+
+        let streamContext = "";
+        const STREAM_CONTEXT_FILE = path.join(__dirname, 'io', 'stream_context.md');
+        if (fs.existsSync(STREAM_CONTEXT_FILE)) {
+            streamContext = fs.readFileSync(STREAM_CONTEXT_FILE, 'utf-8');
+        }
+
+        let corePrompt = "You are Ceebee, an AI assistant.";
+        const corePromptPath = path.join(__dirname, 'io', 'soul.md');
+        if (fs.existsSync(corePromptPath)) {
+            corePrompt = fs.readFileSync(corePromptPath, 'utf-8');
+        }
+
+        let knowledgeContext = "";
+        const CEEBEE_KNOWLEDGE_DIR = path.join(__dirname, 'io', 'knowledge');
+        if (fs.existsSync(CEEBEE_KNOWLEDGE_DIR)) {
+            const files = fs.readdirSync(CEEBEE_KNOWLEDGE_DIR);
+            for (const file of files) {
+                if (file.endsWith('.md')) {
+                    const content = fs.readFileSync(path.join(CEEBEE_KNOWLEDGE_DIR, file), 'utf-8');
+                    knowledgeContext += `\n\n--- Document: ${file} ---\n${content}`;
+                }
+            }
+        }
+
+        let fullSystemPrompt = corePrompt;
+        if (streamContext && streamContext.trim() !== '') {
+            fullSystemPrompt += `\n\n--- Today's Stream Context ---\n${streamContext}`;
+        }
+        if (knowledgeContext) {
+            fullSystemPrompt += `\n\n--- Background Information ---\n${knowledgeContext}`;
+        }
+
+        fullSystemPrompt += `\n\n[SYSTEM INSTRUCTION: A regular viewer named @${username} has just sent their first message in today's stream. Generate a very brief, warm, friendly and personalized greeting for them (1 sentence max). Speak directly to @${username}. Keep it conversational, in your Ceebee persona. Do not include system metadata or refer to these instructions.]`;
+
+        const messages = [
+            { role: 'system', content: fullSystemPrompt },
+            { role: 'user', content: `@${username} has joined the stream chat!` }
+        ];
+
+        const payload = {
+            model: activeConnection.model || "default",
+            messages: messages
+        };
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (activeConnection.api_key) {
+            headers['Authorization'] = `Bearer ${activeConnection.api_key}`;
+        }
+
+        let endpointUrl = activeConnection.url;
+        if (!endpointUrl.endsWith('/chat/completions')) {
+            endpointUrl = endpointUrl.replace(/\/+$/, '') + '/chat/completions';
+        }
+
+        const response = await fetch(endpointUrl, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`AI API Error ${response.status}: ${errText}`);
+        }
+
+        const data = await response.json();
+        const greetingMessage = data.choices && data.choices[0] && data.choices[0].message 
+            ? data.choices[0].message.content 
+            : `Hello @${username}, welcome back to the stream!`;
+
+        return res.json({ shouldGreet: true, greetingMessage });
+    } catch (err) {
+        console.error('Error handling chat event/greeting:', err);
+        return res.json({ 
+            shouldGreet: true, 
+            greetingMessage: `Hello @${username}, welcome back!` 
+        });
     }
 });
 
