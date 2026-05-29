@@ -506,6 +506,7 @@
                                 <thead>
                                     <tr>
                                         <th>Username</th>
+                                        <th>Regular</th>
                                         <th>Drops</th>
                                         <th>Landed</th>
                                         <th>High Score</th>
@@ -1463,20 +1464,52 @@
 
         async function loadUsers() {
             const container = document.getElementById('usersList');
-            if (!streamSessionData || !streamSessionData.UserSession) {
-                container.innerHTML = '<tr><td colspan="5">No user data</td></tr>';
-                return;
-            }
+            try {
+                const response = await fetch('/api/participants');
+                const participants = await response.json();
 
-            container.innerHTML = streamSessionData.UserSession.map(u => `
-                <tr>
-                    <td>${u.user}</td>
-                    <td>${u.dropCount || 0}</td>
-                    <td>${u.landedCount || 0}</td>
-                    <td>${u.highScore || 0}</td>
-                    <td>${u.bestHighScore || 0}</td>
-                </tr>
-            `).join('');
+                if (!Array.isArray(participants) || participants.length === 0) {
+                    container.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No user statistics available.</td></tr>';
+                    return;
+                }
+
+                container.innerHTML = participants.map(u => `
+                    <tr>
+                        <td>${escapeHtml(u.username)}</td>
+                        <td>
+                            <div class="form-check form-switch d-inline-block">
+                                <input class="form-check-input" type="checkbox" role="switch" ${u.is_regular ? 'checked' : ''} onchange="toggleRegular('${escapeHtml(u.username)}', this.checked)">
+                            </div>
+                        </td>
+                        <td>${u.total_drops || 0}</td>
+                        <td>${u.total_landed || 0}</td>
+                        <td>${u.max_high_score || 0}</td>
+                        <td>${u.max_best_high_score || 0}</td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                console.error('Error loading users:', err);
+                container.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading user statistics.</td></tr>';
+            }
+        }
+
+        async function toggleRegular(username, isRegular) {
+            try {
+                const response = await fetch('/api/participants/regular', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, isRegular })
+                });
+                if (response.ok) {
+                    showFeedback(`Updated regular status for @${username}`);
+                } else {
+                    throw new Error('Failed to update');
+                }
+            } catch (err) {
+                console.error('Error toggling regular:', err);
+                alert(`Error toggling regular status for @${username}`);
+                loadUsers(); // reload to reset checkbox state
+            }
         }
 
         async function saveCurrentSession() {

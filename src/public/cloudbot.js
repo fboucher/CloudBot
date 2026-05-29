@@ -554,7 +554,9 @@ SaveToFile = function (verbose = true) {
         })
         .catch(error => {
             console.error('Error:', error);
-            ChatBotSay('Error: ' + error);
+            if (verbose) {
+                ChatBotSay('Error: ' + error);
+            }
         });
 
 }

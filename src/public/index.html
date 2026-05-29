@@ -187,9 +187,29 @@
         //Add Default Reminders
         //_streamSession.Reminders.push(new Reminder("project", "Did you assign a project yet?"));
 
+        function handleUserChatEvent(user) {
+            const lowerUser = user.toLowerCase();
+            const bots = ['ceebee_bot', 'ceebee', 'streamlabs', 'nightbot', 'streamelements'];
+            if (bots.includes(lowerUser)) return;
+
+            fetch('/api/chat-event', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: lowerUser })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.shouldGreet && data.greetingMessage) {
+                    CeebeeSay(data.greetingMessage);
+                }
+            })
+            .catch(err => console.error('Error reporting chat event:', err));
+        }
+
         ComfyJS.onCommand = async (user, command, message, flags, extra) => {
 
             user = user.toLowerCase();
+            handleUserChatEvent(user);
 
             //== PUBLIC Commands Section =====================================
             //== 
@@ -413,6 +433,8 @@
         }
 
         ComfyJS.onChat = (user, message, flags, self, extra) => {
+            user = user.toLowerCase();
+            handleUserChatEvent(user);
 
             const bracketCommand = extractBracketCommand(message);
             if (bracketCommand) {
