@@ -1062,6 +1062,7 @@ app.post('/api/ceebee/context', async (req, res) => {
 });
 
 app.get('/api/ceebee/settings', async (req, res) => {
+    console.log('..GET /api/ceebee/settings called');
     try {
         const settings = await db.getCeebeeSettings();
         res.json(settings);
@@ -1071,6 +1072,7 @@ app.get('/api/ceebee/settings', async (req, res) => {
 });
 
 app.post('/api/ceebee/settings', async (req, res) => {
+    console.log('..POST /api/ceebee/settings called with:', req.body);
     try {
         const { auto_participate, min_messages, max_messages } = req.body;
         const settings = await db.updateCeebeeSettings(
@@ -1177,12 +1179,14 @@ app.post('/api/ceebee/chat', async (req, res) => {
 });
 
 app.post('/api/ceebee/participate', async (req, res) => {
+    const { transcript } = req.body;
+    console.log('..POST /api/ceebee/participate called with transcript:\n', transcript);
     try {
-        const { transcript } = req.body;
         if (!transcript) return res.status(400).json({ error: 'Missing transcript.' });
         
         const activeConnection = await db.getActiveCeebeeConnection();
         if (!activeConnection) {
+            console.warn('..Ceebee participate failed: No active AI connection configured.');
             return res.json({ response: "Error: No active AI connection configured." });
         }
         
