@@ -61,6 +61,51 @@
         let _streamSession = new StreamSession();
         _streamSession.Id = Math.floor((Math.random() * 100));
 
+        // Ceebee Auto-Participation state
+        let ceebeeSettings = { auto_participate: 0, min_messages: 10, max_messages: 15 };
+        let ceebeeChatCounter = 0;
+        let ceebeeTargetLimit = 12;
+        let ceebeeAccumulatedMessages = [];
+
+        function fetchCeebeeSettings() {
+            fetch('/api/ceebee/settings')
+                .then(res => res.json())
+                .then(data => {
+                    ceebeeSettings = data;
+                    // Only update target limit if it hasn't been set yet or the range changed
+                    const min = ceebeeSettings.min_messages ?? 10;
+                    const max = ceebeeSettings.max_messages ?? 15;
+                    if (ceebeeTargetLimit < min || ceebeeTargetLimit > max) {
+                        updateCeebeeTargetLimit();
+                    }
+                })
+                .catch(err => console.error('Error fetching Ceebee settings:', err));
+        }
+
+        function updateCeebeeTargetLimit() {
+            const min = ceebeeSettings.min_messages ?? 10;
+            const max = ceebeeSettings.max_messages ?? 15;
+            ceebeeTargetLimit = Math.floor(Math.random() * (max - min + 1)) + min;
+            console.log(`Ceebee auto-participation target set to ${ceebeeTargetLimit} messages.`);
+        }
+
+        function shouldCountMessage(user, message, flags) {
+            const lowerUser = user.toLowerCase();
+            if (lowerUser === 'ceebee_bot' || lowerUser === 'ceebee') return false;
+            if (lowerUser === 'streamlabs' || lowerUser === 'nightbot' || lowerUser === 'streamelements') return false;
+            
+            const trimmed = message.trim();
+            if (!trimmed) return false;
+            if (trimmed.startsWith('!')) return false;
+            if (trimmed.startsWith('[')) {
+                const bracketCommand = extractBracketCommand(trimmed);
+                if (bracketCommand) return false;
+            }
+            if (trimmed.toLowerCase().includes('ceebee')) return false;
+            
+            return true;
+        }
+
         function extractBracketCommand(message) {
             if (!message) {
                 return null;
@@ -394,6 +439,43 @@
                     .catch(err => console.error('Error calling Ceebee API:', err));
             }
 
+            // Process message for Ceebee auto-participation
+            if (ceebeeSettings.auto_participate) {
+                if (shouldCountMessage(user, message, flags)) {
+                    ceebeeAccumulatedMessages.push(`${user}: ${message}`);
+                    ceebeeChatCounter++;
+                    console.log(`[Ceebee Auto] Message counted from ${user}: "${message}". Count: ${ceebeeChatCounter}/${ceebeeTargetLimit}`);
+                    
+                    if (ceebeeChatCounter >= ceebeeTargetLimit) {
+                        const transcript = ceebeeAccumulatedMessages.join('\n');
+                        console.log(`[Ceebee Auto] Threshold reached (${ceebeeTargetLimit}). Triggering participation API call...`);
+                        
+                        // Reset immediately to avoid duplicate triggers
+                        ceebeeChatCounter = 0;
+                        ceebeeAccumulatedMessages = [];
+                        updateCeebeeTargetLimit();
+                        
+                        fetch('/api/ceebee/participate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ transcript })
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data && data.response) {
+                                console.log('[Ceebee Auto] Received AI response:', data.response);
+                                CeebeeSay(data.response);
+                            } else {
+                                console.warn('[Ceebee Auto] Received empty response from API.');
+                            }
+                        })
+                        .catch(err => console.error('[Ceebee Auto] Error triggering auto-participation:', err));
+                    }
+                } else {
+                    console.log(`[Ceebee Auto] Message from ${user} ignored by filter: "${message}"`);
+                }
+            }
+
             if (flags.broadcaster) {
                 console.log("...broadcaster message");
                 ParseMessage(message);
@@ -482,6 +564,10 @@
         }
         for (var i = 0; i < 25; i++)
             CreateCloud();
+
+        // Load Ceebee settings and poll every 15 seconds
+        fetchCeebeeSettings();
+        setInterval(fetchCeebeeSettings, 15000);
 
         // Add event listener for hide button
         document.addEventListener("DOMContentLoaded", function () {
