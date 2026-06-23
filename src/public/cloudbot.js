@@ -1133,6 +1133,7 @@ CreateCloud = function () {
     const elem = document.createElement('div');
     elem.style.cssText = elemStyle;
     elem.className = "movingCloud";
+    elem.dataset.baseDuration = animDuration;
     const cloud = document.createElement('img');
     cloud.src = `public/medias/cloud-${cloudImage}.png`;
     let sky = document.getElementById("sky");
