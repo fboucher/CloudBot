@@ -370,7 +370,7 @@
             }
 
             //-- tools ---------
-            else if (command === "ceebee") {
+            else if (command === "ceebee" && user !== "ceebee" && user !== "ceebee_bot") {
                 console.log("!ceebee was typed in chat");
                 fetch('/api/ceebee/chat', {
                     method: 'POST',
@@ -526,7 +526,7 @@
             }
 
             // Check if Ceebee is mentioned in normal chat
-            if (message.toLowerCase().includes("ceebee") && user.toLowerCase() !== "ceebee") {
+            if (message.toLowerCase().includes("ceebee") && user.toLowerCase() !== "ceebee" && user.toLowerCase() !== "ceebee_bot") {
                 console.log("@ceebee was mentioned in chat");
                 // Remove the mention from the message to save tokens and keep it clean
                 const cleanMessage = message.replace(/ceebee/gi, '').trim();
