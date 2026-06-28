@@ -280,6 +280,9 @@ async function saveSessionData(sessionId, data) {
     }
   }
 
+  // Delete existing events to prevent duplication upon successive saves
+  await db.prepare("DELETE FROM stream_events WHERE session_id = ?").run(sessionId);
+
   if (data.NewFollowers) {
     for (const user of data.NewFollowers) {
       await db.prepare("INSERT INTO stream_events (session_id, event_type, username) VALUES (?, 'follow', ?)").run(sessionId, user);
