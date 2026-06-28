@@ -1,5 +1,5 @@
 # Cloud Bot
-![Release Docker Image CI](https://github.com/FBoucher/CloudBot/workflows/Release%20Docker%20Image%20CI/badge.svg?branch=main) ![Build Beta Docker Images](https://github.com/FBoucher/CloudBot/workflows/Build%20Docker%20Images/badge.svg?branch=main)
+![Release Docker Image](https://img.shields.io/github/actions/workflow/status/FBoucher/CloudBot/release-docker-image.yml?branch=main&style=flat-square&label=release%20docker) ![Build Beta Docker](https://img.shields.io/github/actions/workflow/status/FBoucher/CloudBot/simple-docker-image.yml?branch=main&style=flat-square&label=build%20beta%20docker) ![GitHub Release](https://img.shields.io/github/v/release/FBoucher/CloudBot?style=flat-square) ![Docker Pulls](https://img.shields.io/docker/pulls/fboucher/cloudbot?style=flat-square) ![License](https://img.shields.io/github/license/FBoucher/CloudBot?style=flat-square)
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
 [![All Contributors](https://img.shields.io/badge/all_contributors-2-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
