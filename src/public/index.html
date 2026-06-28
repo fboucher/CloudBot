@@ -782,6 +782,7 @@
             }
         }, 10000);
 
+<<<<<<< HEAD
         function setCloudSpeedMultiplier(factor) {
             document.querySelectorAll('.movingCloud').forEach(cloud => {
                 const base = parseFloat(cloud.dataset.baseDuration);
@@ -791,16 +792,23 @@
             });
         }
 
+=======
+>>>>>>> origin/main
         function applyDynamicWeather(mpm) {
             const sky = document.getElementById("sky");
             if (!sky) return;
 
             let targetClass = "lightcloud";
+<<<<<<< HEAD
             let factor = 1.0;
+=======
+            let animDuration = 100;
+>>>>>>> origin/main
             let shouldRain = false;
 
             if (mpm < 10) {
                 targetClass = "lightcloud";
+<<<<<<< HEAD
                 factor = 1.0;
                 shouldRain = false;
             } else if (mpm >= 10 && mpm < 25) {
@@ -810,6 +818,17 @@
             } else if (mpm >= 25) {
                 targetClass = "darkcloud";
                 factor = 0.12;
+=======
+                animDuration = 100;
+                shouldRain = false;
+            } else if (mpm >= 10 && mpm < 25) {
+                targetClass = "darkcloud";
+                animDuration = 50;
+                shouldRain = false;
+            } else if (mpm >= 25) {
+                targetClass = "darkcloud";
+                animDuration = 12;
+>>>>>>> origin/main
                 shouldRain = true;
             }
 
@@ -825,7 +844,13 @@
                 stopSound("rain", SoundEnum.rain, true);
             }
 
+<<<<<<< HEAD
             setCloudSpeedMultiplier(factor);
+=======
+            document.querySelectorAll('.movingCloud').forEach(cloud => {
+                cloud.style.animationDuration = `${animDuration}s`;
+            });
+>>>>>>> origin/main
         }
 
         function cleanWeatherOverride() {
@@ -838,7 +863,13 @@
             if (sky) {
                 sky.className = "lightcloud";
             }
+<<<<<<< HEAD
             setCloudSpeedMultiplier(1.0);
+=======
+            document.querySelectorAll('.movingCloud').forEach(cloud => {
+                cloud.style.animationDuration = '100s';
+            });
+>>>>>>> origin/main
             const rb = document.getElementById("rainbowOverlay");
             if (rb) rb.remove();
             const sn = document.getElementById("sunOverlay");
@@ -953,7 +984,13 @@
             makeItRain();
             playSound("rain", SoundEnum.rain, true);
 
+<<<<<<< HEAD
             setCloudSpeedMultiplier(0.08);
+=======
+            document.querySelectorAll('.movingCloud').forEach(cloud => {
+                cloud.style.animationDuration = '8s';
+            });
+>>>>>>> origin/main
 
             weatherOverrideTimeout = setTimeout(() => {
                 cleanWeatherOverride();
@@ -976,7 +1013,13 @@
             document.querySelectorAll('.rain').forEach(el => el.innerHTML = '');
             stopSound("rain", SoundEnum.rain, true);
 
+<<<<<<< HEAD
             setCloudSpeedMultiplier(1.8);
+=======
+            document.querySelectorAll('.movingCloud').forEach(cloud => {
+                cloud.style.animationDuration = '180s';
+            });
+>>>>>>> origin/main
 
             playSound("celebrationSound", SoundEnum.yeah);
 
