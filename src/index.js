@@ -658,6 +658,11 @@ async function generateAndSaveShowNotes(sessionId, options = {}) {
         s.NewFollowers.forEach(u => { md += `- [@${u}](https://www.twitch.tv/${u})\n`; });
     }
 
+    if (s.Subscribers.length > 0) {
+        md += `\n### Subscribers\n\n`;
+        s.Subscribers.forEach(sub => { md += `- [@${sub.user}](https://www.twitch.tv/${sub.user}) ${sub.streamMonths} month(s)\n`; });
+    }
+
     if (s.Raiders.length > 0) {
         md += `\n### Raids\n\n`;
         s.Raiders.forEach(r => { md += `- [@${r.user}](https://www.twitch.tv/${r.user}) has raided you with a party of ${r.viewers}\n`; });
