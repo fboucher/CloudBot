@@ -28,7 +28,7 @@ class Raider {
 
 class Subscriber {
 
-    constructor(user, viewers) {
+    constructor(user, streamMonths) {
         this.user = user;
         this.streamMonths = streamMonths;
     }
@@ -845,12 +845,26 @@ GenerateSessiontInfo = function () {
 
 GenerateCloudiesInfo = function () {
     let cloudiesSection = GenerateNewFollowerSection();
+    cloudiesSection += GenerateSubscribersSection();
     cloudiesSection += GenerateRaidersSection();
     cloudiesSection += GenerateHostSection();
     cloudiesSection += GenerateCheersSection();
     cloudiesSection += GenerateParachuteSection();
 
     return cloudiesSection;
+}
+
+GenerateSubscribersSection = function () {
+    if (_streamSession.Subscribers.length > 0) {
+        let subscribersSection = "\n### Subscribers\n\n"
+
+        for (sub of _streamSession.Subscribers) {
+            subscribersSection += `- [@${sub.user}](https://www.twitch.tv/${sub.user}) ${sub.streamMonths} month(s)\n`;
+        }
+
+        return subscribersSection;
+    }
+    return "";
 }
 
 
