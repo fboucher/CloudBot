@@ -665,7 +665,7 @@ async function generateAndSaveShowNotes(sessionId, options = {}) {
 
     if (s.Raiders.length > 0) {
         md += `\n### Raids\n\n`;
-        s.Raiders.forEach(r => { md += `- [@${r.user}](https://www.twitch.tv/${r.user}) has raided you with a party of ${r.viewers}\n`; });
+        s.Raiders.forEach(r => { md += `- [@${r.user}](https://www.twitch.tv/${r.user}) has raided you with a party of ${r.viewers ?? 0}\n`; });
     }
 
     if (s.Hosts.length > 0) {

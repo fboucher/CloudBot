@@ -1122,7 +1122,7 @@
 
             streamSessionData.NewFollowers?.forEach(u => events.push({ type: 'follow', user: u }));
             streamSessionData.Subscribers?.forEach(s => events.push({ type: 'sub', user: s.user }));
-            streamSessionData.Raiders?.forEach(r => events.push({ type: 'raid', user: r.user, viewers: r.viewers }));
+            streamSessionData.Raiders?.forEach(r => events.push({ type: 'raid', user: r.user, viewers: r.viewers ?? 0 }));
             streamSessionData.Cheerers?.forEach(c => events.push({ type: 'cheer', user: c.user, bits: c.bits }));
             streamSessionData.Hosts?.forEach(h => events.push({ type: 'host', user: h }));
 

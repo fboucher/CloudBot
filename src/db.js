@@ -293,7 +293,7 @@ async function saveSessionData(sessionId, data) {
     for (const raider of data.Raiders) {
       await db.prepare(
         "INSERT INTO stream_events (session_id, event_type, username, metadata) VALUES (?, 'raid', ?, ?)"
-      ).run(sessionId, raider.user, JSON.stringify({ viewers: raider.viewers }));
+      ).run(sessionId, raider.user, JSON.stringify({ viewers: raider.viewers ?? 0 }));
     }
   }
 
@@ -397,7 +397,7 @@ async function loadSessionData(sessionId) {
         break;
       case 'raid':
         const raidMeta = JSON.parse(event.metadata || '{}');
-        data.Raiders.push({ user: event.username, viewers: raidMeta.viewers });
+        data.Raiders.push({ user: event.username, viewers: raidMeta.viewers ?? 0 });
         break;
       case 'sub':
         const subMeta = JSON.parse(event.metadata || '{}');
