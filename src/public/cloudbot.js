@@ -858,7 +858,7 @@ GenerateSubscribersSection = function () {
     if (_streamSession.Subscribers.length > 0) {
         let subscribersSection = "\n### Subscribers\n\n"
 
-        for (sub of _streamSession.Subscribers) {
+        for (const sub of _streamSession.Subscribers) {
             subscribersSection += `- [@${sub.user}](https://www.twitch.tv/${sub.user}) ${sub.streamMonths} month(s)\n`;
         }
 
@@ -886,8 +886,8 @@ GenerateRaidersSection = function () {
     if (_streamSession.Raiders.length > 0) {
         let raidersSection = "\n### Raids\n\n"
 
-        for (raider of _streamSession.Raiders) {
-            raidersSection += `- [@${raider.user}](https://www.twitch.tv/${raider.user}) has raided you with a party of ${raider.viewers}\n`;
+        for (const raider of _streamSession.Raiders) {
+            raidersSection += `- [@${raider.user}](https://www.twitch.tv/${raider.user}) has raided you with a party of ${raider.viewers ?? 0}\n`;
         }
 
         return raidersSection;
@@ -935,7 +935,7 @@ GenerateCheersSection = function () {
     if (_streamSession.Cheerers.length > 0) {
         let cheerersSection = "\n### Cheers\n\n"
 
-        for (cheerer of _streamSession.Cheerers) {
+        for (const cheerer of _streamSession.Cheerers) {
             cheerersSection += `- [@${cheerer.user}](https://www.twitch.tv/${cheerer.user})  ${cheerer.bits} bits\n`;
         }
 
@@ -1040,7 +1040,7 @@ GenerateExtraInfo = function () {
     if (_streamSession.Notes.length > 0) {
         let noteSection = "\n### Notes/ References / Snippets\n\n"
 
-        for (note of _streamSession.Notes) {
+        for (const note of _streamSession.Notes) {
             noteSection += `- ${note}\n`;
         }
         return noteSection;
