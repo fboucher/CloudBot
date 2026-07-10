@@ -280,8 +280,8 @@ async function saveSessionData(sessionId, data) {
     }
   }
 
-  // Delete existing events to prevent duplication upon successive saves
-  await db.prepare("DELETE FROM stream_events WHERE session_id = ?").run(sessionId);
+  // Delete existing events to prevent duplication upon successive saves (excluding greeting events which are server-only)
+  await db.prepare("DELETE FROM stream_events WHERE session_id = ? AND event_type != 'greeting'").run(sessionId);
 
   if (data.NewFollowers) {
     for (const user of data.NewFollowers) {
