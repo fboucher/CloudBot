@@ -297,6 +297,7 @@ ParseMessage = function (message) {
     else if (message.startsWith("Thank you for following")) {
         let user = splitedMsg[4].toLowerCase().slice(0, -1);
         _streamSession.NewFollowers.push(user);
+        SaveToFile(false);
     }
 }
 
@@ -567,18 +568,20 @@ SaveToFile = function (verbose = false) {
         body: JSON.stringify(data)
     }
 
-    fetch('/savetofile', options)
+    return fetch('/savetofile', options)
         .then(response => response.json())
         .then(result => {
             if (verbose && result.success) {
                 ChatBotSay('Session saved!');
             }
+            return result;
         })
         .catch(error => {
             console.error('Error:', error);
             if (verbose) {
                 ChatBotSay('Error: ' + error);
             }
+            throw error;
         });
 
 }
@@ -780,9 +783,13 @@ StreamNoteStart = async function (projectName) {
 
 
 
-StreamNoteStop = function () {
+StreamNoteStop = async function () {
     _streamSession.DateTimeEnd = new Date();
-    SaveToFile(false); // false = no chat announcement; DB is source of truth
+    try {
+        await SaveToFile(false); // wait for save to database to complete
+    } catch (err) {
+        console.error('Failed to save session data on stop:', err);
+    }
     console.log('_streamSession: ', _streamSession);
     let streamNotes = Generate_streamSession();
     console.log('Notes: ', streamNotes);
@@ -1111,6 +1118,7 @@ SavingNote = function (message) {
 LogRaid = function (user, viewers) {
 
     _streamSession.Raiders.push(new Raider(user, viewers));
+    SaveToFile(false);
 }
 
 
@@ -1119,16 +1127,19 @@ LogSub = function (user, message, subTierInfo, streamMonths, cumulativeMonths) {
     cloud("Yeah");
     playSound("yeah", SoundEnum.yeah);
     _streamSession.Subscribers.push(new Subscriber(user, streamMonths));
+    SaveToFile(false);
 }
 
 
 LogHost = function (user, viewers, autohost, extra) {
     _streamSession.Hosts.push(user);
+    SaveToFile(false);
 }
 
 
 LogCheer = function (user, message, bits, flags, extra) {
     _streamSession.Cheerers.push(new Cheerer(user, bits));
+    SaveToFile(false);
 }
 
 CreateCloud = function () {
