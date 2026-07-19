@@ -502,6 +502,47 @@
                             <p class="text-muted p-3 mb-0">No players yet.</p>
                         </div>
                     </div>
+
+                    <!-- Registered Events Section -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <span class="card-title">Registered Stream Events</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <h6 class="text-light border-bottom pb-1"><i class="bi bi-person-plus"></i> New Followers</h6>
+                                    <div id="sessionFollowersList" style="max-height: 200px; overflow-y: auto;">
+                                        <p class="text-muted small">No followers yet</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <h6 class="text-light border-bottom pb-1"><i class="bi bi-star"></i> Subscribers</h6>
+                                    <div id="sessionSubscribersList" style="max-height: 200px; overflow-y: auto;">
+                                        <p class="text-muted small">No subscribers yet</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <h6 class="text-light border-bottom pb-1"><i class="bi bi-people"></i> Raiders</h6>
+                                    <div id="sessionRaidersList" style="max-height: 200px; overflow-y: auto;">
+                                        <p class="text-muted small">No raids yet</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <h6 class="text-light border-bottom pb-1"><i class="bi bi-cash"></i> Cheerers</h6>
+                                    <div id="sessionCheersList" style="max-height: 200px; overflow-y: auto;">
+                                        <p class="text-muted small">No cheers yet</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-12">
+                                    <h6 class="text-light border-bottom pb-1"><i class="bi bi-broadcast"></i> Hosts</h6>
+                                    <div id="sessionHostsList" style="max-height: 200px; overflow-y: auto;">
+                                        <p class="text-muted small">No hosts yet</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="historyPage" style="display: none;">
@@ -986,12 +1027,13 @@
 
                     // Backward-compat: fetch full session data for legacy features (events, export)
                     try {
-                        const legacyRes = await fetch('/api/session');
+                        const legacyRes = await fetch(`/api/session/${s.id}`);
                         const legacyData = await legacyRes.json();
                         streamSessionData = legacyData.data || null;
                     } catch (_) { streamSessionData = null; }
 
                     loadRecentEvents();
+                    renderRegisteredEvents();
                 } else {
                     currentSession = null;
                     streamSessionData = null;
@@ -1002,6 +1044,7 @@
                     document.getElementById('configureSessionBtn').disabled = false;
                     document.getElementById('currentStreamNumber').textContent = '-';
                     document.getElementById('currentStartTime').textContent = '-';
+                    renderRegisteredEvents();
                 }
 
                 await loadDashboardStats();
@@ -1346,6 +1389,93 @@
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;');
+        }
+
+        function renderRegisteredEvents() {
+            const followersContainer = document.getElementById('sessionFollowersList');
+            const subscribersContainer = document.getElementById('sessionSubscribersList');
+            const raidersContainer = document.getElementById('sessionRaidersList');
+            const cheerersContainer = document.getElementById('sessionCheersList');
+            const hostsContainer = document.getElementById('sessionHostsList');
+
+            if (!streamSessionData) {
+                if (followersContainer) followersContainer.innerHTML = '<p class="text-muted small">No followers yet</p>';
+                if (subscribersContainer) subscribersContainer.innerHTML = '<p class="text-muted small">No subscribers yet</p>';
+                if (raidersContainer) raidersContainer.innerHTML = '<p class="text-muted small">No raids yet</p>';
+                if (cheerersContainer) cheerersContainer.innerHTML = '<p class="text-muted small">No cheers yet</p>';
+                if (hostsContainer) hostsContainer.innerHTML = '<p class="text-muted small">No hosts yet</p>';
+                return;
+            }
+
+            // Render Followers
+            const followers = streamSessionData.NewFollowers || [];
+            if (followersContainer) {
+                if (followers.length === 0) {
+                    followersContainer.innerHTML = '<p class="text-muted small">No followers yet</p>';
+                } else {
+                    followersContainer.innerHTML = followers.map(u => `
+                        <div class="event-item event-follow py-1">
+                            <i class="bi bi-person-plus text-info"></i> <strong>@${escapeHtml(u)}</strong>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            // Render Subscribers
+            const subscribers = streamSessionData.Subscribers || [];
+            if (subscribersContainer) {
+                if (subscribers.length === 0) {
+                    subscribersContainer.innerHTML = '<p class="text-muted small">No subscribers yet</p>';
+                } else {
+                    subscribersContainer.innerHTML = subscribers.map(sub => `
+                        <div class="event-item event-sub py-1">
+                            <i class="bi bi-star text-warning"></i> <strong>@${escapeHtml(sub.user)}</strong> (${sub.streamMonths} mo)
+                        </div>
+                    `).join('');
+                }
+            }
+
+            // Render Raiders
+            const raiders = streamSessionData.Raiders || [];
+            if (raidersContainer) {
+                if (raiders.length === 0) {
+                    raidersContainer.innerHTML = '<p class="text-muted small">No raids yet</p>';
+                } else {
+                    raidersContainer.innerHTML = raiders.map(r => `
+                        <div class="event-item event-raid py-1">
+                            <i class="bi bi-people text-success"></i> <strong>@${escapeHtml(r.user)}</strong> (${r.viewers} viewers)
+                        </div>
+                    `).join('');
+                }
+            }
+
+            // Render Cheerers
+            const cheerers = streamSessionData.Cheerers || [];
+            if (cheerersContainer) {
+                if (cheerers.length === 0) {
+                    cheerersContainer.innerHTML = '<p class="text-muted small">No cheers yet</p>';
+                } else {
+                    cheerersContainer.innerHTML = cheerers.map(c => `
+                        <div class="event-item event-cheer py-1">
+                            <i class="bi bi-cash text-danger"></i> <strong>@${escapeHtml(c.user)}</strong> (${c.bits} bits)
+                        </div>
+                    `).join('');
+                }
+            }
+
+            // Render Hosts
+            const hosts = streamSessionData.Hosts || [];
+            if (hostsContainer) {
+                if (hosts.length === 0) {
+                    hostsContainer.innerHTML = '<p class="text-muted small">No hosts yet</p>';
+                } else {
+                    hostsContainer.innerHTML = hosts.map(h => `
+                        <div class="event-item event-host py-1">
+                            <i class="bi bi-broadcast text-primary"></i> <strong>@${escapeHtml(h)}</strong>
+                        </div>
+                    `).join('');
+                }
+            }
         }
 
         // FIX #9: Todos wired to /api/todos
