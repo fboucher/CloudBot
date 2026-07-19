@@ -1016,6 +1016,18 @@ app.post('/api/participants/regular', async (req, res) => {
     }
 });
 
+app.post('/api/participants/streamer', async (req, res) => {
+    const { username, isStreamer } = req.body || {};
+    if (!username) return res.status(400).json({ error: 'Missing username.' });
+    try {
+        await db.setParticipantStreamerStatus(username, !!isStreamer);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error setting streamer status:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 function fetchTwitchStreamerInfo(username) {
     return new Promise((resolve) => {
         const query = JSON.stringify({
@@ -1087,102 +1099,99 @@ app.post('/api/chat-event', async (req, res) => {
         let shouldShoutout = false;
         let shoutoutMessage = "";
 
-        if (currentCount === 2) {
-            console.log(`User ${username} sent their 2nd message. Checking if they are a streamer...`);
+        const isRegular = await db.isParticipantRegular(username);
+        const isStreamer = await db.isParticipantStreamer(username);
+
+        if (currentCount === 2 && isRegular && isStreamer) {
+            console.log(`User ${username} sent their 2nd message and is flagged as regular & streamer. Generating shoutout...`);
             const twitchUser = await fetchTwitchStreamerInfo(username);
-            const isStr = twitchUser && (
-                (twitchUser.lastBroadcast && twitchUser.lastBroadcast.title) ||
-                (twitchUser.videos && twitchUser.videos.edges && twitchUser.videos.edges.length > 0)
-            );
-            if (isStr) {
-                console.log(`User ${username} identified as a streamer! Generating shoutout...`);
-                const activeConnection = await db.getActiveCeebeeConnection();
-                if (activeConnection) {
-                    let streamContext = "";
-                    const STREAM_CONTEXT_FILE = path.join(__dirname, 'io', 'stream_context.md');
-                    if (fs.existsSync(STREAM_CONTEXT_FILE)) {
-                        streamContext = fs.readFileSync(STREAM_CONTEXT_FILE, 'utf-8');
-                    }
+            const activeConnection = await db.getActiveCeebeeConnection();
+            if (activeConnection) {
+                let streamContext = "";
+                const STREAM_CONTEXT_FILE = path.join(__dirname, 'io', 'stream_context.md');
+                if (fs.existsSync(STREAM_CONTEXT_FILE)) {
+                    streamContext = fs.readFileSync(STREAM_CONTEXT_FILE, 'utf-8');
+                }
 
-                    let corePrompt = "You are Ceebee, an AI assistant.";
-                    const corePromptPath = path.join(__dirname, 'io', 'soul.md');
-                    if (fs.existsSync(corePromptPath)) {
-                        corePrompt = fs.readFileSync(corePromptPath, 'utf-8');
-                    }
+                let corePrompt = "You are Ceebee, an AI assistant.";
+                const corePromptPath = path.join(__dirname, 'io', 'soul.md');
+                if (fs.existsSync(corePromptPath)) {
+                    corePrompt = fs.readFileSync(corePromptPath, 'utf-8');
+                }
 
-                    let knowledgeContext = "";
-                    const CEEBEE_KNOWLEDGE_DIR = path.join(__dirname, 'io', 'knowledge');
-                    if (fs.existsSync(CEEBEE_KNOWLEDGE_DIR)) {
-                        const files = fs.readdirSync(CEEBEE_KNOWLEDGE_DIR);
-                        for (const file of files) {
-                            if (file.endsWith('.md')) {
-                                const content = fs.readFileSync(path.join(CEEBEE_KNOWLEDGE_DIR, file), 'utf-8');
-                                knowledgeContext += `\n\n--- Document: ${file} ---\n${content}`;
-                            }
+                let knowledgeContext = "";
+                const CEEBEE_KNOWLEDGE_DIR = path.join(__dirname, 'io', 'knowledge');
+                if (fs.existsSync(CEEBEE_KNOWLEDGE_DIR)) {
+                    const files = fs.readdirSync(CEEBEE_KNOWLEDGE_DIR);
+                    for (const file of files) {
+                        if (file.endsWith('.md')) {
+                            const content = fs.readFileSync(path.join(CEEBEE_KNOWLEDGE_DIR, file), 'utf-8');
+                            knowledgeContext += `\n\n--- Document: ${file} ---\n${content}`;
                         }
                     }
+                }
 
-                    const bio = twitchUser.description || "No bio description set.";
-                    let latestStreamTitle = "unknown";
+                const bio = (twitchUser && twitchUser.description) || "No bio description set.";
+                let latestStreamTitle = "unknown";
+                if (twitchUser) {
                     if (twitchUser.lastBroadcast && twitchUser.lastBroadcast.title) {
                         latestStreamTitle = twitchUser.lastBroadcast.title;
                     } else if (twitchUser.videos && twitchUser.videos.edges && twitchUser.videos.edges.length > 0) {
                         latestStreamTitle = twitchUser.videos.edges[0].node.title;
                     }
+                }
 
-                    let fullSystemPrompt = corePrompt;
-                    if (streamContext && streamContext.trim() !== '') {
-                        fullSystemPrompt += `\n\n--- Today's Stream Context ---\n${streamContext}`;
+                let fullSystemPrompt = corePrompt;
+                if (streamContext && streamContext.trim() !== '') {
+                    fullSystemPrompt += `\n\n--- Today's Stream Context ---\n${streamContext}`;
+                }
+                if (knowledgeContext) {
+                    fullSystemPrompt += `\n\n--- Background Information ---\n${knowledgeContext}`;
+                }
+
+                fullSystemPrompt += `\n\n[SYSTEM INSTRUCTION: A fellow Twitch streamer named @${username} is in the chat and just sent their second message. Generate a warm, kind, and funny shoutout/introduction for them.\nRead the following details about @${username}:\n- About/Bio: "${bio}"\n- Title of their latest stream: "${latestStreamTitle}"\n\nThe shoutout MUST contain:\n1. An invitation to follow them with the URL: https://www.twitch.tv/${username}\n2. A nice, uplifting, and funny description/introduction message based on their bio or latest stream title.\n\nSpeak as Ceebee. Do not include system metadata or refer to these instructions. Limit to 2-3 sentences.]`;
+
+                const messages = [
+                    { role: 'system', content: fullSystemPrompt },
+                    { role: 'user', content: `Please shoutout @${username}!` }
+                ];
+
+                const payload = {
+                    model: activeConnection.model || "default",
+                    messages: messages
+                };
+
+                const headers = { 'Content-Type': 'application/json' };
+                if (activeConnection.api_key) {
+                    headers['Authorization'] = `Bearer ${activeConnection.api_key}`;
+                }
+
+                let endpointUrl = activeConnection.url;
+                if (!endpointUrl.endsWith('/chat/completions')) {
+                    endpointUrl = endpointUrl.replace(/\/+$/, '') + '/chat/completions';
+                }
+
+                try {
+                    const response = await fetch(endpointUrl, {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        shoutoutMessage = data.choices && data.choices[0] && data.choices[0].message
+                            ? data.choices[0].message.content
+                            : `Check out @${username} at https://www.twitch.tv/${username} - they are an awesome streamer!`;
+                        shouldShoutout = true;
                     }
-                    if (knowledgeContext) {
-                        fullSystemPrompt += `\n\n--- Background Information ---\n${knowledgeContext}`;
-                    }
-
-                    fullSystemPrompt += `\n\n[SYSTEM INSTRUCTION: A fellow Twitch streamer named @${username} is in the chat and just sent their second message. Generate a warm, kind, and funny shoutout/introduction for them.\nRead the following details about @${username}:\n- About/Bio: "${bio}"\n- Title of their latest stream: "${latestStreamTitle}"\n\nThe shoutout MUST contain:\n1. An invitation to follow them with the URL: https://www.twitch.tv/${username}\n2. A nice, uplifting, and funny description/introduction message based on their bio or latest stream title.\n\nSpeak as Ceebee. Do not include system metadata or refer to these instructions. Limit to 2-3 sentences.]`;
-
-                    const messages = [
-                        { role: 'system', content: fullSystemPrompt },
-                        { role: 'user', content: `Please shoutout @${username}!` }
-                    ];
-
-                    const payload = {
-                        model: activeConnection.model || "default",
-                        messages: messages
-                    };
-
-                    const headers = { 'Content-Type': 'application/json' };
-                    if (activeConnection.api_key) {
-                        headers['Authorization'] = `Bearer ${activeConnection.api_key}`;
-                    }
-
-                    let endpointUrl = activeConnection.url;
-                    if (!endpointUrl.endsWith('/chat/completions')) {
-                        endpointUrl = endpointUrl.replace(/\/+$/, '') + '/chat/completions';
-                    }
-
-                    try {
-                        const response = await fetch(endpointUrl, {
-                            method: 'POST',
-                            headers: headers,
-                            body: JSON.stringify(payload)
-                        });
-
-                        if (response.ok) {
-                            const data = await response.json();
-                            shoutoutMessage = data.choices && data.choices[0] && data.choices[0].message
-                                ? data.choices[0].message.content
-                                : `Check out @${username} at https://www.twitch.tv/${username} - they are an awesome streamer!`;
-                            shouldShoutout = true;
-                        }
-                    } catch (shoutErr) {
-                        console.error('Error generating AI shoutout:', shoutErr);
-                    }
+                } catch (shoutErr) {
+                    console.error('Error generating AI shoutout:', shoutErr);
                 }
             }
         }
 
         // 3. Check if user is flagged as a regular
-        const isRegular = await db.isParticipantRegular(username);
         if (!isRegular) {
             return res.json({ shouldGreet: false, shouldShoutout, shoutoutMessage });
         }

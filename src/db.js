@@ -105,6 +105,7 @@ async function createTables() {
     `CREATE TABLE IF NOT EXISTS participants (
       username TEXT PRIMARY KEY,
       is_regular INTEGER DEFAULT 0,
+      is_streamer INTEGER DEFAULT 0,
       inventory TEXT DEFAULT '[]',
       created_at TEXT DEFAULT (datetime('now'))
     )`,
@@ -174,6 +175,14 @@ async function createTables() {
     try {
       await db.exec("ALTER TABLE participants ADD COLUMN inventory TEXT DEFAULT '[]'");
       console.log("Migration: Added inventory column to participants");
+    } catch (e) {
+      // Column probably already exists, ignore
+    }
+
+    // Migration: Add is_streamer column to participants if it doesn't exist
+    try {
+      await db.exec("ALTER TABLE participants ADD COLUMN is_streamer INTEGER DEFAULT 0");
+      console.log("Migration: Added is_streamer column to participants");
     } catch (e) {
       // Column probably already exists, ignore
     }
@@ -631,12 +640,29 @@ async function isParticipantRegular(username) {
   return row ? !!row.is_regular : false;
 }
 
+async function setParticipantStreamerStatus(username, isStreamer) {
+  if (!db) await initDb();
+  await registerParticipant(username);
+  await db.prepare(
+    "UPDATE participants SET is_streamer = ? WHERE username = ?"
+  ).run(isStreamer ? 1 : 0, username);
+}
+
+async function isParticipantStreamer(username) {
+  if (!db) await initDb();
+  const row = await db.prepare(
+    "SELECT is_streamer FROM participants WHERE username = ?"
+  ).get(username);
+  return row ? !!row.is_streamer : false;
+}
+
 async function getAllParticipantsWithStats() {
   if (!db) await initDb();
   return db.prepare(`
     SELECT 
       p.username, 
       p.is_regular,
+      p.is_streamer,
       COALESCE(SUM(u.drop_count), 0) AS total_drops,
       COALESCE(SUM(u.landed_count), 0) AS total_landed,
       COALESCE(MAX(u.high_score), 0) AS max_high_score,
@@ -743,6 +769,8 @@ module.exports = {
   registerParticipant,
   setParticipantRegularStatus,
   isParticipantRegular,
+  setParticipantStreamerStatus,
+  isParticipantStreamer,
   getAllParticipantsWithStats,
   hasBeenGreetedInSession,
   logGreetingEvent,

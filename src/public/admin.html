@@ -538,6 +538,7 @@
                                     <tr>
                                         <th>Username</th>
                                         <th>Regular</th>
+                                        <th>Streamer</th>
                                         <th>Drops</th>
                                         <th>Landed</th>
                                         <th>High Score</th>
@@ -1515,7 +1516,7 @@
                 const participants = await response.json();
 
                 if (!Array.isArray(participants) || participants.length === 0) {
-                    container.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No user statistics available.</td></tr>';
+                    container.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No user statistics available.</td></tr>';
                     return;
                 }
 
@@ -1527,6 +1528,11 @@
                                 <input class="form-check-input" type="checkbox" role="switch" ${u.is_regular ? 'checked' : ''} onchange="toggleRegular('${escapeHtml(u.username)}', this.checked)">
                             </div>
                         </td>
+                        <td>
+                            <div class="form-check form-switch d-inline-block">
+                                <input class="form-check-input" type="checkbox" role="switch" ${u.is_streamer ? 'checked' : ''} onchange="toggleStreamer('${escapeHtml(u.username)}', this.checked)">
+                            </div>
+                        </td>
                         <td>${u.total_drops || 0}</td>
                         <td>${u.total_landed || 0}</td>
                         <td>${u.max_high_score || 0}</td>
@@ -1535,7 +1541,7 @@
                 `).join('');
             } catch (err) {
                 console.error('Error loading users:', err);
-                container.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading user statistics.</td></tr>';
+                container.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading user statistics.</td></tr>';
             }
         }
 
@@ -1554,6 +1560,25 @@
             } catch (err) {
                 console.error('Error toggling regular:', err);
                 alert(`Error toggling regular status for @${username}`);
+                loadUsers(); // reload to reset checkbox state
+            }
+        }
+
+        async function toggleStreamer(username, isStreamer) {
+            try {
+                const response = await fetch('/api/participants/streamer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, isStreamer })
+                });
+                if (response.ok) {
+                    showFeedback(`Updated streamer status for @${username}`);
+                } else {
+                    throw new Error('Failed to update');
+                }
+            } catch (err) {
+                console.error('Error toggling streamer:', err);
+                alert(`Error toggling streamer status for @${username}`);
                 loadUsers(); // reload to reset checkbox state
             }
         }
