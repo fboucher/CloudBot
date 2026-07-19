@@ -202,6 +202,9 @@
                 if (data.shouldGreet && data.greetingMessage) {
                     CeebeeSay(data.greetingMessage);
                 }
+                if (data.shouldShoutout && data.shoutoutMessage) {
+                    CeebeeSay(data.shoutoutMessage);
+                }
             })
             .catch(err => console.error('Error reporting chat event:', err));
         }
@@ -582,12 +585,9 @@
                 }
             }
 
-            if (flags.broadcaster) {
-                console.log("...broadcaster message");
-                ParseMessage(message);
-            }
-            else if (user === "Streamlabs") {
-                console.log("...Streamlabs message");
+            const trustedSenders = ['streamlabs', 'ceebee_bot', 'ceebee', 'streamelements', 'nightbot'];
+            if (flags.broadcaster || trustedSenders.includes(user)) {
+                console.log(`...parsing message from trusted source: ${user}`);
                 ParseMessage(message);
             }
         }
@@ -1058,22 +1058,18 @@
             } 
             else if (item === 'shield') {
                 playSound("shieldSound", SoundEnum.doorknock);
-                const positions = [
-                    { top: '25%', left: '20%' },
-                    { top: '65%', left: '80%' },
-                    { top: '70%', left: '30%' },
-                    { top: '30%', left: '70%' }
-                ];
-                positions.forEach((pos, idx) => {
+                for (let idx = 0; idx < 4; idx++) {
+                    const topRandom = Math.floor(Math.random() * 65) + 15; // 15% to 80%
+                    const leftRandom = Math.floor(Math.random() * 75) + 10; // 10% to 85%
                     setTimeout(() => {
                         const shield = document.createElement("div");
                         shield.className = "shield-overlay";
-                        shield.style.top = pos.top;
-                        shield.style.left = pos.left;
+                        shield.style.top = `${topRandom}%`;
+                        shield.style.left = `${leftRandom}%`;
                         document.body.appendChild(shield);
                         setTimeout(() => shield.remove(), 5000);
                     }, idx * 250);
-                });
+                }
             }
             else if (item === 'umbrella') {
                 playSound("umbrellaSound", SoundEnum.rainUmbrella);

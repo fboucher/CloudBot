@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const { exec } = require('child_process');
 const dateFormat = require('dateformat');
 const pkg = require('./package.json');
 const BUILD_DATE = new Date().toISOString().split('T')[0];
@@ -12,6 +13,7 @@ try {
 }
 const db = require('./db');
 const app = express();
+const sessionMessageCounts = new Map();
 const port = 3000;
 const DEFAULT_GENERATED_DIR = path.join(__dirname, 'public', 'medias', 'generated');
 const FALLBACK_GENERATED_DIR = path.join('/tmp', 'cloudbot-generated');
@@ -797,6 +799,7 @@ app.post('/api/stream/stop', async (req, res) => {
         const session = await db.getActiveSession();
         if (!session) return res.status(400).json({ error: 'No active session.' });
         await db.endStreamSession(session.id);
+        sessionMessageCounts.delete(session.id);
         broadcastSSE({ event: 'stream_stopped', sessionId: session.id });
         console.log(`Stream stopped: session=${session.id}`);
 
@@ -1013,6 +1016,64 @@ app.post('/api/participants/regular', async (req, res) => {
     }
 });
 
+app.post('/api/participants/streamer', async (req, res) => {
+    const { username, isStreamer } = req.body || {};
+    if (!username) return res.status(400).json({ error: 'Missing username.' });
+    try {
+        await db.setParticipantStreamerStatus(username, !!isStreamer);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error setting streamer status:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+function fetchTwitchStreamerInfo(username) {
+    return new Promise((resolve) => {
+        const query = JSON.stringify({
+            query: `
+              query($login: String!) {
+                user(login: $login) {
+                  description
+                  lastBroadcast {
+                    title
+                  }
+                  videos(first: 1, type: ARCHIVE) {
+                    edges {
+                      node {
+                        title
+                      }
+                    }
+                  }
+                }
+              }
+            `,
+            variables: { login: username }
+        });
+
+        const escapedQuery = query.replace(/'/g, "'\\''");
+        const cmd = `curl -s -X POST -H "Client-ID: kimne78kx3ncx6brgo4mv6wki5h1ko" -H "Content-Type: application/json" -d '${escapedQuery}' https://gql.twitch.tv/gql`;
+
+        exec(cmd, (err, stdout, stderr) => {
+            if (err) {
+                console.error(`[Twitch GQL] Error fetching info for ${username}:`, err);
+                return resolve(null);
+            }
+            try {
+                const result = JSON.parse(stdout);
+                if (result && result.data && result.data.user) {
+                    resolve(result.data.user);
+                } else {
+                    resolve(null);
+                }
+            } catch (parseErr) {
+                console.error(`[Twitch GQL] Parse error for ${username}:`, parseErr);
+                resolve(null);
+            }
+        });
+    });
+}
+
 app.post('/api/chat-event', async (req, res) => {
     const { username } = req.body || {};
     if (!username) return res.status(400).json({ error: 'Missing username.' });
@@ -1027,16 +1088,118 @@ app.post('/api/chat-event', async (req, res) => {
             return res.json({ shouldGreet: false });
         }
 
-        // 3. Check if user is flagged as a regular
+        // Track message count for this user in the active session
+        if (!sessionMessageCounts.has(session.id)) {
+            sessionMessageCounts.set(session.id, new Map());
+        }
+        const userCounts = sessionMessageCounts.get(session.id);
+        const currentCount = (userCounts.get(username) || 0) + 1;
+        userCounts.set(username, currentCount);
+
+        let shouldShoutout = false;
+        let shoutoutMessage = "";
+
         const isRegular = await db.isParticipantRegular(username);
+        const isStreamer = await db.isParticipantStreamer(username);
+
+        if (currentCount === 2 && isRegular && isStreamer) {
+            console.log(`User ${username} sent their 2nd message and is flagged as regular & streamer. Generating shoutout...`);
+            const twitchUser = await fetchTwitchStreamerInfo(username);
+            const activeConnection = await db.getActiveCeebeeConnection();
+            if (activeConnection) {
+                let streamContext = "";
+                const STREAM_CONTEXT_FILE = path.join(__dirname, 'io', 'stream_context.md');
+                if (fs.existsSync(STREAM_CONTEXT_FILE)) {
+                    streamContext = fs.readFileSync(STREAM_CONTEXT_FILE, 'utf-8');
+                }
+
+                let corePrompt = "You are Ceebee, an AI assistant.";
+                const corePromptPath = path.join(__dirname, 'io', 'soul.md');
+                if (fs.existsSync(corePromptPath)) {
+                    corePrompt = fs.readFileSync(corePromptPath, 'utf-8');
+                }
+
+                let knowledgeContext = "";
+                const CEEBEE_KNOWLEDGE_DIR = path.join(__dirname, 'io', 'knowledge');
+                if (fs.existsSync(CEEBEE_KNOWLEDGE_DIR)) {
+                    const files = fs.readdirSync(CEEBEE_KNOWLEDGE_DIR);
+                    for (const file of files) {
+                        if (file.endsWith('.md')) {
+                            const content = fs.readFileSync(path.join(CEEBEE_KNOWLEDGE_DIR, file), 'utf-8');
+                            knowledgeContext += `\n\n--- Document: ${file} ---\n${content}`;
+                        }
+                    }
+                }
+
+                const bio = (twitchUser && twitchUser.description) || "No bio description set.";
+                let latestStreamTitle = "unknown";
+                if (twitchUser) {
+                    if (twitchUser.lastBroadcast && twitchUser.lastBroadcast.title) {
+                        latestStreamTitle = twitchUser.lastBroadcast.title;
+                    } else if (twitchUser.videos && twitchUser.videos.edges && twitchUser.videos.edges.length > 0) {
+                        latestStreamTitle = twitchUser.videos.edges[0].node.title;
+                    }
+                }
+
+                let fullSystemPrompt = corePrompt;
+                if (streamContext && streamContext.trim() !== '') {
+                    fullSystemPrompt += `\n\n--- Today's Stream Context ---\n${streamContext}`;
+                }
+                if (knowledgeContext) {
+                    fullSystemPrompt += `\n\n--- Background Information ---\n${knowledgeContext}`;
+                }
+
+                fullSystemPrompt += `\n\n[SYSTEM INSTRUCTION: A fellow Twitch streamer named @${username} is in the chat and just sent their second message. Generate a warm, kind, and funny shoutout/introduction for them.\nRead the following details about @${username}:\n- About/Bio: "${bio}"\n- Title of their latest stream: "${latestStreamTitle}"\n\nThe shoutout MUST contain:\n1. An invitation to follow them with the URL: https://www.twitch.tv/${username}\n2. A nice, uplifting, and funny description/introduction message based on their bio or latest stream title.\n\nSpeak as Ceebee. Do not include system metadata or refer to these instructions. Limit to 2-3 sentences.]`;
+
+                const messages = [
+                    { role: 'system', content: fullSystemPrompt },
+                    { role: 'user', content: `Please shoutout @${username}!` }
+                ];
+
+                const payload = {
+                    model: activeConnection.model || "default",
+                    messages: messages
+                };
+
+                const headers = { 'Content-Type': 'application/json' };
+                if (activeConnection.api_key) {
+                    headers['Authorization'] = `Bearer ${activeConnection.api_key}`;
+                }
+
+                let endpointUrl = activeConnection.url;
+                if (!endpointUrl.endsWith('/chat/completions')) {
+                    endpointUrl = endpointUrl.replace(/\/+$/, '') + '/chat/completions';
+                }
+
+                try {
+                    const response = await fetch(endpointUrl, {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        shoutoutMessage = data.choices && data.choices[0] && data.choices[0].message
+                            ? data.choices[0].message.content
+                            : `Check out @${username} at https://www.twitch.tv/${username} - they are an awesome streamer!`;
+                        shouldShoutout = true;
+                    }
+                } catch (shoutErr) {
+                    console.error('Error generating AI shoutout:', shoutErr);
+                }
+            }
+        }
+
+        // 3. Check if user is flagged as a regular
         if (!isRegular) {
-            return res.json({ shouldGreet: false });
+            return res.json({ shouldGreet: false, shouldShoutout, shoutoutMessage });
         }
 
         // 4. Check if they have been greeted in this session
         const alreadyGreeted = await db.hasBeenGreetedInSession(session.id, username);
         if (alreadyGreeted) {
-            return res.json({ shouldGreet: false });
+            return res.json({ shouldGreet: false, shouldShoutout, shoutoutMessage });
         }
 
         // 5. User is regular and has not been greeted yet in this session. Log it!
@@ -1046,7 +1209,7 @@ app.post('/api/chat-event', async (req, res) => {
         const activeConnection = await db.getActiveCeebeeConnection();
         if (!activeConnection) {
             console.warn('Ceebee greeting failed: No active AI connection configured.');
-            return res.json({ shouldGreet: false });
+            return res.json({ shouldGreet: false, shouldShoutout, shoutoutMessage });
         }
 
         let streamContext = "";
@@ -1119,7 +1282,7 @@ app.post('/api/chat-event', async (req, res) => {
             ? data.choices[0].message.content
             : `Hello @${username}, welcome back to the stream!`;
 
-        return res.json({ shouldGreet: true, greetingMessage });
+        return res.json({ shouldGreet: true, greetingMessage, shouldShoutout, shoutoutMessage });
     } catch (err) {
         console.error('Error handling chat event/greeting:', err);
         return res.json({
