@@ -1027,13 +1027,9 @@
 
                     // Backward-compat: fetch full session data for legacy features (events, export)
                     try {
-                        console.log(`[Admin] Fetching full session data for session ID: ${s.id}`);
                         const legacyRes = await fetch(`/api/session/${s.id}`);
-                        console.log(`[Admin] Fetch status: ${legacyRes.status}`);
                         const legacyData = await legacyRes.json();
-                        console.log(`[Admin] Legacy session data received:`, legacyData);
                         streamSessionData = legacyData.data || null;
-                        console.log(`[Admin] streamSessionData set to:`, streamSessionData);
                     } catch (e) {
                         console.error("[Admin] Error fetching legacy session data:", e);
                         streamSessionData = null;
@@ -1409,7 +1405,6 @@
         }
 
         function renderRegisteredEvents() {
-            console.log("[Admin] renderRegisteredEvents running. streamSessionData:", streamSessionData);
             const followersContainer = document.getElementById('sessionFollowersList');
             const subscribersContainer = document.getElementById('sessionSubscribersList');
             const raidersContainer = document.getElementById('sessionRaidersList');
@@ -1417,7 +1412,6 @@
             const hostsContainer = document.getElementById('sessionHostsList');
 
             if (!streamSessionData) {
-                console.log("[Admin] streamSessionData is empty or null. Resetting containers to default.");
                 if (followersContainer) followersContainer.innerHTML = '<p class="text-muted small">No followers yet</p>';
                 if (subscribersContainer) subscribersContainer.innerHTML = '<p class="text-muted small">No subscribers yet</p>';
                 if (raidersContainer) raidersContainer.innerHTML = '<p class="text-muted small">No raids yet</p>';
