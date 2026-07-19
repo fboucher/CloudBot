@@ -1107,17 +1107,27 @@
         function updateSessionInfo() {
             if (!currentSession) return;
 
-            document.getElementById('currentProject').textContent = currentSession.project_name;
-            document.getElementById('currentStreamNumber').textContent = currentSession.id;
-            document.getElementById('currentTitle').textContent = currentSession.stream_title || '(No title)';
-            document.getElementById('currentStartTime').textContent = new Date(currentSession.started_at).toLocaleString();
+            const projectEl = document.getElementById('currentProject');
+            if (projectEl) projectEl.textContent = currentSession.project_name;
 
-            const start = new Date(currentSession.started_at);
-            const now = new Date();
-            const duration = Math.floor((now - start) / 1000);
-            const hours = Math.floor(duration / 3600);
-            const minutes = Math.floor((duration % 3600) / 60);
-            document.getElementById('currentDuration').textContent = `${hours}h ${minutes}m`;
+            const streamNumberEl = document.getElementById('currentStreamNumber');
+            if (streamNumberEl) streamNumberEl.textContent = currentSession.id;
+
+            const titleEl = document.getElementById('currentTitle');
+            if (titleEl) titleEl.textContent = currentSession.stream_title || '(No title)';
+
+            const startTimeEl = document.getElementById('currentStartTime');
+            if (startTimeEl) startTimeEl.textContent = new Date(currentSession.started_at).toLocaleString();
+
+            const durationEl = document.getElementById('currentDuration');
+            if (durationEl) {
+                const start = new Date(currentSession.started_at);
+                const now = new Date();
+                const duration = Math.floor((now - start) / 1000);
+                const hours = Math.floor(duration / 3600);
+                const minutes = Math.floor((duration % 3600) / 60);
+                durationEl.textContent = `${hours}h ${minutes}m`;
+            }
         }
 
         let todosVisibleOnStream = true;
