@@ -1,0 +1,41 @@
+name: "Antigravity GitHub Agent"
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  antigravity-bot:
+    # Trigger ONLY if @gemini is tagged by a repository OWNER, MEMBER, or COLLABORATOR
+    if: >-
+      contains(github.event.comment.body, '@gemini') &&
+      github.event.comment.user.type != 'Bot' &&
+      (
+        github.event.comment.author_association == 'OWNER' ||
+        github.event.comment.author_association == 'MEMBER' ||
+        github.event.comment.author_association == 'COLLABORATOR'
+      )
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Antigravity SDK
+        run: |
+          pip install google-antigravity
+
+      - name: Execute Antigravity Agent
+        env:
+          ANTIGRAVITY_API_KEY: ${{ secrets.ANTIGRAVITY_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: python .github/scripts/run_agent.py
