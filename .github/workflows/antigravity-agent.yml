@@ -34,7 +34,7 @@ jobs:
 
       - name: Execute Antigravity Agent
         env:
-          ANTIGRAVITY_API_KEY: ${{ secrets.ANTIGRAVITY_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.ANTIGRAVITY_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           COMMENT_BODY: ${{ github.event.comment.body }}
