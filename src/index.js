@@ -1,6 +1,43 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+
+// Load environment variables from .env file if present (useful for local development)
+function loadEnv() {
+    const envPaths = [
+        path.join(__dirname, '..', '.env'),
+        path.join(__dirname, '.env')
+    ];
+    for (const envPath of envPaths) {
+        if (fs.existsSync(envPath)) {
+            try {
+                const content = fs.readFileSync(envPath, 'utf-8');
+                const lines = content.split(/\r?\n/);
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed || trimmed.startsWith('#')) continue;
+                    const eqIdx = trimmed.indexOf('=');
+                    if (eqIdx > 0) {
+                        const key = trimmed.slice(0, eqIdx).trim();
+                        let val = trimmed.slice(eqIdx + 1).trim();
+                        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+                            val = val.slice(1, -1);
+                        }
+                        if (!process.env[key]) {
+                            process.env[key] = val;
+                        }
+                    }
+                }
+                console.log(`Loaded environment variables from ${envPath}`);
+                break;
+            } catch (err) {
+                console.error(`Error reading env file at ${envPath}:`, err);
+            }
+        }
+    }
+}
+loadEnv();
+
 const { exec } = require('child_process');
 const dateFormat = require('dateformat');
 const pkg = require('./package.json');
@@ -1028,50 +1065,111 @@ app.post('/api/participants/streamer', async (req, res) => {
     }
 });
 
-function fetchTwitchStreamerInfo(username) {
-    return new Promise((resolve) => {
-        const query = JSON.stringify({
-            query: `
-              query($login: String!) {
-                user(login: $login) {
-                  description
-                  lastBroadcast {
-                    title
-                  }
-                  videos(first: 1, type: ARCHIVE) {
-                    edges {
-                      node {
-                        title
-                      }
-                    }
-                  }
-                }
-              }
-            `,
-            variables: { login: username }
+let twitchAccessToken = null;
+let twitchTokenExpiry = 0;
+
+async function getTwitchAccessToken() {
+    const now = Date.now();
+    if (twitchAccessToken && now < twitchTokenExpiry - 60000) {
+        return twitchAccessToken;
+    }
+
+    const clientId = process.env.CLIENT_ID;
+    const clientSecret = process.env.SECRET;
+
+    if (!clientId || !clientSecret) {
+        console.warn("[Twitch API] Missing CLIENT_ID or SECRET environment variables. Cannot fetch streamer info.");
+        return null;
+    }
+
+    try {
+        const response = await fetch('https://id.twitch.tv/oauth2/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({
+                client_id: clientId,
+                client_secret: clientSecret,
+                grant_type: 'client_credentials'
+            })
         });
 
-        const escapedQuery = query.replace(/'/g, "'\\''");
-        const cmd = `curl -s -X POST -H "Client-ID: kimne78kx3ncx6brgo4mv6wki5h1ko" -H "Content-Type: application/json" -d '${escapedQuery}' https://gql.twitch.tv/gql`;
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Failed to get Twitch token: ${response.status} ${errText}`);
+        }
 
-        exec(cmd, (err, stdout, stderr) => {
-            if (err) {
-                console.error(`[Twitch GQL] Error fetching info for ${username}:`, err);
-                return resolve(null);
-            }
-            try {
-                const result = JSON.parse(stdout);
-                if (result && result.data && result.data.user) {
-                    resolve(result.data.user);
-                } else {
-                    resolve(null);
-                }
-            } catch (parseErr) {
-                console.error(`[Twitch GQL] Parse error for ${username}:`, parseErr);
-                resolve(null);
+        const data = await response.json();
+        twitchAccessToken = data.access_token;
+        twitchTokenExpiry = now + (data.expires_in * 1000);
+        return twitchAccessToken;
+    } catch (err) {
+        console.error("[Twitch API] Error fetching access token:", err);
+        return null;
+    }
+}
+
+async function fetchTwitchStreamerInfo(username) {
+    const token = await getTwitchAccessToken();
+    const clientId = process.env.CLIENT_ID;
+
+    if (!token || !clientId) {
+        console.warn("[Twitch API] Cannot fetch streamer info due to missing token or client ID.");
+        return null;
+    }
+
+    try {
+        // 1. Get User Info
+        const userRes = await fetch(`https://api.twitch.tv/helix/users?login=${encodeURIComponent(username)}`, {
+            headers: {
+                'Client-Id': clientId,
+                'Authorization': `Bearer ${token}`
             }
         });
-    });
+
+        if (!userRes.ok) {
+            throw new Error(`Helix User API error: ${userRes.status} ${await userRes.text()}`);
+        }
+
+        const userData = await userRes.json();
+        if (!userData.data || userData.data.length === 0) {
+            console.warn(`[Twitch API] User ${username} not found.`);
+            return null;
+        }
+
+        const user = userData.data[0];
+        const userId = user.id;
+
+        // 2. Get 5 latest videos
+        let videos = [];
+        try {
+            const videoRes = await fetch(`https://api.twitch.tv/helix/videos?user_id=${userId}&first=5`, {
+                headers: {
+                    'Client-Id': clientId,
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (videoRes.ok) {
+                const videoData = await videoRes.json();
+                videos = videoData.data || [];
+            } else {
+                console.warn(`[Twitch API] Helix Videos API error: ${videoRes.status} ${await videoRes.text()}`);
+            }
+        } catch (vidErr) {
+            console.error(`[Twitch API] Error fetching videos for ${username}:`, vidErr);
+        }
+
+        return {
+            description: user.description || "",
+            profile_image_url: user.profile_image_url || "",
+            videos: videos.map(v => ({ title: v.title }))
+        };
+    } catch (err) {
+        console.error(`[Twitch API] Error fetching streamer info for ${username}:`, err);
+        return null;
+    }
 }
 
 app.post('/api/chat-event', async (req, res) => {
@@ -1098,6 +1196,7 @@ app.post('/api/chat-event', async (req, res) => {
 
         let shouldShoutout = false;
         let shoutoutMessage = "";
+        let profileImageUrl = "";
 
         const isRegular = await db.isParticipantRegular(username);
         const isStreamer = await db.isParticipantStreamer(username);
@@ -1105,6 +1204,10 @@ app.post('/api/chat-event', async (req, res) => {
         if (currentCount === 2 && isRegular && isStreamer) {
             console.log(`User ${username} sent their 2nd message and is flagged as regular & streamer. Generating shoutout...`);
             const twitchUser = await fetchTwitchStreamerInfo(username);
+            if (twitchUser && twitchUser.profile_image_url) {
+                profileImageUrl = twitchUser.profile_image_url;
+            }
+
             const activeConnection = await db.getActiveCeebeeConnection();
             if (activeConnection) {
                 let streamContext = "";
@@ -1132,13 +1235,9 @@ app.post('/api/chat-event', async (req, res) => {
                 }
 
                 const bio = (twitchUser && twitchUser.description) || "No bio description set.";
-                let latestStreamTitle = "unknown";
-                if (twitchUser) {
-                    if (twitchUser.lastBroadcast && twitchUser.lastBroadcast.title) {
-                        latestStreamTitle = twitchUser.lastBroadcast.title;
-                    } else if (twitchUser.videos && twitchUser.videos.edges && twitchUser.videos.edges.length > 0) {
-                        latestStreamTitle = twitchUser.videos.edges[0].node.title;
-                    }
+                let streamTitlesSection = "No recent stream titles found.";
+                if (twitchUser && twitchUser.videos && twitchUser.videos.length > 0) {
+                    streamTitlesSection = twitchUser.videos.map((vid, idx) => `${idx + 1}. "${vid.title}"`).join('\n');
                 }
 
                 let fullSystemPrompt = corePrompt;
@@ -1149,7 +1248,7 @@ app.post('/api/chat-event', async (req, res) => {
                     fullSystemPrompt += `\n\n--- Background Information ---\n${knowledgeContext}`;
                 }
 
-                fullSystemPrompt += `\n\n[SYSTEM INSTRUCTION: A fellow Twitch streamer named @${username} is in the chat and just sent their second message. Generate a warm, kind, and funny shoutout/introduction for them.\nRead the following details about @${username}:\n- About/Bio: "${bio}"\n- Title of their latest stream: "${latestStreamTitle}"\n\nThe shoutout MUST contain:\n1. An invitation to follow them with the URL: https://www.twitch.tv/${username}\n2. A nice, uplifting, and funny description/introduction message based on their bio or latest stream title.\n\nSpeak as Ceebee. Do not include system metadata or refer to these instructions. Limit to 2-3 sentences.]`;
+                fullSystemPrompt += `\n\n[SYSTEM INSTRUCTION: A fellow Twitch streamer named @${username} is in the chat and just sent their second message. Generate a warm, kind, and funny shoutout/introduction for them.\nRead the following details about @${username}:\n- About/Bio: "${bio}"\n- Titles of their last 5 streams:\n${streamTitlesSection}\n\nThe shoutout MUST contain:\n1. An invitation to follow them with the URL: https://www.twitch.tv/${username}\n2. A nice, uplifting, and funny description/introduction message based on their bio and/or their recent stream titles.\n\nSpeak as Ceebee. Do not include system metadata or refer to these instructions. Limit to 2-3 sentences.]`;
 
                 const messages = [
                     { role: 'system', content: fullSystemPrompt },
@@ -1193,13 +1292,13 @@ app.post('/api/chat-event', async (req, res) => {
 
         // 3. Check if user is flagged as a regular
         if (!isRegular) {
-            return res.json({ shouldGreet: false, shouldShoutout, shoutoutMessage });
+            return res.json({ shouldGreet: false, shouldShoutout, shoutoutMessage, profileImageUrl });
         }
 
         // 4. Check if they have been greeted in this session
         const alreadyGreeted = await db.hasBeenGreetedInSession(session.id, username);
         if (alreadyGreeted) {
-            return res.json({ shouldGreet: false, shouldShoutout, shoutoutMessage });
+            return res.json({ shouldGreet: false, shouldShoutout, shoutoutMessage, profileImageUrl });
         }
 
         // 5. User is regular and has not been greeted yet in this session. Log it!
@@ -1209,7 +1308,7 @@ app.post('/api/chat-event', async (req, res) => {
         const activeConnection = await db.getActiveCeebeeConnection();
         if (!activeConnection) {
             console.warn('Ceebee greeting failed: No active AI connection configured.');
-            return res.json({ shouldGreet: false, shouldShoutout, shoutoutMessage });
+            return res.json({ shouldGreet: false, shouldShoutout, shoutoutMessage, profileImageUrl });
         }
 
         let streamContext = "";
@@ -1282,12 +1381,15 @@ app.post('/api/chat-event', async (req, res) => {
             ? data.choices[0].message.content
             : `Hello @${username}, welcome back to the stream!`;
 
-        return res.json({ shouldGreet: true, greetingMessage, shouldShoutout, shoutoutMessage });
+        return res.json({ shouldGreet: true, greetingMessage, shouldShoutout, shoutoutMessage, profileImageUrl });
     } catch (err) {
         console.error('Error handling chat event/greeting:', err);
         return res.json({
             shouldGreet: true,
-            greetingMessage: `Hello @${username}, welcome back!`
+            greetingMessage: `Hello @${username}, welcome back!`,
+            shouldShoutout: shouldShoutout || false,
+            shoutoutMessage: shoutoutMessage || "",
+            profileImageUrl: profileImageUrl || ""
         });
     }
 });

@@ -34,6 +34,24 @@
     <h1 id="cbTitle"></h1>
     <p id="lastChatMsg"></p>
     <div id="imageViewer"></div>
+    <!-- Streamer Shoutout Overlay Card -->
+    <div id="streamerShoutoutCard">
+        <div class="streamer-card-glow"></div>
+        <div class="streamer-card-content">
+            <div class="streamer-avatar-container">
+                <img id="streamerAvatar" src="" alt="Streamer Avatar">
+            </div>
+            <div class="streamer-card-info">
+                <div class="streamer-tag">Live Streamer!</div>
+                <div id="streamerCardName" class="streamer-name"></div>
+            </div>
+            <div class="streamer-twitch-icon">
+                <svg viewBox="0 0 24 24" width="24" height="24">
+                    <path fill="#9146FF" d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/>
+                </svg>
+            </div>
+        </div>
+    </div>
     <div id="announcementContainer"></div>
     <div id="todoArea">
         <h4>To-Dos</h4>
@@ -204,6 +222,19 @@
                 }
                 if (data.shouldShoutout && data.shoutoutMessage) {
                     CeebeeSay(data.shoutoutMessage);
+                    if (data.profileImageUrl) {
+                        const shoutoutCard = document.getElementById("streamerShoutoutCard");
+                        const avatarImg = document.getElementById("streamerAvatar");
+                        const nameDiv = document.getElementById("streamerCardName");
+                        if (shoutoutCard && avatarImg && nameDiv) {
+                            avatarImg.src = data.profileImageUrl;
+                            nameDiv.textContent = lowerUser;
+                            shoutoutCard.classList.add("show");
+                            setTimeout(() => {
+                                shoutoutCard.classList.remove("show");
+                            }, 5000);
+                        }
+                    }
                 }
             })
             .catch(err => console.error('Error reporting chat event:', err));

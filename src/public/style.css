@@ -928,3 +928,112 @@ div.splat-toggle .splat {
     25% { opacity: 0; }
     100% { opacity: 0; }
 }
+
+/* Streamer Shoutout Overlay Card */
+#streamerShoutoutCard {
+    position: fixed;
+    bottom: 30px;
+    left: 30px;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    background: rgba(20, 20, 25, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 16px 24px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    transform: translateY(150%) scale(0.9);
+    opacity: 0;
+    transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    width: 320px;
+    overflow: hidden;
+}
+
+#streamerShoutoutCard.show {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+}
+
+.streamer-card-glow {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(145, 70, 255, 0.25), rgba(0, 204, 255, 0.25));
+    z-index: 1;
+    pointer-events: none;
+}
+
+.streamer-card-content {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    z-index: 2;
+}
+
+.streamer-avatar-container {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    padding: 3px;
+    background: linear-gradient(45deg, #9146ff, #00ccff);
+    box-shadow: 0 0 15px rgba(145, 70, 255, 0.6);
+    flex-shrink: 0;
+}
+
+.streamer-avatar-container img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #111;
+    border: 2px solid #202028;
+    display: block;
+}
+
+.streamer-card-info {
+    margin-left: 16px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.streamer-tag {
+    font-family: 'Press Start 2P', cursive;
+    font-size: 8px;
+    color: #a970ff;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    text-shadow: 0 0 8px rgba(145, 70, 255, 0.5);
+}
+
+.streamer-name {
+    font-family: 'VT323', monospace;
+    font-size: 28px;
+    color: #ffffff;
+    font-weight: bold;
+    line-height: 1.1;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5), 0 0 8px rgba(255, 255, 255, 0.2);
+}
+
+.streamer-twitch-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(145, 70, 255, 0.25);
+    border: 1px solid rgba(145, 70, 255, 0.4);
+    box-shadow: 0 0 10px rgba(145, 70, 255, 0.3);
+    flex-shrink: 0;
+}
+
+.streamer-twitch-icon svg {
+    filter: drop-shadow(0 0 4px #9146ff);
+}
