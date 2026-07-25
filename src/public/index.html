@@ -1073,22 +1073,18 @@
             }
             else if (item === 'umbrella') {
                 playSound("umbrellaSound", SoundEnum.rainUmbrella);
-                const positions = [
-                    { top: '40%', left: '25%' },
-                    { top: '75%', left: '75%' },
-                    { top: '30%', left: '70%' },
-                    { top: '70%', left: '30%' }
-                ];
-                positions.forEach((pos, idx) => {
+                for (let idx = 0; idx < 4; idx++) {
+                    const topRandom = Math.floor(Math.random() * 65) + 15; // 15% to 80%
+                    const leftRandom = Math.floor(Math.random() * 75) + 10; // 10% to 85%
                     setTimeout(() => {
                         const umbrella = document.createElement("div");
                         umbrella.className = "umbrella-overlay";
-                        umbrella.style.top = pos.top;
-                        umbrella.style.left = pos.left;
+                        umbrella.style.top = `${topRandom}%`;
+                        umbrella.style.left = `${leftRandom}%`;
                         document.body.appendChild(umbrella);
                         setTimeout(() => umbrella.remove(), 6000);
                     }, idx * 300);
-                });
+                }
             }
             else if (item === 'bomb') {
                 playExplosionSound(); 
