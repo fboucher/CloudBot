@@ -140,7 +140,8 @@ const SoundEnum = {
     hmmhmm: "public/medias/hmmhmm.mp3",
     rain: "public/medias/rain.mp3",
     rainUmbrella: "public/medias/Rain-On-Umbrella.com.mp3",
-    previously: "public/medias/previously.mp3"
+    previously: "public/medias/previously.mp3",
+    applause: "public/medias/applause.mp3"
 };
 
 const TodoStatusEnum = {
@@ -1592,6 +1593,26 @@ function handleEffect(effect) {
                 ChatBotShow('Thumbs-up', effect.image);
             }
             playSound('hmmhmm', SoundEnum.hmmhmm);
+            break;
+
+        case 'shoutout':
+            if (effect.message) {
+                if (typeof CeebeeSay !== 'undefined') {
+                    CeebeeSay(effect.message);
+                }
+                playSound('applause', SoundEnum.applause);
+                const shoutoutCard = document.getElementById("streamerShoutoutCard");
+                const avatarImg = document.getElementById("streamerAvatar");
+                const nameDiv = document.getElementById("streamerCardName");
+                if (shoutoutCard && avatarImg && nameDiv) {
+                    avatarImg.src = effect.image || "/public/medias/logo_behind-my-cloud.png";
+                    nameDiv.textContent = effect.user;
+                    shoutoutCard.classList.add("show");
+                    setTimeout(() => {
+                        shoutoutCard.classList.remove("show");
+                    }, 5000);
+                }
+            }
             break;
 
         // case 'drop':

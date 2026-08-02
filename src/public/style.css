@@ -23,15 +23,26 @@ td {
     padding: 8px;
 }
 
+#imageViewer {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 180px;
+}
+
 .textBubble {
-    position: absolute;
-    top: 30px;
-    left: 600px;
     z-index: 3;
+    transform: scale(2);
 }
 
 .nuage {
     z-index: 2;
+    transform: scale(2);
 }
 
 #todoArea {
@@ -932,8 +943,9 @@ div.splat-toggle .splat {
 /* Streamer Shoutout Overlay Card */
 #streamerShoutoutCard {
     position: fixed;
-    bottom: 30px;
-    left: 30px;
+    top: 50%;
+    left: 50%;
+    bottom: auto;
     z-index: 10000;
     display: flex;
     align-items: center;
@@ -941,18 +953,18 @@ div.splat-toggle .splat {
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    padding: 16px 24px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-    transform: translateY(150%) scale(0.9);
+    border-radius: 32px;
+    padding: 32px 48px;
+    box-shadow: 0 40px 80px rgba(0, 0, 0, 0.5), inset 0 2px 0 rgba(255, 255, 255, 0.1);
+    transform: translate(-50%, -50%) scale(0.9);
     opacity: 0;
     transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    width: 320px;
+    width: 640px;
     overflow: hidden;
 }
 
 #streamerShoutoutCard.show {
-    transform: translateY(0) scale(1);
+    transform: translate(-50%, -50%) scale(1);
     opacity: 1;
 }
 
@@ -976,12 +988,12 @@ div.splat-toggle .splat {
 
 .streamer-avatar-container {
     position: relative;
-    width: 64px;
-    height: 64px;
+    width: 128px;
+    height: 128px;
     border-radius: 50%;
-    padding: 3px;
+    padding: 6px;
     background: linear-gradient(45deg, #9146ff, #00ccff);
-    box-shadow: 0 0 15px rgba(145, 70, 255, 0.6);
+    box-shadow: 0 0 30px rgba(145, 70, 255, 0.8);
     flex-shrink: 0;
 }
 
@@ -991,12 +1003,12 @@ div.splat-toggle .splat {
     border-radius: 50%;
     object-fit: cover;
     background: #111;
-    border: 2px solid #202028;
+    border: 4px solid #202028;
     display: block;
 }
 
 .streamer-card-info {
-    margin-left: 16px;
+    margin-left: 32px;
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -1004,36 +1016,38 @@ div.splat-toggle .splat {
 
 .streamer-tag {
     font-family: 'Press Start 2P', cursive;
-    font-size: 8px;
+    font-size: 16px;
     color: #a970ff;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 6px;
-    text-shadow: 0 0 8px rgba(145, 70, 255, 0.5);
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+    text-shadow: 0 0 16px rgba(145, 70, 255, 0.5);
 }
 
 .streamer-name {
     font-family: 'VT323', monospace;
-    font-size: 28px;
+    font-size: 56px;
     color: #ffffff;
     font-weight: bold;
     line-height: 1.1;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5), 0 0 8px rgba(255, 255, 255, 0.2);
+    text-shadow: 0 4px 8px rgba(0, 0, 0, 0.5), 0 0 16px rgba(255, 255, 255, 0.2);
 }
 
 .streamer-twitch-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: 72px;
+    height: 72px;
     border-radius: 50%;
     background: rgba(145, 70, 255, 0.25);
-    border: 1px solid rgba(145, 70, 255, 0.4);
-    box-shadow: 0 0 10px rgba(145, 70, 255, 0.3);
+    border: 2px solid rgba(145, 70, 255, 0.4);
+    box-shadow: 0 0 20px rgba(145, 70, 255, 0.3);
     flex-shrink: 0;
 }
 
 .streamer-twitch-icon svg {
-    filter: drop-shadow(0 0 4px #9146ff);
+    width: 48px;
+    height: 48px;
+    filter: drop-shadow(0 0 8px #9146ff);
 }

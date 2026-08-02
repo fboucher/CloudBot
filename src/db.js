@@ -1,7 +1,7 @@
 const path = require("path");
 
 let db;
-const dbPath = path.join(__dirname, "io", "cloudbot.db");
+const dbPath = path.join(__dirname, "io", "cloudbot.db") + "?nolock=1";
 
 async function initDb() {
   const { connect } = await import("@tursodatabase/database");

@@ -497,7 +497,7 @@ app.get('/api/sessions', async (req, res) => {
 });
 
 app.get('/api/session/:id', async (req, res) => {
-    console.log('..getting session by id..');
+    // console.log('..getting session by id..');
     try {
         const session = await db.getSessionById(parseInt(req.params.id));
         if (session) {
@@ -1172,6 +1172,122 @@ async function fetchTwitchStreamerInfo(username) {
     }
 }
 
+async function generateShoutoutMessage(username) {
+    let shoutoutMessage = "";
+    let profileImageUrl = "";
+    let success = false;
+
+    console.log(`[generateShoutoutMessage] Fetching Twitch streamer info for: ${username}`);
+    try {
+        const twitchUser = await fetchTwitchStreamerInfo(username);
+        console.log(`[generateShoutoutMessage] Twitch info result for ${username}:`, twitchUser ? "Found" : "Not Found");
+        if (twitchUser && twitchUser.profile_image_url) {
+            profileImageUrl = twitchUser.profile_image_url;
+        }
+
+        console.log(`[generateShoutoutMessage] Fetching active Ceebee connection...`);
+        const activeConnection = await db.getActiveCeebeeConnection();
+        console.log(`[generateShoutoutMessage] Active connection:`, activeConnection ? activeConnection.name : "None");
+
+        if (activeConnection) {
+            let streamContext = "";
+            const STREAM_CONTEXT_FILE = path.join(__dirname, 'io', 'stream_context.md');
+            if (fs.existsSync(STREAM_CONTEXT_FILE)) {
+                streamContext = fs.readFileSync(STREAM_CONTEXT_FILE, 'utf-8');
+            }
+
+            let corePrompt = "You are Ceebee, an AI assistant.";
+            const corePromptPath = path.join(__dirname, 'io', 'soul.md');
+            if (fs.existsSync(corePromptPath)) {
+                corePrompt = fs.readFileSync(corePromptPath, 'utf-8');
+            }
+
+            let knowledgeContext = "";
+            const CEEBEE_KNOWLEDGE_DIR = path.join(__dirname, 'io', 'knowledge');
+            if (fs.existsSync(CEEBEE_KNOWLEDGE_DIR)) {
+                const files = fs.readdirSync(CEEBEE_KNOWLEDGE_DIR);
+                for (const file of files) {
+                    if (file.endsWith('.md')) {
+                        const content = fs.readFileSync(path.join(CEEBEE_KNOWLEDGE_DIR, file), 'utf-8');
+                        knowledgeContext += `\n\n--- Document: ${file} ---\n${content}`;
+                    }
+                }
+            }
+
+            const bio = (twitchUser && twitchUser.description) || "No bio description set.";
+            let streamTitlesSection = "No recent stream titles found.";
+            if (twitchUser && twitchUser.videos && twitchUser.videos.length > 0) {
+                streamTitlesSection = twitchUser.videos.map((vid, idx) => `${idx + 1}. "${vid.title}"`).join('\n');
+            }
+
+            let fullSystemPrompt = corePrompt;
+            if (streamContext && streamContext.trim() !== '') {
+                fullSystemPrompt += `\n\n--- Today's Stream Context ---\n${streamContext}`;
+            }
+            if (knowledgeContext) {
+                fullSystemPrompt += `\n\n--- Background Information ---\n${knowledgeContext}`;
+            }
+
+            fullSystemPrompt += `\n\n[SYSTEM INSTRUCTION: A fellow Twitch streamer named @${username} is in the chat. Generate a warm, kind, and funny shoutout/introduction for them.\nRead the following details about @${username}:\n- About/Bio: "${bio}"\n- Titles of their last 5 streams:\n${streamTitlesSection}\n\nThe shoutout MUST contain:\n1. An invitation to follow them with the URL: https://www.twitch.tv/${username}\n2. A nice, uplifting, and funny description/introduction message based on their bio and/or their recent stream titles.\n\nSpeak as Ceebee. Do not include system metadata or refer to these instructions. Limit to 2-3 sentences.]`;
+
+            const messages = [
+                { role: 'system', content: fullSystemPrompt },
+                { role: 'user', content: `Please shoutout @${username}!` }
+            ];
+
+            const payload = {
+                model: activeConnection.model || "default",
+                messages: messages
+            };
+
+            const headers = { 'Content-Type': 'application/json' };
+            if (activeConnection.api_key) {
+                headers['Authorization'] = `Bearer ${activeConnection.api_key}`;
+            }
+
+            let endpointUrl = activeConnection.url;
+            if (!endpointUrl.endsWith('/chat/completions')) {
+                endpointUrl = endpointUrl.replace(/\/+$/, '') + '/chat/completions';
+            }
+
+            try {
+                console.log(`[generateShoutoutMessage] Sending request to AI at ${endpointUrl}...`);
+                const response = await fetch(endpointUrl, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(payload)
+                });
+
+                console.log(`[generateShoutoutMessage] AI response status: ${response.status}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    shoutoutMessage = data.choices && data.choices[0] && data.choices[0].message
+                        ? data.choices[0].message.content
+                        : `Check out @${username} at https://www.twitch.tv/${username} - they are an awesome streamer!`;
+                    success = true;
+                    console.log(`[generateShoutoutMessage] AI shoutout generated successfully.`);
+                } else {
+                    const errText = await response.text();
+                    console.warn(`[generateShoutoutMessage] AI response failed: ${response.status} - ${errText}`);
+                }
+            } catch (shoutErr) {
+                console.error('[generateShoutoutMessage] Error during AI API call:', shoutErr);
+            }
+        } else {
+            console.warn("[generateShoutoutMessage] No active Ceebee connection found in the database.");
+        }
+    } catch (err) {
+        console.error("[generateShoutoutMessage] Unhandled error during generation:", err);
+    }
+
+    if (!success) {
+        shoutoutMessage = `Check out @${username} at https://www.twitch.tv/${username} - they are an awesome streamer!`;
+        console.log(`[generateShoutoutMessage] Using fallback shoutout message: ${shoutoutMessage}`);
+    }
+
+    return { shoutoutMessage, profileImageUrl, success };
+}
+
 app.post('/api/chat-event', async (req, res) => {
     const { username } = req.body || {};
     if (!username) return res.status(400).json({ error: 'Missing username.' });
@@ -1203,90 +1319,11 @@ app.post('/api/chat-event', async (req, res) => {
 
         if (currentCount === 2 && isRegular && isStreamer) {
             console.log(`User ${username} sent their 2nd message and is flagged as regular & streamer. Generating shoutout...`);
-            const twitchUser = await fetchTwitchStreamerInfo(username);
-            if (twitchUser && twitchUser.profile_image_url) {
-                profileImageUrl = twitchUser.profile_image_url;
-            }
-
-            const activeConnection = await db.getActiveCeebeeConnection();
-            if (activeConnection) {
-                let streamContext = "";
-                const STREAM_CONTEXT_FILE = path.join(__dirname, 'io', 'stream_context.md');
-                if (fs.existsSync(STREAM_CONTEXT_FILE)) {
-                    streamContext = fs.readFileSync(STREAM_CONTEXT_FILE, 'utf-8');
-                }
-
-                let corePrompt = "You are Ceebee, an AI assistant.";
-                const corePromptPath = path.join(__dirname, 'io', 'soul.md');
-                if (fs.existsSync(corePromptPath)) {
-                    corePrompt = fs.readFileSync(corePromptPath, 'utf-8');
-                }
-
-                let knowledgeContext = "";
-                const CEEBEE_KNOWLEDGE_DIR = path.join(__dirname, 'io', 'knowledge');
-                if (fs.existsSync(CEEBEE_KNOWLEDGE_DIR)) {
-                    const files = fs.readdirSync(CEEBEE_KNOWLEDGE_DIR);
-                    for (const file of files) {
-                        if (file.endsWith('.md')) {
-                            const content = fs.readFileSync(path.join(CEEBEE_KNOWLEDGE_DIR, file), 'utf-8');
-                            knowledgeContext += `\n\n--- Document: ${file} ---\n${content}`;
-                        }
-                    }
-                }
-
-                const bio = (twitchUser && twitchUser.description) || "No bio description set.";
-                let streamTitlesSection = "No recent stream titles found.";
-                if (twitchUser && twitchUser.videos && twitchUser.videos.length > 0) {
-                    streamTitlesSection = twitchUser.videos.map((vid, idx) => `${idx + 1}. "${vid.title}"`).join('\n');
-                }
-
-                let fullSystemPrompt = corePrompt;
-                if (streamContext && streamContext.trim() !== '') {
-                    fullSystemPrompt += `\n\n--- Today's Stream Context ---\n${streamContext}`;
-                }
-                if (knowledgeContext) {
-                    fullSystemPrompt += `\n\n--- Background Information ---\n${knowledgeContext}`;
-                }
-
-                fullSystemPrompt += `\n\n[SYSTEM INSTRUCTION: A fellow Twitch streamer named @${username} is in the chat and just sent their second message. Generate a warm, kind, and funny shoutout/introduction for them.\nRead the following details about @${username}:\n- About/Bio: "${bio}"\n- Titles of their last 5 streams:\n${streamTitlesSection}\n\nThe shoutout MUST contain:\n1. An invitation to follow them with the URL: https://www.twitch.tv/${username}\n2. A nice, uplifting, and funny description/introduction message based on their bio and/or their recent stream titles.\n\nSpeak as Ceebee. Do not include system metadata or refer to these instructions. Limit to 2-3 sentences.]`;
-
-                const messages = [
-                    { role: 'system', content: fullSystemPrompt },
-                    { role: 'user', content: `Please shoutout @${username}!` }
-                ];
-
-                const payload = {
-                    model: activeConnection.model || "default",
-                    messages: messages
-                };
-
-                const headers = { 'Content-Type': 'application/json' };
-                if (activeConnection.api_key) {
-                    headers['Authorization'] = `Bearer ${activeConnection.api_key}`;
-                }
-
-                let endpointUrl = activeConnection.url;
-                if (!endpointUrl.endsWith('/chat/completions')) {
-                    endpointUrl = endpointUrl.replace(/\/+$/, '') + '/chat/completions';
-                }
-
-                try {
-                    const response = await fetch(endpointUrl, {
-                        method: 'POST',
-                        headers: headers,
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        shoutoutMessage = data.choices && data.choices[0] && data.choices[0].message
-                            ? data.choices[0].message.content
-                            : `Check out @${username} at https://www.twitch.tv/${username} - they are an awesome streamer!`;
-                        shouldShoutout = true;
-                    }
-                } catch (shoutErr) {
-                    console.error('Error generating AI shoutout:', shoutErr);
-                }
+            const shoutoutData = await generateShoutoutMessage(username);
+            if (shoutoutData.success) {
+                shoutoutMessage = shoutoutData.shoutoutMessage;
+                profileImageUrl = shoutoutData.profileImageUrl;
+                shouldShoutout = true;
             }
         }
 
@@ -1391,6 +1428,37 @@ app.post('/api/chat-event', async (req, res) => {
             shoutoutMessage: shoutoutMessage || "",
             profileImageUrl: profileImageUrl || ""
         });
+    }
+});
+
+app.post('/api/shoutout-demand', async (req, res) => {
+    const { username } = req.body || {};
+    if (!username) {
+        console.warn('[Manual Shoutout] Missing username in request body');
+        return res.status(400).json({ error: 'Missing username.' });
+    }
+
+    const trimmedUsername = username.trim().toLowerCase();
+    console.log(`[Manual Shoutout] Requested for user: ${trimmedUsername}`);
+
+    try {
+        console.log(`[Manual Shoutout] Calling generateShoutoutMessage for ${trimmedUsername}...`);
+        const shoutoutData = await generateShoutoutMessage(trimmedUsername);
+        console.log(`[Manual Shoutout] generateShoutoutMessage finished. Success = ${shoutoutData.success}`);
+
+        currentEffect = {
+            type: 'shoutout',
+            user: trimmedUsername,
+            message: shoutoutData.shoutoutMessage,
+            image: shoutoutData.profileImageUrl || null,
+            timestamp: Date.now()
+        };
+
+        console.log(`[Manual Shoutout] Triggered effect:`, currentEffect);
+        res.json({ msg: 'Shoutout triggered.', effect: currentEffect });
+    } catch (err) {
+        console.error('[Manual Shoutout] Error during processing:', err);
+        res.status(500).json({ error: 'Failed to generate shoutout: ' + err.message });
     }
 });
 
@@ -1600,7 +1668,7 @@ app.post('/api/loot/add-drop-item', async (req, res) => {
 });
 
 app.get('/api/ceebee/settings', async (req, res) => {
-    console.log('..GET /api/ceebee/settings called');
+    // console.log('..GET /api/ceebee/settings called');
     try {
         const settings = await db.getCeebeeSettings();
         res.json(settings);
@@ -1610,7 +1678,7 @@ app.get('/api/ceebee/settings', async (req, res) => {
 });
 
 app.post('/api/ceebee/settings', async (req, res) => {
-    console.log('..POST /api/ceebee/settings called with:', req.body);
+    // console.log('..POST /api/ceebee/settings called with:', req.body);
     try {
         const { auto_participate, min_messages, max_messages, game_enabled, dynamic_weather_enabled } = req.body;
         const settings = await db.updateCeebeeSettings(

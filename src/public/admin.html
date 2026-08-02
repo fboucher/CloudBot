@@ -413,6 +413,9 @@
                                 <button class="btn btn-cb btn-sm" onclick="triggerSun()">
                                     <i class="bi bi-sun"></i> Sun
                                 </button>
+                                <button class="btn btn-cb btn-sm" onclick="triggerShoutout()">
+                                    <i class="bi bi-megaphone"></i> Shoutout
+                                </button>
                             </div>
                             <div id="actionFeedback" class="mt-2 text-muted small"></div>
                         </div>
@@ -1834,6 +1837,31 @@
             } catch (err) {
                 console.error(err);
                 showFeedback('Failed to trigger chat speed');
+            }
+        }
+
+        async function triggerShoutout() {
+            const username = prompt('Enter Twitch username to shoutout:');
+            if (username && username.trim()) {
+                showFeedback('Generating shoutout...');
+                try {
+                    const response = await fetch('/api/shoutout-demand', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: username.trim() })
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        showFeedback(`Shoutout triggered for ${username}`);
+                    } else {
+                        const error = await response.json();
+                        showFeedback('Error: ' + (error.error || 'Failed to trigger shoutout'));
+                    }
+                } catch (err) {
+                    console.error('Error:', err);
+                    showFeedback('Error: ' + err.message);
+                }
             }
         }
 
