@@ -1288,6 +1288,118 @@ async function generateShoutoutMessage(username) {
     return { shoutoutMessage, profileImageUrl, success };
 }
 
+async function triggerTwitchHelixShoutout(targetUsername) {
+    let userToken = null;
+    try {
+        const secretPath = path.join(__dirname, 'io', 'secret.js');
+        if (fs.existsSync(secretPath)) {
+            const secretContent = fs.readFileSync(secretPath, 'utf8');
+            const match = secretContent.match(/authToken\s*=\s*["'](oauth:)?([^"']+)["']/);
+            if (match) {
+                userToken = match[2];
+            }
+        }
+    } catch (err) {
+        console.error("[Shoutout API] Error reading secret.js:", err);
+    }
+
+    if (!userToken) {
+        console.warn("[Shoutout API] Could not retrieve authToken from secret.js");
+        return;
+    }
+
+    try {
+        // 1. Validate the token to auto-retrieve Client ID and Broadcaster User ID
+        console.log("[Shoutout API] Validating OAuth token...");
+        const valRes = await fetch("https://id.twitch.tv/oauth2/validate", {
+            headers: {
+                'Authorization': `OAuth ${userToken}`
+            }
+        });
+
+        if (valRes.status !== 200) {
+            const errText = await valRes.text();
+            console.error(`[Shoutout API] Token validation failed: ${valRes.status} - ${errText}`);
+            return;
+        }
+
+        const valData = await valRes.json();
+        const clientId = valData.client_id;
+        const moderatorId = valData.user_id;
+        const scopes = valData.scopes || [];
+
+        console.log("[Shoutout API] Token validated successfully.");
+
+        // Check for required scope
+        if (!scopes.includes("moderator:manage:shoutouts")) {
+            console.warn(`[Shoutout API] WARNING: The oauth token in secret.js is missing the 'moderator:manage:shoutouts' scope.`);
+            console.warn(`[Shoutout API] Please regenerate your token at https://twitchtokengenerator.com/ (Select Custom Scope Selection -> select 'moderator:manage:shoutouts') and update your secret.js file!`);
+            return;
+        }
+
+        // 1.5. Resolve broadcaster ("fboucheros") user ID
+        const broadcasterRes = await fetch(`https://api.twitch.tv/helix/users?login=fboucheros`, {
+            headers: {
+                'Authorization': `Bearer ${userToken}`,
+                'Client-Id': clientId
+            }
+        });
+
+        if (broadcasterRes.status !== 200) {
+            const errText = await broadcasterRes.text();
+            console.error(`[Shoutout API] Broadcaster ID lookup failed: ${broadcasterRes.status} - ${errText}`);
+            return;
+        }
+
+        const broadcasterData = await broadcasterRes.json();
+        if (!broadcasterData.data || broadcasterData.data.length === 0) {
+            console.warn("[Shoutout API] Broadcaster fboucheros not found.");
+            return;
+        }
+        const broadcasterId = broadcasterData.data[0].id;
+
+        // 2. Resolve target user ID
+        const targetRes = await fetch(`https://api.twitch.tv/helix/users?login=${encodeURIComponent(targetUsername)}`, {
+            headers: {
+                'Authorization': `Bearer ${userToken}`,
+                'Client-Id': clientId
+            }
+        });
+
+        if (targetRes.status !== 200) {
+            const errText = await targetRes.text();
+            console.error(`[Shoutout API] Target user request failed with status ${targetRes.status}: ${errText}`);
+            return;
+        }
+
+        const targetData = await targetRes.json();
+        if (!targetData.data || targetData.data.length === 0) {
+            console.warn(`[Shoutout API] Target user ${targetUsername} not found.`);
+            return;
+        }
+        const targetId = targetData.data[0].id;
+
+        // 3. Trigger the Shoutout!
+        console.log(`[Shoutout API] Triggering Helix shoutout from channel to @${targetUsername}...`);
+        const shoutoutRes = await fetch(`https://api.twitch.tv/helix/chat/shoutouts?from_broadcaster_id=${broadcasterId}&to_broadcaster_id=${targetId}&moderator_id=${moderatorId}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${userToken}`,
+                'Client-Id': clientId
+            }
+        });
+
+        if (shoutoutRes.status === 204) {
+            console.log("[Shoutout API] Helix shoutout triggered successfully (204 No Content).");
+        } else {
+            const errText = await shoutoutRes.text();
+            console.error(`[Shoutout API] Helix shoutout failed with status ${shoutoutRes.status}: ${errText}`);
+        }
+    } catch (err) {
+        console.error("[Shoutout API] Error sending Helix shoutout:", err);
+    }
+}
+
 app.post('/api/chat-event', async (req, res) => {
     const { username } = req.body || {};
     if (!username) return res.status(400).json({ error: 'Missing username.' });
@@ -1324,6 +1436,7 @@ app.post('/api/chat-event', async (req, res) => {
                 shoutoutMessage = shoutoutData.shoutoutMessage;
                 profileImageUrl = shoutoutData.profileImageUrl;
                 shouldShoutout = true;
+                triggerTwitchHelixShoutout(username).catch(err => console.error("Helix shoutout error:", err));
             }
         }
 
@@ -1453,6 +1566,8 @@ app.post('/api/shoutout-demand', async (req, res) => {
             image: shoutoutData.profileImageUrl || null,
             timestamp: Date.now()
         };
+
+        triggerTwitchHelixShoutout(trimmedUsername).catch(err => console.error("Helix shoutout error:", err));
 
         console.log(`[Manual Shoutout] Triggered effect:`, currentEffect);
         res.json({ msg: 'Shoutout triggered.', effect: currentEffect });
