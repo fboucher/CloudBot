@@ -260,7 +260,7 @@
                     } else if (data.onCooldown) {
                         ChatBotSay(`@${user}, you are on cooldown. Please wait ${data.remainingMinutes} more minute(s) before searching again.`);
                     } else if (data.success) {
-                        const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb', 'mud-stone': '🪨 Mud Stone' };
+                        const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb', 'shovel': '⛏️ Shovel' };
                         const itemStr = emojiMap[data.item] || data.item;
                         ChatBotSay(`@${user} searched the cloud forest and found a ${itemStr}!`);
                     }
@@ -280,7 +280,7 @@
                         if (data.inventory.length === 0) {
                             ChatBotSay(`@${user}'s bag is completely empty! Land drops or use !search to find RPG items.`);
                         } else {
-                            const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', umbrella: '☔ Umbrella', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb', 'mud-stone': '🪨 Mud Stone' };
+                            const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', umbrella: '☔ Umbrella', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb', 'shovel': '⛏️ Shovel' };
                             const itemsList = data.inventory.map(item => emojiMap[item] || item).join(', ');
                             ChatBotSay(`@${user}'s bag (${data.inventory.length}/5 items): ${itemsList}`);
                         }
@@ -295,7 +295,7 @@
                     return;
                 }
                 const requestedItem = message.toLowerCase().trim().replace(/[^a-z0-9-]/g, '');
-                const validItems = ['potion', 'shield', 'umbrella', 'rain-stone', 'sun-stone', 'bomb', 'mud-stone'];
+                const validItems = ['potion', 'shield', 'umbrella', 'rain-stone', 'sun-stone', 'bomb', 'shovel'];
                 const itemMap = {
                     'potion': 'potion', 'potion🧪': 'potion', '🧪': 'potion',
                     'shield': 'shield', 'shield🛡️': 'shield', '🛡️': 'shield',
@@ -303,11 +303,11 @@
                     'rain-stone': 'rain-stone', 'rainstone': 'rain-stone', '🌧️': 'rain-stone',
                     'sun-stone': 'sun-stone', 'sunstone': 'sun-stone', '☀️': 'sun-stone',
                     'bomb': 'bomb', 'bomb💣': 'bomb', '💣': 'bomb',
-                    'mud-stone': 'mud-stone', 'mudstone': 'mud-stone', '🪨': 'mud-stone', 'mud': 'mud-stone'
+                    'shovel': 'shovel', 'shovel⛏️': 'shovel', '⛏️': 'shovel', 'shov': 'shovel'
                 };
                 const matchedItem = itemMap[requestedItem] || (validItems.includes(requestedItem) ? requestedItem : null);
                 if (!matchedItem) {
-                    ChatBotSay(`@${user}, that is not a valid item. Choose from: potion, shield, umbrella, rain-stone, sun-stone, bomb, mud-stone.`);
+                    ChatBotSay(`@${user}, that is not a valid item. Choose from: potion, shield, umbrella, rain-stone, sun-stone, bomb, shovel.`);
                     return;
                 }
  
@@ -323,12 +323,21 @@
                     } else if (data.noItem) {
                         ChatBotSay(`@${user}, you do not have that item in your bag.`);
                     } else if (data.success) {
-                        const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', umbrella: '☔ Umbrella', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb', 'mud-stone': '🪨 Mud Stone' };mbrella', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb' };
+                        const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', umbrella: '☔ Umbrella', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb', 'shovel': '⛏️ Shovel' };
                         const itemStr = emojiMap[matchedItem];
                         ChatBotSay(`@${user} used their ${itemStr}!`);
                     }
                 })
                 .catch(err => console.error('Error in !use:', err));
+            }
+            else if (command === "roll" || command === "dice" || command === "2d6") {
+                console.log("!roll was typed in chat");
+                const d1 = Math.floor(Math.random() * 6) + 1;
+                const d2 = Math.floor(Math.random() * 6) + 1;
+                const total = d1 + d2;
+                
+                triggerDiceRoll(d1, d2);
+                ChatBotSay(`@${user} rolled two dice: 🎲 ${d1} + 🎲 ${d2} = ${total}!`);
             }
 
             //== PUBLIC Commands Section =====================================
@@ -1050,8 +1059,8 @@
             }, 10000);
         }
 
-        function triggerMudStone() {
-            console.log("[Loot] Mud Stone triggered! Splatting mud on screen...");
+        function triggerShovel() {
+            console.log("[Loot] Shovel triggered! Splatting mud on screen...");
             playSound("splatSound", SoundEnum.splat);
             
             // Create 8 to 12 mud splats at random screen locations
@@ -1067,7 +1076,8 @@
                     splat.style.left = `${x}%`;
                     splat.style.top = `${y}%`;
                     
-                    const size = Math.random() * 80 + 80;
+                    // Made 2.5 times larger (from 80-160px to 200-450px)
+                    const size = Math.random() * 250 + 200;
                     splat.style.width = `${size}px`;
                     splat.style.height = `${size}px`;
                     
@@ -1195,8 +1205,8 @@
             else if (item === 'rain-stone') {
                 triggerThunderstorm();
             }
-            else if (item === 'mud-stone') {
-                triggerMudStone();
+            else if (item === 'shovel') {
+                triggerShovel();
             }
         }
 
@@ -1216,6 +1226,9 @@
                     } else if (payload.event === 'use_item') {
                         console.log('User used item via SSE:', payload);
                         triggerItemEffect(payload.item, payload.user);
+                    } else if (payload.event === 'dice_roll') {
+                        console.log('Dice roll via SSE:', payload);
+                        triggerDiceRoll(payload.d1, payload.d2);
                     } else if (payload.event === 'test_weather') {
                         console.log('Simulating weather event via SSE:', payload.type);
                         if (payload.type === 'thunderstorm') {
@@ -1270,6 +1283,102 @@
                 noteEl.style.opacity = '0';
                 setTimeout(() => { noteEl.style.display = 'none'; }, 500);
             }, 5000);
+        }
+
+        function triggerDiceRoll(d1, d2) {
+            console.log(`[Dice] Rolling dice: ${d1} and ${d2}`);
+            playSound("diceSound", SoundEnum.dice);
+
+            const container = document.createElement("div");
+            container.id = "diceOverlayContainer";
+            container.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                perspective: 1000px;
+                pointer-events: none;
+                z-index: 10005;
+            `;
+
+            const getFaceHTML = (num) => {
+                const pipCoordinates = {
+                    1: [[2, 2]],
+                    2: [[1, 1], [3, 3]],
+                    3: [[1, 1], [2, 2], [3, 3]],
+                    4: [[1, 1], [1, 3], [3, 1], [3, 3]],
+                    5: [[1, 1], [1, 3], [2, 2], [3, 1], [3, 3]],
+                    6: [[1, 1], [1, 3], [2, 1], [2, 3], [3, 1], [3, 3]]
+                };
+                
+                let pipsHTML = "";
+                const coords = pipCoordinates[num] || [];
+                for (let r = 1; r <= 3; r++) {
+                    for (let c = 1; c <= 3; c++) {
+                        const hasPip = coords.some(([pr, pc]) => pr === r && pc === c);
+                        if (hasPip) {
+                            pipsHTML += `<span class="pip" style="grid-row:${r}; grid-column:${c};"></span>`;
+                        }
+                    }
+                }
+                return pipsHTML;
+            };
+
+            const createDie = (rolledVal, leftOffset, delay, animClass, colorClass) => {
+                const dieWrapper = document.createElement("div");
+                dieWrapper.className = `dice-container ${animClass}`;
+                dieWrapper.style.cssText = `
+                    position: absolute;
+                    left: ${leftOffset};
+                    width: 200px;
+                    height: 200px;
+                    top: -250px;
+                `;
+                
+                const die = document.createElement("div");
+                die.className = `dice ${colorClass}`;
+                die.innerHTML = `
+                    <div class="face front">${getFaceHTML(1)}</div>
+                    <div class="face back">${getFaceHTML(6)}</div>
+                    <div class="face right">${getFaceHTML(4)}</div>
+                    <div class="face left">${getFaceHTML(3)}</div>
+                    <div class="face top">${getFaceHTML(2)}</div>
+                    <div class="face bottom">${getFaceHTML(5)}</div>
+                `;
+
+                dieWrapper.appendChild(die);
+                container.appendChild(dieWrapper);
+
+                const faceRotations = {
+                    1: { x: 0, y: 0 },
+                    6: { x: 0, y: 180 },
+                    4: { x: 0, y: -90 },
+                    3: { x: 0, y: 90 },
+                    2: { x: -90, y: 0 },
+                    5: { x: 90, y: 0 }
+                };
+
+                setTimeout(() => {
+                    const rot = faceRotations[rolledVal] || { x: 0, y: 0 };
+                    const rx = 1440 + rot.x;
+                    const ry = 1440 + rot.y;
+                    const rz = 720 + (Math.random() * 90 - 45);
+                    
+                    die.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${rz}deg)`;
+                }, delay);
+            };
+
+            createDie(d1, "20%", 50, "dice-bounce-left", "red-dice");
+            createDie(d2, "70%", 200, "dice-bounce-right", "white-dice");
+
+            document.body.appendChild(container);
+
+            setTimeout(() => {
+                container.style.transition = "opacity 1.5s ease-out";
+                container.style.opacity = "0";
+                setTimeout(() => container.remove(), 1500);
+            }, 6000);
         }
     </script>
 </body>

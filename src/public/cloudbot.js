@@ -143,7 +143,8 @@ const SoundEnum = {
     previously: "public/medias/previously.mp3",
     applause: "public/medias/applause.mp3",
     click: "public/medias/click.mp3",
-    splat: "public/medias/splat.mp3"
+    splat: "public/medias/splat.mp3",
+    dice: "public/medias/dice.mp3"
 };
 
 const TodoStatusEnum = {

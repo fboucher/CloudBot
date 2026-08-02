@@ -1610,7 +1610,7 @@ app.post('/api/loot/search', async (req, res) => {
             }
         }
 
-        const items = ['potion', 'shield', 'umbrella', 'rain-stone', 'sun-stone', 'bomb', 'mud-stone'];
+        const items = ['potion', 'shield', 'umbrella', 'rain-stone', 'sun-stone', 'bomb', 'shovel'];
         const rolledItem = items[Math.floor(Math.random() * items.length)];
         const inventory = await db.addInventoryItem(lowerUser, rolledItem);
         lootCooldowns.set(lowerUser, now);
@@ -1644,6 +1644,13 @@ app.post('/api/loot/use', async (req, res) => {
     }
 });
 
+app.post('/api/dice/test', (req, res) => {
+    const d1 = Math.floor(Math.random() * 6) + 1;
+    const d2 = Math.floor(Math.random() * 6) + 1;
+    broadcastSSE({ event: 'dice_roll', d1, d2 });
+    res.json({ success: true, d1, d2 });
+});
+
 app.post('/api/loot/add-drop-item', async (req, res) => {
     const { username } = req.body;
     if (!username) return res.status(400).json({ error: 'Missing username.' });
@@ -1656,7 +1663,7 @@ app.post('/api/loot/add-drop-item', async (req, res) => {
         }
 
         if (Math.random() <= 0.25) {
-            const items = ['potion', 'shield', 'umbrella', 'rain-stone', 'sun-stone', 'bomb', 'mud-stone'];
+            const items = ['potion', 'shield', 'umbrella', 'rain-stone', 'sun-stone', 'bomb', 'shovel'];
             const rolledItem = items[Math.floor(Math.random() * items.length)];
             const inventory = await db.addInventoryItem(lowerUser, rolledItem);
             return res.json({ success: true, rolled: true, item: rolledItem, inventory });

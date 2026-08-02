@@ -1129,3 +1129,158 @@ div.splat-toggle .splat {
         margin-top: 50px;
     }
 }
+
+/* ===== 3D DICE OVERLAY EFFECT ===== */
+.dice-container {
+    perspective: 1000px;
+    transform-style: preserve-3d;
+}
+
+.dice-container.dice-bounce-left {
+    animation: diceFallAndBounceLeft 3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.dice-container.dice-bounce-right {
+    animation: diceFallAndBounceRight 3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.dice {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    transform-style: preserve-3d;
+    transition: transform 3s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.face {
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    background: #ffffff;
+    border: 8px solid #1a1a1a;
+    border-radius: 32px;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    padding: 20px;
+    backface-visibility: hidden;
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.15), 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+/* Face positioning (200px size = 100px translateZ) */
+.face.front  { transform: rotateY(0deg) translateZ(100px); }
+.face.back   { transform: rotateY(180deg) translateZ(100px); }
+.face.right  { transform: rotateY(90deg) translateZ(100px); }
+.face.left   { transform: rotateY(-90deg) translateZ(100px); }
+.face.top    { transform: rotateX(90deg) translateZ(100px); }
+.face.bottom { transform: rotateX(-90deg) translateZ(100px); }
+
+/* Pips styling */
+.face .pip {
+    display: block;
+    width: 32px;
+    height: 32px;
+    background-color: #2c3e50;
+    border-radius: 50%;
+    margin: auto;
+    box-shadow: inset 2px 2px 5px rgba(0,0,0,0.6);
+}
+
+/* Traditional red dot on Face 1 */
+.face.front .pip {
+    width: 48px;
+    height: 48px;
+    background-color: #e74c3c;
+}
+
+/* ===== RED DICE OVERLAY STYLING ===== */
+.dice.red-dice .face {
+    background: radial-gradient(circle at 35% 35%, #e74c3c 0%, #c0392b 100%);
+    border-color: #7f0000;
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.dice.red-dice .face .pip {
+    background-color: #ffffff;
+    box-shadow: inset 1px 1px 4px rgba(0,0,0,0.3);
+}
+
+.dice.red-dice .face.front .pip {
+    background-color: #ffffff;
+}
+
+/* ===== WHITE DICE OVERLAY STYLING ===== */
+.dice.white-dice .face {
+    background: radial-gradient(circle at 35% 35%, #ffffff 0%, #ecf0f1 100%);
+}
+
+@keyframes diceFallAndBounceLeft {
+    0% {
+        top: -250px;
+        left: 20%;
+    }
+    35% {
+        top: calc(100vh - 280px);
+        left: 30%;
+    }
+    50% {
+        top: calc(100vh - 450px);
+        left: 34%;
+    }
+    65% {
+        top: calc(100vh - 280px);
+        left: 38%;
+    }
+    78% {
+        top: calc(100vh - 350px);
+        left: 40%;
+    }
+    90% {
+        top: calc(100vh - 280px);
+        left: 42%;
+    }
+    95% {
+        top: calc(100vh - 300px);
+        left: 43%;
+    }
+    100% {
+        top: calc(100vh - 280px);
+        left: 43%;
+    }
+}
+
+@keyframes diceFallAndBounceRight {
+    0% {
+        top: -250px;
+        left: 80%;
+    }
+    35% {
+        top: calc(100vh - 280px);
+        left: 70%;
+    }
+    50% {
+        top: calc(100vh - 450px);
+        left: 66%;
+    }
+    65% {
+        top: calc(100vh - 280px);
+        left: 62%;
+    }
+    78% {
+        top: calc(100vh - 350px);
+        left: 60%;
+    }
+    90% {
+        top: calc(100vh - 280px);
+        left: 58%;
+    }
+    95% {
+        top: calc(100vh - 300px);
+        left: 57%;
+    }
+    100% {
+        top: calc(100vh - 280px);
+        left: 57%;
+    }
+}

@@ -436,7 +436,8 @@
                                     <button class="btn btn-outline-info btn-sm" onclick="triggerTestItem('bomb')">💣 Test Bomb</button>
                                     <button class="btn btn-outline-info btn-sm" onclick="triggerTestItem('sun-stone')">☀️ Test Sun Stone</button>
                                     <button class="btn btn-outline-info btn-sm" onclick="triggerTestItem('rain-stone')">🌧️ Test Rain Stone</button>
-                                    <button class="btn btn-outline-info btn-sm" onclick="triggerTestItem('mud-stone')">🪨 Test Mud Stone</button>
+                                    <button class="btn btn-outline-info btn-sm" onclick="triggerTestItem('shovel')">⛏️ Test Shovel</button>
+                                    <button class="btn btn-outline-info btn-sm" onclick="triggerTestDice()">🎲 Test 2D6 Dice</button>
                                 </div>
                                 <h6 class="text-light mb-2">Simulate Weather Events</h6>
                                 <div class="d-flex gap-2 mb-3 flex-wrap">
@@ -1806,6 +1807,24 @@
             } catch (err) {
                 console.error(err);
                 showFeedback('Failed to trigger test item');
+            }
+        }
+
+        async function triggerTestDice() {
+            const d1 = Math.floor(Math.random() * 6) + 1;
+            const d2 = Math.floor(Math.random() * 6) + 1;
+            try {
+                const response = await fetch('/api/stream/overlay', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ event: 'dice_roll', d1, d2 })
+                });
+                if (response.ok) {
+                    showFeedback(`Simulated 2D6 roll: ${d1} + ${d2} = ${d1 + d2}`);
+                }
+            } catch (err) {
+                console.error(err);
+                showFeedback('Failed to trigger dice roll');
             }
         }
 
