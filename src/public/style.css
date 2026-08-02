@@ -314,6 +314,7 @@ h4 {
 }
 
 .announcement {
+    zoom: 1.5;
     min-width: 450px;
     max-width: 600px;
     padding: 24px 30px;
@@ -722,7 +723,7 @@ div.splat-toggle .splat {
     border-radius: 50%;
     z-index: 10000;
     pointer-events: none;
-    box-shadow: 0 0 10px rgba(46, 204, 113, 0.9), inset 0 0 4px rgba(255, 255, 255, 0.5);
+    box-shadow: 0 0 25px rgba(46, 204, 113, 0.85), inset 0 0 10px rgba(255, 255, 255, 0.7);
     animation: riseAndFade 8s ease-in forwards;
 }
 
@@ -811,11 +812,11 @@ div.splat-toggle .splat {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(120, 120, 120, 0.45);
+    background: radial-gradient(circle, rgba(40, 40, 45, 0.8) 0%, rgba(15, 15, 18, 0.9) 100%);
     z-index: 10001;
     pointer-events: none;
     opacity: 0;
-    backdrop-filter: blur(5px);
+    backdrop-filter: blur(8px);
     animation: smokeBillow 12s ease-out forwards;
 }
 
@@ -1050,4 +1051,81 @@ div.splat-toggle .splat {
     width: 48px;
     height: 48px;
     filter: drop-shadow(0 0 8px #9146ff);
+}
+
+/* ===== SUN STONE / LENS FLARE EFFECT ===== */
+.sun-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at 80% 20%, rgba(255, 255, 230, 0.5) 0%, rgba(255, 230, 180, 0.2) 50%, rgba(255, 255, 255, 0) 100%);
+    mix-blend-mode: screen;
+    pointer-events: none;
+    z-index: 10002;
+    opacity: 0;
+    animation: sunGlowFade 10s ease-in-out forwards;
+}
+
+.lens-flare {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 200, 0.8) 5%, rgba(255, 220, 150, 0) 25%),
+        radial-gradient(circle at 80% 20%, rgba(255, 220, 150, 0) 28%, rgba(255, 220, 150, 0.15) 30%, rgba(255, 220, 150, 0) 32%),
+        radial-gradient(circle at 45% 55%, rgba(0, 180, 255, 0.08) 0%, rgba(0, 180, 255, 0) 12%),
+        radial-gradient(circle at 35% 65%, rgba(255, 100, 100, 0.06) 0%, rgba(255, 100, 100, 0) 8%),
+        radial-gradient(circle at 20% 80%, rgba(0, 255, 150, 0.05) 0%, rgba(0, 255, 150, 0) 18%);
+    pointer-events: none;
+}
+
+@keyframes sunGlowFade {
+    0% { opacity: 0; }
+    15% { opacity: 1; }
+    85% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* ===== MUD STONE SPLAT EFFECT ===== */
+.mud-splat {
+    position: fixed;
+    z-index: 10000;
+    background: radial-gradient(circle at 35% 35%, #5d4037 0%, #3e2723 100%);
+    box-shadow: 
+        0 8px 16px rgba(0, 0, 0, 0.4), 
+        inset -4px -4px 8px rgba(0, 0, 0, 0.6), 
+        inset 4px 4px 8px rgba(255, 255, 255, 0.15);
+    pointer-events: none;
+    opacity: 0;
+    animation: 
+        mudImpact 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, 
+        mudDrip 10s linear forwards;
+    transition: opacity 2s ease-out;
+}
+
+.mud-splat.fade-out {
+    opacity: 0 !important;
+}
+
+@keyframes mudImpact {
+    0% {
+        opacity: 0;
+        transform: scale(0);
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+@keyframes mudDrip {
+    0% {
+        margin-top: 0px;
+    }
+    100% {
+        margin-top: 50px;
+    }
 }

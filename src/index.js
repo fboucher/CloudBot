@@ -1610,7 +1610,7 @@ app.post('/api/loot/search', async (req, res) => {
             }
         }
 
-        const items = ['potion', 'shield', 'umbrella', 'rain-stone', 'sun-stone', 'bomb'];
+        const items = ['potion', 'shield', 'umbrella', 'rain-stone', 'sun-stone', 'bomb', 'mud-stone'];
         const rolledItem = items[Math.floor(Math.random() * items.length)];
         const inventory = await db.addInventoryItem(lowerUser, rolledItem);
         lootCooldowns.set(lowerUser, now);
@@ -1656,7 +1656,7 @@ app.post('/api/loot/add-drop-item', async (req, res) => {
         }
 
         if (Math.random() <= 0.25) {
-            const items = ['potion', 'shield', 'umbrella', 'rain-stone', 'sun-stone', 'bomb'];
+            const items = ['potion', 'shield', 'umbrella', 'rain-stone', 'sun-stone', 'bomb', 'mud-stone'];
             const rolledItem = items[Math.floor(Math.random() * items.length)];
             const inventory = await db.addInventoryItem(lowerUser, rolledItem);
             return res.json({ success: true, rolled: true, item: rolledItem, inventory });

@@ -141,7 +141,9 @@ const SoundEnum = {
     rain: "public/medias/rain.mp3",
     rainUmbrella: "public/medias/Rain-On-Umbrella.com.mp3",
     previously: "public/medias/previously.mp3",
-    applause: "public/medias/applause.mp3"
+    applause: "public/medias/applause.mp3",
+    click: "public/medias/click.mp3",
+    splat: "public/medias/splat.mp3"
 };
 
 const TodoStatusEnum = {
@@ -1460,6 +1462,8 @@ let isDisplayingAnnouncement = false;
 displayAnnouncement = function (title, message, themeClass) {
     const container = document.getElementById('announcementContainer');
     if (!container) return;
+
+    playSound('click', SoundEnum.click);
 
     // Randomize which side the announcement appears on
     const fromLeft = Math.random() < 0.5;

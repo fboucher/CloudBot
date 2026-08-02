@@ -260,7 +260,7 @@
                     } else if (data.onCooldown) {
                         ChatBotSay(`@${user}, you are on cooldown. Please wait ${data.remainingMinutes} more minute(s) before searching again.`);
                     } else if (data.success) {
-                        const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb' };
+                        const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb', 'mud-stone': '🪨 Mud Stone' };
                         const itemStr = emojiMap[data.item] || data.item;
                         ChatBotSay(`@${user} searched the cloud forest and found a ${itemStr}!`);
                     }
@@ -280,7 +280,7 @@
                         if (data.inventory.length === 0) {
                             ChatBotSay(`@${user}'s bag is completely empty! Land drops or use !search to find RPG items.`);
                         } else {
-                            const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', umbrella: '☔ Umbrella', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb' };
+                            const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', umbrella: '☔ Umbrella', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb', 'mud-stone': '🪨 Mud Stone' };
                             const itemsList = data.inventory.map(item => emojiMap[item] || item).join(', ');
                             ChatBotSay(`@${user}'s bag (${data.inventory.length}/5 items): ${itemsList}`);
                         }
@@ -295,21 +295,22 @@
                     return;
                 }
                 const requestedItem = message.toLowerCase().trim().replace(/[^a-z0-9-]/g, '');
-                const validItems = ['potion', 'shield', 'umbrella', 'rain-stone', 'sun-stone', 'bomb'];
+                const validItems = ['potion', 'shield', 'umbrella', 'rain-stone', 'sun-stone', 'bomb', 'mud-stone'];
                 const itemMap = {
                     'potion': 'potion', 'potion🧪': 'potion', '🧪': 'potion',
                     'shield': 'shield', 'shield🛡️': 'shield', '🛡️': 'shield',
                     'umbrella': 'umbrella', 'umbrella☔': 'umbrella', '☔': 'umbrella',
                     'rain-stone': 'rain-stone', 'rainstone': 'rain-stone', '🌧️': 'rain-stone',
                     'sun-stone': 'sun-stone', 'sunstone': 'sun-stone', '☀️': 'sun-stone',
-                    'bomb': 'bomb', 'bomb💣': 'bomb', '💣': 'bomb'
+                    'bomb': 'bomb', 'bomb💣': 'bomb', '💣': 'bomb',
+                    'mud-stone': 'mud-stone', 'mudstone': 'mud-stone', '🪨': 'mud-stone', 'mud': 'mud-stone'
                 };
                 const matchedItem = itemMap[requestedItem] || (validItems.includes(requestedItem) ? requestedItem : null);
                 if (!matchedItem) {
-                    ChatBotSay(`@${user}, that is not a valid item. Choose from: potion, shield, umbrella, rain-stone, sun-stone, bomb.`);
+                    ChatBotSay(`@${user}, that is not a valid item. Choose from: potion, shield, umbrella, rain-stone, sun-stone, bomb, mud-stone.`);
                     return;
                 }
-
+ 
                 fetch('/api/loot/use', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -322,7 +323,7 @@
                     } else if (data.noItem) {
                         ChatBotSay(`@${user}, you do not have that item in your bag.`);
                     } else if (data.success) {
-                        const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', umbrella: '☔ Umbrella', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb' };
+                        const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', umbrella: '☔ Umbrella', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb', 'mud-stone': '🪨 Mud Stone' };mbrella', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb' };
                         const itemStr = emojiMap[matchedItem];
                         ChatBotSay(`@${user} used their ${itemStr}!`);
                     }
@@ -1011,6 +1012,21 @@
 
             playSound("celebrationSound", SoundEnum.yeah);
 
+            // Clean up old sun overlay if exists
+            const oldSun = document.getElementById("sunOverlay");
+            if (oldSun) oldSun.remove();
+
+            // Create Sun and Lens Flare Overlay
+            const sunOverlay = document.createElement("div");
+            sunOverlay.id = "sunOverlay";
+            sunOverlay.className = "sun-overlay";
+            
+            const lensFlare = document.createElement("div");
+            lensFlare.className = "lens-flare";
+            sunOverlay.appendChild(lensFlare);
+            
+            document.body.appendChild(sunOverlay);
+
             for (let i = 0; i < 60; i++) {
                 setTimeout(() => {
                     const star = document.createElement("div");
@@ -1027,9 +1043,51 @@
 
             weatherOverrideTimeout = setTimeout(() => {
                 weatherOverrideActive = false;
+                const sn = document.getElementById("sunOverlay");
+                if (sn) sn.remove();
                 console.log("[Weather] Star Celebration decayed. Returning to baseline.");
                 trackMessageVelocity();
             }, 10000);
+        }
+
+        function triggerMudStone() {
+            console.log("[Loot] Mud Stone triggered! Splatting mud on screen...");
+            playSound("splatSound", SoundEnum.splat);
+            
+            // Create 8 to 12 mud splats at random screen locations
+            const splatCount = Math.floor(Math.random() * 5) + 8;
+            
+            for (let i = 0; i < splatCount; i++) {
+                setTimeout(() => {
+                    const splat = document.createElement("div");
+                    splat.className = "mud-splat";
+                    
+                    const x = Math.random() * 80 + 10;
+                    const y = Math.random() * 70 + 10;
+                    splat.style.left = `${x}%`;
+                    splat.style.top = `${y}%`;
+                    
+                    const size = Math.random() * 80 + 80;
+                    splat.style.width = `${size}px`;
+                    splat.style.height = `${size}px`;
+                    
+                    const rotate = Math.random() * 360;
+                    splat.style.transform = `rotate(${rotate}deg)`;
+                    
+                    const r1 = Math.floor(Math.random() * 30) + 35;
+                    const r2 = Math.floor(Math.random() * 30) + 35;
+                    const r3 = Math.floor(Math.random() * 30) + 35;
+                    const r4 = Math.floor(Math.random() * 30) + 35;
+                    splat.style.borderRadius = `${r1}% ${100-r1}% ${r2}% ${100-r2}% / ${r3}% ${r4}% ${100-r4}% ${100-r3}%`;
+
+                    document.body.appendChild(splat);
+                    
+                    setTimeout(() => {
+                        splat.classList.add("fade-out");
+                        setTimeout(() => splat.remove(), 2000);
+                    }, 10000);
+                }, i * 150);
+            }
         }
 
         function playExplosionSound() {
@@ -1078,7 +1136,7 @@
                         const bubble = document.createElement("div");
                         bubble.className = "bubble-effect";
                         bubble.style.left = `${Math.random() * 100}%`;
-                        const size = Math.random() * 25 + 10;
+                        const size = Math.random() * 80 + 40;
                         bubble.style.width = `${size}px`;
                         bubble.style.height = `${size}px`;
                         bubble.style.animationDelay = `${Math.random() * 1.5}s`;
@@ -1136,6 +1194,9 @@
             } 
             else if (item === 'rain-stone') {
                 triggerThunderstorm();
+            }
+            else if (item === 'mud-stone') {
+                triggerMudStone();
             }
         }
 
