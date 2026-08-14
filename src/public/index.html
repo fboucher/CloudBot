@@ -142,7 +142,7 @@
             const bracketChannel = colonIndex === -1 ? null : bracketContent.slice(0, colonIndex).trim();
             const bracketUser = (atIndex === -1 || atIndex + 1 >= bracketContent.length)
                 ? null
-                : bracketContent.slice(atIndex + 1).trim().toLowerCase();
+                : sanitizeUsername(bracketContent.slice(atIndex + 1));
             const afterBracket = trimmed.slice(closingIndex + 1).trimStart();
             if (!afterBracket.startsWith('!')) {
                 return null;
