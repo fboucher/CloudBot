@@ -160,8 +160,21 @@ const ReminderStatusEnum = {
     done: "done"
 };
 
+sanitizeUsername = function (name) {
+    if (name === null || name === undefined) {
+        return '';
+    }
+    return String(name)
+        .trim()
+        .replace(/^@+/, '')
+        .replace(/[,.:;!?]+$/, '')
+        .trim()
+        .toLowerCase();
+}
+
 getUserPosition = function (userName) {
     console.log("... Searching for: " + userName);
+    userName = sanitizeUsername(userName);
     for (i = 0; i < _streamSession.UserSession.length; i++) {
         console.log("... looking at : " + _streamSession.UserSession[i].user);
         if (_streamSession.UserSession[i].user === userName) {
@@ -293,13 +306,13 @@ ParseMessage = function (message) {
     let splitedMsg = message.split(" ");
 
     if (splitedMsg.length > 1 && splitedMsg[1] === "landed") {
-        let user = splitedMsg[0].toLowerCase();
+        let user = sanitizeUsername(splitedMsg[0]);
         let curScore = splitedMsg[3].slice(0, -1);
 
         UserLanded(user, curScore);
     }
     else if (message.startsWith("Thank you for following")) {
-        let user = splitedMsg[4].toLowerCase().slice(0, -1);
+        let user = sanitizeUsername(splitedMsg[4]);
         _streamSession.NewFollowers.push(user);
         SaveToFile(false);
     }

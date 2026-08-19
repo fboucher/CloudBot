@@ -81,6 +81,18 @@ if (!fs.existsSync(CEEBEE_KNOWLEDGE_DIR)) {
     fs.mkdirSync(CEEBEE_KNOWLEDGE_DIR, { recursive: true });
 }
 
+function sanitizeUsername(name) {
+    if (name === null || name === undefined) {
+        return '';
+    }
+    return String(name)
+        .trim()
+        .replace(/^@+/, '')
+        .replace(/[,.:;!?]+$/, '')
+        .trim()
+        .toLowerCase();
+}
+
 let ceebeeChatHistory = [];
 
 app.use('/public', express.static(path.join(__dirname, 'public')));
@@ -1022,7 +1034,9 @@ app.post('/api/users/score', async (req, res) => {
         if (!session) return res.status(404).json({ error: 'No active session' });
         const { username, dropCount, landedCount, highScore, bestHighScore } = req.body;
         if (!username) return res.status(400).json({ error: 'username required' });
-        await db.upsertUser(session.id, username, { dropCount, landedCount, highScore, bestHighScore });
+        const cleanUsername = sanitizeUsername(username);
+        if (!cleanUsername) return res.status(400).json({ error: 'username required' });
+        await db.upsertUser(session.id, cleanUsername, { dropCount, landedCount, highScore, bestHighScore });
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1043,9 +1057,10 @@ app.get('/api/participants', async (req, res) => {
 
 app.post('/api/participants/regular', async (req, res) => {
     const { username, isRegular } = req.body || {};
-    if (!username) return res.status(400).json({ error: 'Missing username.' });
+    const cleanUsername = sanitizeUsername(username);
+    if (!cleanUsername) return res.status(400).json({ error: 'Missing username.' });
     try {
-        await db.setParticipantRegularStatus(username, !!isRegular);
+        await db.setParticipantRegularStatus(cleanUsername, !!isRegular);
         res.json({ success: true });
     } catch (err) {
         console.error('Error setting regular status:', err);
@@ -1055,9 +1070,10 @@ app.post('/api/participants/regular', async (req, res) => {
 
 app.post('/api/participants/streamer', async (req, res) => {
     const { username, isStreamer } = req.body || {};
-    if (!username) return res.status(400).json({ error: 'Missing username.' });
+    const cleanUsername = sanitizeUsername(username);
+    if (!cleanUsername) return res.status(400).json({ error: 'Missing username.' });
     try {
-        await db.setParticipantStreamerStatus(username, !!isStreamer);
+        await db.setParticipantStreamerStatus(cleanUsername, !!isStreamer);
         res.json({ success: true });
     } catch (err) {
         console.error('Error setting streamer status:', err);
@@ -1402,11 +1418,12 @@ async function triggerTwitchHelixShoutout(targetUsername) {
 
 app.post('/api/chat-event', async (req, res) => {
     const { username } = req.body || {};
-    if (!username) return res.status(400).json({ error: 'Missing username.' });
+    const cleanUsername = sanitizeUsername(username);
+    if (!cleanUsername) return res.status(400).json({ error: 'Missing username.' });
 
     try {
         // 1. Register the participant
-        await db.registerParticipant(username);
+        await db.registerParticipant(cleanUsername);
 
         // 2. Check if there's an active session
         const session = await db.getActiveSession();
@@ -1419,24 +1436,24 @@ app.post('/api/chat-event', async (req, res) => {
             sessionMessageCounts.set(session.id, new Map());
         }
         const userCounts = sessionMessageCounts.get(session.id);
-        const currentCount = (userCounts.get(username) || 0) + 1;
-        userCounts.set(username, currentCount);
+        const currentCount = (userCounts.get(cleanUsername) || 0) + 1;
+        userCounts.set(cleanUsername, currentCount);
 
         let shouldShoutout = false;
         let shoutoutMessage = "";
         let profileImageUrl = "";
 
-        const isRegular = await db.isParticipantRegular(username);
-        const isStreamer = await db.isParticipantStreamer(username);
+        const isRegular = await db.isParticipantRegular(cleanUsername);
+        const isStreamer = await db.isParticipantStreamer(cleanUsername);
 
         if (currentCount === 2 && isRegular && isStreamer) {
-            console.log(`User ${username} sent their 2nd message and is flagged as regular & streamer. Generating shoutout...`);
-            const shoutoutData = await generateShoutoutMessage(username);
+            console.log(`User ${cleanUsername} sent their 2nd message and is flagged as regular & streamer. Generating shoutout...`);
+            const shoutoutData = await generateShoutoutMessage(cleanUsername);
             if (shoutoutData.success) {
                 shoutoutMessage = shoutoutData.shoutoutMessage;
                 profileImageUrl = shoutoutData.profileImageUrl;
                 shouldShoutout = true;
-                triggerTwitchHelixShoutout(username).catch(err => console.error("Helix shoutout error:", err));
+                triggerTwitchHelixShoutout(cleanUsername).catch(err => console.error("Helix shoutout error:", err));
             }
         }
 
@@ -1446,13 +1463,13 @@ app.post('/api/chat-event', async (req, res) => {
         }
 
         // 4. Check if they have been greeted in this session
-        const alreadyGreeted = await db.hasBeenGreetedInSession(session.id, username);
+        const alreadyGreeted = await db.hasBeenGreetedInSession(session.id, cleanUsername);
         if (alreadyGreeted) {
             return res.json({ shouldGreet: false, shouldShoutout, shoutoutMessage, profileImageUrl });
         }
 
         // 5. User is regular and has not been greeted yet in this session. Log it!
-        await db.logGreetingEvent(session.id, username);
+        await db.logGreetingEvent(session.id, cleanUsername);
 
         // 6. Generate the dynamic AI greeting
         const activeConnection = await db.getActiveCeebeeConnection();
@@ -1693,9 +1710,10 @@ const lootCooldowns = new Map();
 
 app.get('/api/loot/bag', async (req, res) => {
     const { username } = req.query;
-    if (!username) return res.status(400).json({ error: 'Missing username.' });
+    const cleanUsername = sanitizeUsername(username);
+    if (!cleanUsername) return res.status(400).json({ error: 'Missing username.' });
     try {
-        const inventory = await db.getInventory(username);
+        const inventory = await db.getInventory(cleanUsername);
         res.json({ success: true, inventory });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1704,8 +1722,8 @@ app.get('/api/loot/bag', async (req, res) => {
 
 app.post('/api/loot/search', async (req, res) => {
     const { username } = req.body;
-    if (!username) return res.status(400).json({ error: 'Missing username.' });
-    const lowerUser = username.toLowerCase();
+    const lowerUser = sanitizeUsername(username);
+    if (!lowerUser) return res.status(400).json({ error: 'Missing username.' });
 
     try {
         const settings = await db.getCeebeeSettings();
@@ -1738,8 +1756,8 @@ app.post('/api/loot/search', async (req, res) => {
 
 app.post('/api/loot/use', async (req, res) => {
     const { username, item } = req.body;
-    if (!username || !item) return res.status(400).json({ error: 'Missing username or item.' });
-    const lowerUser = username.toLowerCase();
+    const lowerUser = sanitizeUsername(username);
+    if (!lowerUser || !item) return res.status(400).json({ error: 'Missing username or item.' });
 
     try {
         const settings = await db.getCeebeeSettings();
@@ -1768,8 +1786,8 @@ app.post('/api/dice/test', (req, res) => {
 
 app.post('/api/loot/add-drop-item', async (req, res) => {
     const { username } = req.body;
-    if (!username) return res.status(400).json({ error: 'Missing username.' });
-    const lowerUser = username.toLowerCase();
+    const lowerUser = sanitizeUsername(username);
+    if (!lowerUser) return res.status(400).json({ error: 'Missing username.' });
 
     try {
         const settings = await db.getCeebeeSettings();
@@ -1857,7 +1875,7 @@ app.post('/api/ceebee/chat', async (req, res) => {
             fullSystemPrompt += `\n\n--- Background Information ---\n${knowledgeContext}`;
         }
 
-        ceebeeChatHistory.push({ role: 'user', content: `${user ? user + ' says: ' : ''}${message}` });
+        ceebeeChatHistory.push({ role: 'user', content: `${user ? sanitizeUsername(user) + ' says: ' : ''}${message}` });
         if (ceebeeChatHistory.length > 20) {
             ceebeeChatHistory.shift();
         }
