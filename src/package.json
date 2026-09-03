@@ -19,7 +19,7 @@
   "dependencies": {
     "@tursodatabase/database": "^0.5.1",
     "dateformat": "^3.0.3",
-    "express": "^4.22.2",
+    "express": "^5.2.1",
     "text2png": "^2.3.0",
     "toastr": "^2.1.4"
   },
