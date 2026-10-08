@@ -1,6 +1,6 @@
 {
   "name": "cloudbot",
-  "version": "1.8.5",
+  "version": "1.10.0",
   "description": "Twitch ChatBot and Score keeper",
   "main": "index.js",
   "scripts": {
@@ -24,6 +24,6 @@
     "toastr": "^2.1.4"
   },
   "devDependencies": {
-    "nodemon": "^2.0.20"
+    "nodemon": "^3.1.14"
   }
 }

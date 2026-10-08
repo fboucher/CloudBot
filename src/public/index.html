@@ -6,6 +6,7 @@
     <script src="https://cdn.jsdelivr.net/npm/tmi.js@1.8.5/dist/tmi.min.js"></script>
     <script src="/io/secret.js"></script>
     <script src="/public/cloudbot.js"></script>
+    <script src="/public/fx.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
@@ -34,6 +35,24 @@
     <h1 id="cbTitle"></h1>
     <p id="lastChatMsg"></p>
     <div id="imageViewer"></div>
+    <!-- Streamer Shoutout Overlay Card -->
+    <div id="streamerShoutoutCard">
+        <div class="streamer-card-glow"></div>
+        <div class="streamer-card-content">
+            <div class="streamer-avatar-container">
+                <img id="streamerAvatar" src="" alt="Streamer Avatar">
+            </div>
+            <div class="streamer-card-info">
+                <div class="streamer-tag">Live Streamer!</div>
+                <div id="streamerCardName" class="streamer-name"></div>
+            </div>
+            <div class="streamer-twitch-icon">
+                <svg viewBox="0 0 24 24" width="24" height="24">
+                    <path fill="#9146FF" d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/>
+                </svg>
+            </div>
+        </div>
+    </div>
     <div id="announcementContainer"></div>
     <div id="todoArea">
         <h4>To-Dos</h4>
@@ -124,7 +143,7 @@
             const bracketChannel = colonIndex === -1 ? null : bracketContent.slice(0, colonIndex).trim();
             const bracketUser = (atIndex === -1 || atIndex + 1 >= bracketContent.length)
                 ? null
-                : bracketContent.slice(atIndex + 1).trim().toLowerCase();
+                : sanitizeUsername(bracketContent.slice(atIndex + 1));
             const afterBracket = trimmed.slice(closingIndex + 1).trimStart();
             if (!afterBracket.startsWith('!')) {
                 return null;
@@ -202,6 +221,22 @@
                 if (data.shouldGreet && data.greetingMessage) {
                     CeebeeSay(data.greetingMessage);
                 }
+                if (data.shouldShoutout && data.shoutoutMessage) {
+                    CeebeeSay(data.shoutoutMessage);
+                    if (data.profileImageUrl) {
+                        const shoutoutCard = document.getElementById("streamerShoutoutCard");
+                        const avatarImg = document.getElementById("streamerAvatar");
+                        const nameDiv = document.getElementById("streamerCardName");
+                        if (shoutoutCard && avatarImg && nameDiv) {
+                            avatarImg.src = data.profileImageUrl;
+                            nameDiv.textContent = lowerUser;
+                            shoutoutCard.classList.add("show");
+                            setTimeout(() => {
+                                shoutoutCard.classList.remove("show");
+                            }, 5000);
+                        }
+                    }
+                }
             })
             .catch(err => console.error('Error reporting chat event:', err));
         }
@@ -226,7 +261,7 @@
                     } else if (data.onCooldown) {
                         ChatBotSay(`@${user}, you are on cooldown. Please wait ${data.remainingMinutes} more minute(s) before searching again.`);
                     } else if (data.success) {
-                        const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb' };
+                        const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb', 'shovel': '⛏️ Shovel' };
                         const itemStr = emojiMap[data.item] || data.item;
                         ChatBotSay(`@${user} searched the cloud forest and found a ${itemStr}!`);
                     }
@@ -246,7 +281,7 @@
                         if (data.inventory.length === 0) {
                             ChatBotSay(`@${user}'s bag is completely empty! Land drops or use !search to find RPG items.`);
                         } else {
-                            const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', umbrella: '☔ Umbrella', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb' };
+                            const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', umbrella: '☔ Umbrella', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb', 'shovel': '⛏️ Shovel' };
                             const itemsList = data.inventory.map(item => emojiMap[item] || item).join(', ');
                             ChatBotSay(`@${user}'s bag (${data.inventory.length}/5 items): ${itemsList}`);
                         }
@@ -261,21 +296,22 @@
                     return;
                 }
                 const requestedItem = message.toLowerCase().trim().replace(/[^a-z0-9-]/g, '');
-                const validItems = ['potion', 'shield', 'umbrella', 'rain-stone', 'sun-stone', 'bomb'];
+                const validItems = ['potion', 'shield', 'umbrella', 'rain-stone', 'sun-stone', 'bomb', 'shovel'];
                 const itemMap = {
                     'potion': 'potion', 'potion🧪': 'potion', '🧪': 'potion',
                     'shield': 'shield', 'shield🛡️': 'shield', '🛡️': 'shield',
                     'umbrella': 'umbrella', 'umbrella☔': 'umbrella', '☔': 'umbrella',
                     'rain-stone': 'rain-stone', 'rainstone': 'rain-stone', '🌧️': 'rain-stone',
                     'sun-stone': 'sun-stone', 'sunstone': 'sun-stone', '☀️': 'sun-stone',
-                    'bomb': 'bomb', 'bomb💣': 'bomb', '💣': 'bomb'
+                    'bomb': 'bomb', 'bomb💣': 'bomb', '💣': 'bomb',
+                    'shovel': 'shovel', 'shovel⛏️': 'shovel', '⛏️': 'shovel', 'shov': 'shovel'
                 };
                 const matchedItem = itemMap[requestedItem] || (validItems.includes(requestedItem) ? requestedItem : null);
                 if (!matchedItem) {
-                    ChatBotSay(`@${user}, that is not a valid item. Choose from: potion, shield, umbrella, rain-stone, sun-stone, bomb.`);
+                    ChatBotSay(`@${user}, that is not a valid item. Choose from: potion, shield, umbrella, rain-stone, sun-stone, bomb, shovel.`);
                     return;
                 }
-
+ 
                 fetch('/api/loot/use', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -288,12 +324,21 @@
                     } else if (data.noItem) {
                         ChatBotSay(`@${user}, you do not have that item in your bag.`);
                     } else if (data.success) {
-                        const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', umbrella: '☔ Umbrella', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb' };
+                        const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', umbrella: '☔ Umbrella', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb', 'shovel': '⛏️ Shovel' };
                         const itemStr = emojiMap[matchedItem];
                         ChatBotSay(`@${user} used their ${itemStr}!`);
                     }
                 })
                 .catch(err => console.error('Error in !use:', err));
+            }
+            else if (command === "roll" || command === "dice" || command === "2d6") {
+                console.log("!roll was typed in chat");
+                const d1 = Math.floor(Math.random() * 6) + 1;
+                const d2 = Math.floor(Math.random() * 6) + 1;
+                const total = d1 + d2;
+                
+                triggerDiceRoll(d1, d2, user);
+                ChatBotSay(`@${user} rolled two dice: 🎲 ${d1} + 🎲 ${d2} = ${total}!`);
             }
 
             //== PUBLIC Commands Section =====================================
@@ -582,12 +627,9 @@
                 }
             }
 
-            if (flags.broadcaster) {
-                console.log("...broadcaster message");
-                ParseMessage(message);
-            }
-            else if (user === "Streamlabs") {
-                console.log("...Streamlabs message");
+            const trustedSenders = ['streamlabs', 'ceebee_bot', 'ceebee', 'streamelements', 'nightbot'];
+            if (flags.broadcaster || trustedSenders.includes(user)) {
+                console.log(`...parsing message from trusted source: ${user}`);
                 ParseMessage(message);
             }
         }
@@ -927,7 +969,7 @@
             }
         }
 
-        function triggerThunderstorm() {
+        function triggerThunderstorm(durationMs = 90000) {
             console.log("[Weather] Triggering Thunderstorm!");
             weatherOverrideActive = true;
             clearTimeout(weatherOverrideTimeout);
@@ -943,6 +985,7 @@
                 const flash = document.createElement("div");
                 flash.className = "thunder-flash";
                 document.body.appendChild(flash);
+                CloudFX.lightning();
                 playThunderSound();
                 setTimeout(() => flash.remove(), 1500);
             };
@@ -958,7 +1001,7 @@
             weatherOverrideTimeout = setTimeout(() => {
                 cleanWeatherOverride();
                 console.log("[Weather] Thunderstorm decayed. Returning to baseline.");
-            }, 90000);
+            }, durationMs);
         }
 
         function triggerRainbowSunshine() {
@@ -980,6 +1023,21 @@
 
             playSound("celebrationSound", SoundEnum.yeah);
 
+            // Clean up old sun overlay if exists
+            const oldSun = document.getElementById("sunOverlay");
+            if (oldSun) oldSun.remove();
+
+            // Create Sun and Lens Flare Overlay
+            const sunOverlay = document.createElement("div");
+            sunOverlay.id = "sunOverlay";
+            sunOverlay.className = "sun-overlay";
+            
+            const lensFlare = document.createElement("div");
+            lensFlare.className = "lens-flare";
+            sunOverlay.appendChild(lensFlare);
+            
+            document.body.appendChild(sunOverlay);
+
             for (let i = 0; i < 60; i++) {
                 setTimeout(() => {
                     const star = document.createElement("div");
@@ -996,9 +1054,16 @@
 
             weatherOverrideTimeout = setTimeout(() => {
                 weatherOverrideActive = false;
+                const sn = document.getElementById("sunOverlay");
+                if (sn) sn.remove();
                 console.log("[Weather] Star Celebration decayed. Returning to baseline.");
                 trackMessageVelocity();
             }, 10000);
+        }
+
+        function triggerShovel(user) {
+            console.log("[Loot] Shovel triggered! Splatting mud on screen...");
+            CloudFX.shovel(user, { onFirstSplat: () => playSound("splatSound", SoundEnum.splat) });
         }
 
         function playExplosionSound() {
@@ -1042,77 +1107,28 @@
 
             if (item === 'potion') {
                 playBubbleSound();
-                for (let i = 0; i < 60; i++) {
-                    setTimeout(() => {
-                        const bubble = document.createElement("div");
-                        bubble.className = "bubble-effect";
-                        bubble.style.left = `${Math.random() * 100}%`;
-                        const size = Math.random() * 25 + 10;
-                        bubble.style.width = `${size}px`;
-                        bubble.style.height = `${size}px`;
-                        bubble.style.animationDelay = `${Math.random() * 1.5}s`;
-                        document.body.appendChild(bubble);
-                        setTimeout(() => bubble.remove(), 8500);
-                    }, i * 120);
-                }
+                CloudFX.potion(user);
             } 
             else if (item === 'shield') {
                 playSound("shieldSound", SoundEnum.doorknock);
-                const positions = [
-                    { top: '25%', left: '20%' },
-                    { top: '65%', left: '80%' },
-                    { top: '70%', left: '30%' },
-                    { top: '30%', left: '70%' }
-                ];
-                positions.forEach((pos, idx) => {
-                    setTimeout(() => {
-                        const shield = document.createElement("div");
-                        shield.className = "shield-overlay";
-                        shield.style.top = pos.top;
-                        shield.style.left = pos.left;
-                        document.body.appendChild(shield);
-                        setTimeout(() => shield.remove(), 5000);
-                    }, idx * 250);
-                });
+                CloudFX.shield(user);
             }
             else if (item === 'umbrella') {
                 playSound("umbrellaSound", SoundEnum.rainUmbrella);
-                const positions = [
-                    { top: '40%', left: '25%' },
-                    { top: '75%', left: '75%' },
-                    { top: '30%', left: '70%' },
-                    { top: '70%', left: '30%' }
-                ];
-                positions.forEach((pos, idx) => {
-                    setTimeout(() => {
-                        const umbrella = document.createElement("div");
-                        umbrella.className = "umbrella-overlay";
-                        umbrella.style.top = pos.top;
-                        umbrella.style.left = pos.left;
-                        document.body.appendChild(umbrella);
-                        setTimeout(() => umbrella.remove(), 6000);
-                    }, idx * 300);
-                });
+                CloudFX.umbrella(user);
             }
             else if (item === 'bomb') {
-                playExplosionSound(); 
-                document.body.classList.add("screen-shake");
-                
-                const smoke = document.createElement("div");
-                smoke.className = "smoke-overlay";
-                document.body.appendChild(smoke);
-                setTimeout(() => smoke.remove(), 12000);
-
-                setTimeout(() => {
-                    document.body.classList.remove("screen-shake");
-                }, 2000);
+                CloudFX.bomb(user, { onExplode: playExplosionSound });
                 clean();
             } 
             else if (item === 'sun-stone') {
-                triggerRainbowSunshine();
+                CloudFX.sunStone(user, { onBurst: triggerRainbowSunshine });
             } 
             else if (item === 'rain-stone') {
-                triggerThunderstorm();
+                CloudFX.rainStone(user, { onStrike: () => triggerThunderstorm(15000) });
+            }
+            else if (item === 'shovel') {
+                triggerShovel(user);
             }
         }
 
@@ -1132,6 +1148,9 @@
                     } else if (payload.event === 'use_item') {
                         console.log('User used item via SSE:', payload);
                         triggerItemEffect(payload.item, payload.user);
+                    } else if (payload.event === 'dice_roll') {
+                        console.log('Dice roll via SSE:', payload);
+                        triggerDiceRoll(payload.d1, payload.d2);
                     } else if (payload.event === 'test_weather') {
                         console.log('Simulating weather event via SSE:', payload.type);
                         if (payload.type === 'thunderstorm') {
@@ -1187,7 +1206,13 @@
                 setTimeout(() => { noteEl.style.display = 'none'; }, 500);
             }, 5000);
         }
+
+        function triggerDiceRoll(d1, d2, user) {
+            console.log(`[Dice] Rolling dice: ${d1} and ${d2}`);
+            playSound("diceSound", SoundEnum.dice);
+            CloudFX.dice(d1, d2, user);
+        }
     </script>
 </body>
 
-</html>
+</html>

@@ -140,7 +140,11 @@ const SoundEnum = {
     hmmhmm: "public/medias/hmmhmm.mp3",
     rain: "public/medias/rain.mp3",
     rainUmbrella: "public/medias/Rain-On-Umbrella.com.mp3",
-    previously: "public/medias/previously.mp3"
+    previously: "public/medias/previously.mp3",
+    applause: "public/medias/applause.mp3",
+    click: "public/medias/click.mp3",
+    splat: "public/medias/splat.mp3",
+    dice: "public/medias/dice.mp3"
 };
 
 const TodoStatusEnum = {
@@ -156,8 +160,21 @@ const ReminderStatusEnum = {
     done: "done"
 };
 
+sanitizeUsername = function (name) {
+    if (name === null || name === undefined) {
+        return '';
+    }
+    return String(name)
+        .trim()
+        .replace(/^@+/, '')
+        .replace(/[,.:;!?]+$/, '')
+        .trim()
+        .toLowerCase();
+}
+
 getUserPosition = function (userName) {
     console.log("... Searching for: " + userName);
+    userName = sanitizeUsername(userName);
     for (i = 0; i < _streamSession.UserSession.length; i++) {
         console.log("... looking at : " + _streamSession.UserSession[i].user);
         if (_streamSession.UserSession[i].user === userName) {
@@ -289,14 +306,15 @@ ParseMessage = function (message) {
     let splitedMsg = message.split(" ");
 
     if (splitedMsg.length > 1 && splitedMsg[1] === "landed") {
-        let user = splitedMsg[0].toLowerCase();
+        let user = sanitizeUsername(splitedMsg[0]);
         let curScore = splitedMsg[3].slice(0, -1);
 
         UserLanded(user, curScore);
     }
     else if (message.startsWith("Thank you for following")) {
-        let user = splitedMsg[4].toLowerCase().slice(0, -1);
+        let user = sanitizeUsername(splitedMsg[4]);
         _streamSession.NewFollowers.push(user);
+        SaveToFile(false);
     }
 }
 
@@ -567,18 +585,20 @@ SaveToFile = function (verbose = false) {
         body: JSON.stringify(data)
     }
 
-    fetch('/savetofile', options)
+    return fetch('/savetofile', options)
         .then(response => response.json())
         .then(result => {
             if (verbose && result.success) {
                 ChatBotSay('Session saved!');
             }
+            return result;
         })
         .catch(error => {
             console.error('Error:', error);
             if (verbose) {
                 ChatBotSay('Error: ' + error);
             }
+            throw error;
         });
 
 }
@@ -780,9 +800,13 @@ StreamNoteStart = async function (projectName) {
 
 
 
-StreamNoteStop = function () {
+StreamNoteStop = async function () {
     _streamSession.DateTimeEnd = new Date();
-    SaveToFile(false); // false = no chat announcement; DB is source of truth
+    try {
+        await SaveToFile(false); // wait for save to database to complete
+    } catch (err) {
+        console.error('Failed to save session data on stop:', err);
+    }
     console.log('_streamSession: ', _streamSession);
     let streamNotes = Generate_streamSession();
     console.log('Notes: ', streamNotes);
@@ -1111,6 +1135,7 @@ SavingNote = function (message) {
 LogRaid = function (user, viewers) {
 
     _streamSession.Raiders.push(new Raider(user, viewers));
+    SaveToFile(false);
 }
 
 
@@ -1119,16 +1144,19 @@ LogSub = function (user, message, subTierInfo, streamMonths, cumulativeMonths) {
     cloud("Yeah");
     playSound("yeah", SoundEnum.yeah);
     _streamSession.Subscribers.push(new Subscriber(user, streamMonths));
+    SaveToFile(false);
 }
 
 
 LogHost = function (user, viewers, autohost, extra) {
     _streamSession.Hosts.push(user);
+    SaveToFile(false);
 }
 
 
 LogCheer = function (user, message, bits, flags, extra) {
     _streamSession.Cheerers.push(new Cheerer(user, bits));
+    SaveToFile(false);
 }
 
 CreateCloud = function () {
@@ -1449,6 +1477,8 @@ displayAnnouncement = function (title, message, themeClass) {
     const container = document.getElementById('announcementContainer');
     if (!container) return;
 
+    playSound('click', SoundEnum.click);
+
     // Randomize which side the announcement appears on
     const fromLeft = Math.random() < 0.5;
     const directionClass = fromLeft ? 'from-left' : 'from-right';
@@ -1581,6 +1611,26 @@ function handleEffect(effect) {
                 ChatBotShow('Thumbs-up', effect.image);
             }
             playSound('hmmhmm', SoundEnum.hmmhmm);
+            break;
+
+        case 'shoutout':
+            if (effect.message) {
+                if (typeof CeebeeSay !== 'undefined') {
+                    CeebeeSay(effect.message);
+                }
+                playSound('applause', SoundEnum.applause);
+                const shoutoutCard = document.getElementById("streamerShoutoutCard");
+                const avatarImg = document.getElementById("streamerAvatar");
+                const nameDiv = document.getElementById("streamerCardName");
+                if (shoutoutCard && avatarImg && nameDiv) {
+                    avatarImg.src = effect.image || "/public/medias/logo_behind-my-cloud.png";
+                    nameDiv.textContent = effect.user;
+                    shoutoutCard.classList.add("show");
+                    setTimeout(() => {
+                        shoutoutCard.classList.remove("show");
+                    }, 5000);
+                }
+            }
             break;
 
         // case 'drop':

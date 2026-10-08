@@ -1,7 +1,7 @@
 const path = require("path");
 
 let db;
-const dbPath = path.join(__dirname, "io", "cloudbot.db");
+const dbPath = path.join(__dirname, "io", "cloudbot.db") + "?nolock=1";
 
 async function initDb() {
   const { connect } = await import("@tursodatabase/database");
@@ -105,6 +105,7 @@ async function createTables() {
     `CREATE TABLE IF NOT EXISTS participants (
       username TEXT PRIMARY KEY,
       is_regular INTEGER DEFAULT 0,
+      is_streamer INTEGER DEFAULT 0,
       inventory TEXT DEFAULT '[]',
       created_at TEXT DEFAULT (datetime('now'))
     )`,
@@ -178,6 +179,45 @@ async function createTables() {
       // Column probably already exists, ignore
     }
 
+    // Migration: Add is_streamer column to participants if it doesn't exist
+    try {
+      await db.exec("ALTER TABLE participants ADD COLUMN is_streamer INTEGER DEFAULT 0");
+      console.log("Migration: Added is_streamer column to participants");
+    } catch (e) {
+      // Column probably already exists, ignore
+    }
+
+    // Migration: Strip leading '@' from usernames so only the real name is stored
+    try {
+      const cleanUsername = (name) => String(name || "").trim().replace(/^@+/, "").trim();
+      const dirtyParticipants = await db.prepare("SELECT username FROM participants WHERE username LIKE '@%'").all();
+      for (const row of dirtyParticipants) {
+        const clean = cleanUsername(row.username);
+        if (!clean) {
+          await db.prepare("DELETE FROM participants WHERE username = ?").run(row.username);
+          continue;
+        }
+        const existing = await db.prepare("SELECT username FROM participants WHERE username = ?").get(clean);
+        if (existing) {
+          await db.prepare("DELETE FROM participants WHERE username = ?").run(row.username);
+        } else {
+          await db.prepare("UPDATE participants SET username = ? WHERE username = ?").run(clean, row.username);
+        }
+      }
+      for (const table of ["users", "stream_events", "time_logs"]) {
+        const dirtyRows = await db.prepare(`SELECT username FROM ${table} WHERE username LIKE '@%'`).all();
+        for (const row of dirtyRows) {
+          const clean = cleanUsername(row.username);
+          if (clean) {
+            await db.prepare(`UPDATE ${table} SET username = ? WHERE username = ?`).run(clean, row.username);
+          }
+        }
+      }
+      console.log("Migration: Stripped leading '@' from stored usernames");
+    } catch (e) {
+      console.error("Migration error cleaning '@' usernames:", e.message);
+    }
+
     const counterRow = await db.prepare("SELECT * FROM stream_counter WHERE id = 1").get();
     if (!counterRow) {
       await db.prepare("INSERT INTO stream_counter (id, current_stream_number, last_stream_date) VALUES (?, ?, ?)").run(1, 0, "");
@@ -247,13 +287,23 @@ async function getAllSessions() {
 async function saveSessionData(sessionId, data) {
   if (!db) await initDb();
 
+  const sanitizeUsername = (name) =>
+    String(name || "")
+      .trim()
+      .replace(/^@+/, "")
+      .replace(/[,.:;!?]+$/, "")
+      .trim()
+      .toLowerCase();
+
   if (data.UserSession) {
     await db.prepare("DELETE FROM users WHERE session_id = ?").run(sessionId);
     for (const user of data.UserSession) {
+      const cleanUsername = sanitizeUsername(user.user);
+      if (!cleanUsername) continue;
       await db.prepare(
         `INSERT INTO users (session_id, username, drop_count, landed_count, high_score, best_high_score, last_update)
               VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).run(sessionId, user.user, user.dropCount || 0, user.landedCount || 0, user.highScore || 0, user.bestHighScore || 0, user.lastUpdate || null);
+      ).run(sessionId, cleanUsername, user.dropCount || 0, user.landedCount || 0, user.highScore || 0, user.bestHighScore || 0, user.lastUpdate || null);
     }
   }
 
@@ -280,42 +330,52 @@ async function saveSessionData(sessionId, data) {
     }
   }
 
-  // Delete existing events to prevent duplication upon successive saves
-  await db.prepare("DELETE FROM stream_events WHERE session_id = ?").run(sessionId);
+  // Delete existing events to prevent duplication upon successive saves (excluding greeting events which are server-only)
+  await db.prepare("DELETE FROM stream_events WHERE session_id = ? AND event_type != 'greeting'").run(sessionId);
 
   if (data.NewFollowers) {
     for (const user of data.NewFollowers) {
-      await db.prepare("INSERT INTO stream_events (session_id, event_type, username) VALUES (?, 'follow', ?)").run(sessionId, user);
+      const cleanUsername = sanitizeUsername(user);
+      if (!cleanUsername) continue;
+      await db.prepare("INSERT INTO stream_events (session_id, event_type, username) VALUES (?, 'follow', ?)").run(sessionId, cleanUsername);
     }
   }
 
   if (data.Raiders) {
     for (const raider of data.Raiders) {
+      const cleanUsername = sanitizeUsername(raider.user);
+      if (!cleanUsername) continue;
       await db.prepare(
         "INSERT INTO stream_events (session_id, event_type, username, metadata) VALUES (?, 'raid', ?, ?)"
-      ).run(sessionId, raider.user, JSON.stringify({ viewers: raider.viewers ?? 0 }));
+      ).run(sessionId, cleanUsername, JSON.stringify({ viewers: raider.viewers ?? 0 }));
     }
   }
 
   if (data.Subscribers) {
     for (const sub of data.Subscribers) {
+      const cleanUsername = sanitizeUsername(sub.user);
+      if (!cleanUsername) continue;
       await db.prepare(
         "INSERT INTO stream_events (session_id, event_type, username, metadata) VALUES (?, 'sub', ?, ?)"
-      ).run(sessionId, sub.user, JSON.stringify({ months: sub.streamMonths }));
+      ).run(sessionId, cleanUsername, JSON.stringify({ months: sub.streamMonths }));
     }
   }
 
   if (data.Cheerers) {
     for (const cheerer of data.Cheerers) {
+      const cleanUsername = sanitizeUsername(cheerer.user);
+      if (!cleanUsername) continue;
       await db.prepare(
         "INSERT INTO stream_events (session_id, event_type, username, metadata) VALUES (?, 'cheer', ?, ?)"
-      ).run(sessionId, cheerer.user, JSON.stringify({ bits: cheerer.bits }));
+      ).run(sessionId, cleanUsername, JSON.stringify({ bits: cheerer.bits }));
     }
   }
 
   if (data.Hosts) {
     for (const host of data.Hosts) {
-      await db.prepare("INSERT INTO stream_events (session_id, event_type, username) VALUES (?, 'host', ?)").run(sessionId, host);
+      const cleanUsername = sanitizeUsername(host);
+      if (!cleanUsername) continue;
+      await db.prepare("INSERT INTO stream_events (session_id, event_type, username) VALUES (?, 'host', ?)").run(sessionId, cleanUsername);
     }
   }
 
@@ -631,12 +691,29 @@ async function isParticipantRegular(username) {
   return row ? !!row.is_regular : false;
 }
 
+async function setParticipantStreamerStatus(username, isStreamer) {
+  if (!db) await initDb();
+  await registerParticipant(username);
+  await db.prepare(
+    "UPDATE participants SET is_streamer = ? WHERE username = ?"
+  ).run(isStreamer ? 1 : 0, username);
+}
+
+async function isParticipantStreamer(username) {
+  if (!db) await initDb();
+  const row = await db.prepare(
+    "SELECT is_streamer FROM participants WHERE username = ?"
+  ).get(username);
+  return row ? !!row.is_streamer : false;
+}
+
 async function getAllParticipantsWithStats() {
   if (!db) await initDb();
   return db.prepare(`
     SELECT 
       p.username, 
       p.is_regular,
+      p.is_streamer,
       COALESCE(SUM(u.drop_count), 0) AS total_drops,
       COALESCE(SUM(u.landed_count), 0) AS total_landed,
       COALESCE(MAX(u.high_score), 0) AS max_high_score,
@@ -743,6 +820,8 @@ module.exports = {
   registerParticipant,
   setParticipantRegularStatus,
   isParticipantRegular,
+  setParticipantStreamerStatus,
+  isParticipantStreamer,
   getAllParticipantsWithStats,
   hasBeenGreetedInSession,
   logGreetingEvent,
