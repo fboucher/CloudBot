@@ -212,11 +212,31 @@ cloud = function (expression) {
 ChatBotShow = function (expression, imgText) {
 
     const fileName = "CB-" + expression + ".gif";
-    document.querySelector("#imageViewer").innerHTML = "<img src='public/medias/" + fileName + "' class='nuage'>";
+    const viewer = document.querySelector("#imageViewer");
+    // Attention messages are long: push Ceebee further left to leave room for the text
+    const ceebeeClass = expression === 'Talking' ? 'nuage nuage-left' : 'nuage';
+    viewer.innerHTML = "<img src='public/medias/" + fileName + "' class='" + ceebeeClass + "'>";
     if (imgText) {
-        document.querySelector("#imageViewer").innerHTML += "<img src='public/medias/generated/" + imgText + "' class='textBubble'>";
+        const bubble = new Image();
+        bubble.className = 'textBubble';
+        bubble.style.visibility = 'hidden';
+        // Attention text is long: keep it at its natural size at most
+        const maxScale = expression === 'Talking' ? 1 : 2;
+        bubble.onload = () => fitTextBubble(bubble, maxScale);
+        bubble.src = 'public/medias/generated/' + imgText;
+        viewer.appendChild(bubble);
     }
     setTimeout(() => { clean(); }, 5000);
+}
+
+// Scale the text bubble up to maxScale, but never past the right edge or the screen height
+fitTextBubble = function (bubble, maxScale) {
+    const left = bubble.getBoundingClientRect().left;
+    const availableWidth = window.innerWidth - left - 20;
+    const availableHeight = window.innerHeight * 0.9;
+    const scale = Math.min(maxScale, availableWidth / bubble.naturalWidth, availableHeight / bubble.naturalHeight);
+    bubble.style.transform = 'scale(' + scale + ')';
+    bubble.style.visibility = 'visible';
 }
 
 sleep = function (ms) {

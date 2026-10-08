@@ -37,13 +37,19 @@ td {
 
 .textBubble {
     z-index: 3;
+    flex-shrink: 0;
     transform: scale(2);
     transform-origin: left center;
 }
 
 .nuage {
     z-index: 2;
+    flex-shrink: 0;
     transform: scale(1);
+}
+
+.nuage-left {
+    margin-left: -150px;
 }
 
 #todoArea {
