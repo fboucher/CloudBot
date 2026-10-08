@@ -720,14 +720,16 @@
             draw(h, p, t) {
                 const a = flicker(t);
                 h.globalCompositeOperation = 'lighter';
-                // the whole sky lights up with each flicker
-                h.fillStyle = `rgba(${rgb},${0.28 * a})`;
-                h.fillRect(0, 0, W, H);
-                const sky = h.createRadialGradient(x1, 0, 0, x1, 0, H * 0.9);
-                sky.addColorStop(0, `rgba(235,242,255,${0.6 * a})`);
-                sky.addColorStop(1, 'rgba(235,242,255,0)');
-                h.fillStyle = sky;
-                h.fillRect(0, 0, W, H);
+                // the whole sky lights up with each flicker (rain stone only; the weather storm stays subtle)
+                if (opts.flash) {
+                    h.fillStyle = `rgba(${rgb},${0.28 * a})`;
+                    h.fillRect(0, 0, W, H);
+                    const sky = h.createRadialGradient(x1, 0, 0, x1, 0, H * 0.9);
+                    sky.addColorStop(0, `rgba(235,242,255,${0.6 * a})`);
+                    sky.addColorStop(1, 'rgba(235,242,255,0)');
+                    h.fillStyle = sky;
+                    h.fillRect(0, 0, W, H);
+                }
                 drawStrike(h, s, a, rgb, opts.scale || 1);
                 drawGlow(h, rgb, x2, y2, 360, a, true);
             }
@@ -1668,7 +1670,7 @@
     function rainStone(user, opts = {}) {
         setup();
         banner('storm', user, 'shattered a', 'Rain Stone');
-        vignette('storm', 14000);
+        vignette('storm', 9500);
         const stone = sprites.rainStone(), S = 2;
         const cx = W / 2 + rand(-W * 0.1, W * 0.1), cy = H * 0.5;
         const STRIKE = 2.3;
@@ -1682,9 +1684,9 @@
             const a = rand(0, TAU), l = rand(6, 13);
             cracks.push({ pts: boltPoints(rand(-3, 3), rand(0, 8), Math.cos(a) * l, 4 + Math.sin(a) * l * 1.3, 10), at: lerp(0.35, 0.95, i / 5) });
         }
-        const followUps = [{ at: 0.14, done: false }, { at: 0.42, done: false }, { at: 2.4, done: false }, { at: 4.1, done: false }, { at: 5.2, done: false }, { at: 7.3, done: false }];
+        const followUps = [{ at: 0.14, done: false }, { at: 0.42, done: false }, { at: 1.6, done: false }, { at: 2.9, done: false }, { at: 4.2, done: false }];
         // after the strike: a downpour, and drops running down the "glass" in front of the stream
-        const STORM = 10.5;
+        const STORM = 7;
         const streaks = [];
         for (let i = 0; i < 650; i++) streaks.push({ x: rand(-W * 0.2, W), y: rand(-H, H), v: rand(1600, 2400), len: rand(30, 90), w: rand(1, 2.4) });
         const glass = [];
@@ -1712,7 +1714,7 @@
                 }
                 if (!struck && t >= STRIKE) {
                     struck = true;
-                    lightning({ x1: cx + rand(-160, 160), y1: -20, x2: cx, y2: sy, rgb: '150,200,255', scale: 1.6 });
+                    lightning({ x1: cx + rand(-160, 160), y1: -20, x2: cx, y2: sy, rgb: '150,200,255', scale: 1.6, flash: true });
                     if (opts.onStrike) opts.onStrike();
                     shake(16, 0.5);
                     for (let i = 0; i < 40; i++) {
@@ -1728,7 +1730,7 @@
                         f.done = true;
                         const near = f.at < 1;
                         const x1 = near ? cx + rand(-W * 0.3, W * 0.3) : rand(W * 0.05, W * 0.95);
-                        lightning({ x1, y1: -20, x2: near ? cx + rand(-120, 120) : x1 + rand(-W * 0.15, W * 0.15), y2: near ? sy + rand(-40, 80) : rand(H * 0.6, H), rgb: '150,200,255', scale: near ? 1.2 : 1.5 });
+                        lightning({ x1, y1: -20, x2: near ? cx + rand(-120, 120) : x1 + rand(-W * 0.15, W * 0.15), y2: near ? sy + rand(-40, 80) : rand(H * 0.6, H), rgb: '150,200,255', scale: near ? 1.2 : 1.5, flash: true });
                         shake(near ? 8 : 12, 0.25);
                     }
                 }

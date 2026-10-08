@@ -969,7 +969,7 @@
             }
         }
 
-        function triggerThunderstorm() {
+        function triggerThunderstorm(durationMs = 90000) {
             console.log("[Weather] Triggering Thunderstorm!");
             weatherOverrideActive = true;
             clearTimeout(weatherOverrideTimeout);
@@ -1001,7 +1001,7 @@
             weatherOverrideTimeout = setTimeout(() => {
                 cleanWeatherOverride();
                 console.log("[Weather] Thunderstorm decayed. Returning to baseline.");
-            }, 90000);
+            }, durationMs);
         }
 
         function triggerRainbowSunshine() {
@@ -1125,7 +1125,7 @@
                 CloudFX.sunStone(user, { onBurst: triggerRainbowSunshine });
             } 
             else if (item === 'rain-stone') {
-                CloudFX.rainStone(user, { onStrike: triggerThunderstorm });
+                CloudFX.rainStone(user, { onStrike: () => triggerThunderstorm(15000) });
             }
             else if (item === 'shovel') {
                 triggerShovel(user);
