@@ -693,7 +693,7 @@
         ctx.globalCompositeOperation = 'lighter';
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
-        const passes = [[22, 0.07, rgb], [9, 0.22, rgb], [3.2, 0.95, '255,255,255']];
+        const passes = [[40, 0.07, rgb], [16, 0.22, rgb], [6, 0.5, '230,240,255'], [3.2, 1, '255,255,255']];
         for (const [w, a, col] of passes) {
             ctx.strokeStyle = `rgba(${col},${a * alpha})`;
             ctx.lineWidth = w * scale;
@@ -719,9 +719,17 @@
             update(dt, t) { return t < 0.9; },
             draw(h, p, t) {
                 const a = flicker(t);
-                drawStrike(h, s, a, rgb, opts.scale || 1);
                 h.globalCompositeOperation = 'lighter';
-                drawGlow(h, rgb, x2, y2, 220, a * 0.8, true);
+                // the whole sky lights up with each flicker
+                h.fillStyle = `rgba(${rgb},${0.28 * a})`;
+                h.fillRect(0, 0, W, H);
+                const sky = h.createRadialGradient(x1, 0, 0, x1, 0, H * 0.9);
+                sky.addColorStop(0, `rgba(235,242,255,${0.6 * a})`);
+                sky.addColorStop(1, 'rgba(235,242,255,0)');
+                h.fillStyle = sky;
+                h.fillRect(0, 0, W, H);
+                drawStrike(h, s, a, rgb, opts.scale || 1);
+                drawGlow(h, rgb, x2, y2, 360, a, true);
             }
         });
         return s;
@@ -739,7 +747,7 @@
         const fh = flask.height * S * PX, fw = flask.width * S * PX;
         const cx = W / 2 + rand(-W * 0.12, W * 0.12), restY = H * 0.58;
         const glowP = new Particles(), bub = new Particles(), crosses = new Particles(), bokehP = new Particles(), sparks = new Particles();
-        const twinkles = new Particles(), twinkle = sprites.sparkle('#b6ffd0');
+        const twinkles = new Particles(), twinkle = sprites.sparkle('#b6ffd0'), mist = new Particles();
         let fx = cx, fy = H + fh, popped = false, corkP = null, burst = false;
         const rings = [];
         // regen ticks: the first heal is big, then smaller ones (and a rare critical heal)
@@ -784,6 +792,13 @@
                         rings.push(t);
                         floatText(`+${randInt(20, 99)}`, fx + rand(-fw, fw), top + rand(-20, 60), '#a8ffc8', 1600);
                     }
+                    // healing mist welling up from the bottom, and bubbles rising across the whole screen
+                    for (let i = count(16, dt); i > 0; i--) {
+                        mist.emit({ x: rand(-100, W + 100), y: H + rand(60, 160), vx: rand(-30, 30), vy: rand(-170, -70), drag: 0.15, size: rand(160, 320), grow: 25, life: rand(4, 6), variant: randInt(0, 3), shade: pick(['90,230,150', '130,255,170', '70,200,170']), vr: rand(-0.2, 0.2) });
+                    }
+                    for (let i = count(30, dt); i > 0; i--) {
+                        bub.emit({ x: rand(0, W), y: H + 20, vx: rand(-40, 40), vy: rand(-420, -160), life: rand(2.5, 4.5), sprite: sprites.bubble(randInt(2, 4)) });
+                    }
                     for (let i = count(10, dt); i > 0; i--) {
                         twinkles.emit({ x: rand(0, W), y: rand(H * 0.1, H * 0.95), vy: -30, life: rand(0.5, 0.9), sprite: twinkle });
                     }
@@ -802,12 +817,22 @@
                         bokehP.emit({ x: left ? rand(0, W * 0.25) : rand(W * 0.75, W), y: rand(H * 0.2, H), vx: rand(-10, 10), vy: rand(-40, -15), size: rand(50, 130), life: rand(2.5, 4), color: pick(['120,255,180', '180,255,140']), alpha: 0.28 });
                     }
                 }
-                glowP.update(dt); bub.update(dt); crosses.update(dt); bokehP.update(dt); sparks.update(dt); twinkles.update(dt);
-                return t < 8.4;
+                glowP.update(dt); bub.update(dt); crosses.update(dt); bokehP.update(dt); sparks.update(dt); twinkles.update(dt); mist.update(dt);
+                return t < 8.4 || mist.list.length > 0;
             },
             draw(h, p, t) {
                 const a = envelope(t, 0.2, 1, 6.3, 7.3);
                 const top = fy - fh / 2;
+                for (const m of mist.list) {
+                    const k = lifeOf(m);
+                    h.globalAlpha = 0.38 * Math.min(1, m.age / 0.6) * (1 - k);
+                    h.save();
+                    h.translate(m.x, m.y);
+                    h.rotate(m.rot);
+                    h.drawImage(smokeSprite(m.shade, m.variant), -m.size, -m.size, m.size * 2, m.size * 2);
+                    h.restore();
+                }
+                h.globalAlpha = 1;
                 h.globalCompositeOperation = 'lighter';
                 if (popped) {
                     const sa = a * envelope(t, 1.5, 1.8, 5, 6.5);
@@ -870,8 +895,8 @@
     function shield(user) {
         setup();
         banner('shield', user, 'raised a', 'Shield');
-        const R = Math.min(W, H) * 0.38;
-        const cx = rand(W * 0.32, W * 0.68), cy = rand(H * 0.4, H * 0.6);
+        const R = Math.min(W, H) * 0.5;
+        const cx = rand(W * 0.4, W * 0.6), cy = H * 0.52;
         const s = R / 10, hw = Math.sqrt(3) * s;
         const hexes = [];
         for (let row = -12; row <= 12; row++) {
@@ -884,7 +909,7 @@
         const HEX = [0, 1, 2, 3, 4, 5].map(i => [Math.cos(Math.PI / 6 + i * Math.PI / 3), Math.sin(Math.PI / 6 + i * Math.PI / 3)]);
         const impacts = [], bolts = [], cracks = [];
         const sparks = new Particles(), frags = new Particles();
-        const schedule = [1.0, 1.4, 1.75, 2.05, 2.4, 2.7, 3.05, 3.7];
+        const schedule = [1.0, 1.3, 1.55, 1.8, 2.0, 2.25, 2.45, 2.7, 2.9, 3.1, 3.3, 3.45, 3.6, 4.2];
         // incoming attacks come in a few flavours: fire, arcane, acid
         const AMMO = [['255,80,50', '255,170,110', '255,120,80'], ['190,80,255', '220,170,255', '200,120,255'], ['120,255,80', '200,255,160', '150,255,100']];
         const END = 5.4;
@@ -952,6 +977,9 @@
                 const grow = easeOutBack(phase(t, 0, 0.55));
                 let fade = 1 - phase(t, END, END + 0.35);
                 if (t > END - 0.7 && Math.random() < 0.3) fade *= 0.35;
+                // the whole screen sits behind a faint energy field while the barrier holds
+                h.fillStyle = `rgba(50,130,255,${0.14 * fade * phase(t, 0, 0.4)})`;
+                h.fillRect(0, 0, W, H);
                 if (fade > 0 && grow > 0) {
                     h.save();
                     h.translate(cx, cy);
@@ -1088,24 +1116,27 @@
     function umbrella(user) {
         setup();
         banner('umbrella', user, 'opened an', 'Umbrella');
-        const palettes = shuffle([['#e63946', '#f1faee'], ['#ffb703', '#fb8500'], ['#8338ec', '#ff8fd8'], ['#06d6a0', '#118ab2'], ['#3a86ff', '#f1faee']]);
+        const palettes = shuffle([['#e63946', '#f1faee'], ['#ffb703', '#fb8500'], ['#8338ec', '#ff8fd8'], ['#06d6a0', '#118ab2'], ['#3a86ff', '#f1faee'], ['#2b2d42', '#ef233c'], ['#ff006e', '#ffbe0b']]);
         const OPEN = [0.15, 0.4, 0.7, 1];
         const umbs = [];
-        for (let i = 0; i < 4; i++) {
+        // two staggered rows of umbrellas so they fill most of the screen
+        for (let i = 0; i < 7; i++) {
             const [cA, cB] = palettes[i];
+            const back = i >= 4, slot = back ? i - 4 : i;
             umbs.push({
-                baseX: PW * (0.125 + i * 0.25) + rand(-PW * 0.04, PW * 0.04),
-                targetY: PH * rand(0.4, 0.72),
+                baseX: back ? PW * (0.25 + slot * 0.25) + rand(-PW * 0.03, PW * 0.03) : PW * (0.125 + slot * 0.25) + rand(-PW * 0.04, PW * 0.04),
+                targetY: back ? PH * rand(0.3, 0.42) : PH * rand(0.62, 0.78),
                 delay: i * 0.35 + rand(0, 0.15),
                 ph: rand(0, TAU),
                 frames: OPEN.map(o => sprites.umbrella(o, cA, cB)),
                 x: 0, y: -40, open: 0, frame: 0
             });
         }
-        shuffle(umbs).forEach((u, i) => { u.delay = i * 0.35 + rand(0, 0.15); });
+        shuffle(umbs.slice()).forEach((u, i) => { u.delay = i * 0.25 + rand(0, 0.12); });
+        umbs.sort((a, b) => a.targetY - b.targetY); // back row first
         const drops = [];
-        for (let i = 0; i < 280; i++) {
-            drops.push({ x: rand(0, PW + 60), y: rand(-PH, PH), v: rand(230, 330), len: randInt(2, 4), c: pick(['#9ec9ff', '#cfe6ff', '#7fb2f0']) });
+        for (let i = 0; i < 700; i++) {
+            drops.push({ x: rand(0, PW + 60), y: rand(-PH, PH), v: rand(260, 380), len: randInt(3, 6), c: pick(['#9ec9ff', '#cfe6ff', '#7fb2f0']) });
         }
         const splashes = new Particles();
         const clouds = sprites.cloudBand(PW);
@@ -1191,6 +1222,9 @@
             draw(h, p, t) {
                 const cy = lerp(-clouds.height, 0, easeOutCubic(phase(t, 0, 0.8))) - easeInCubic(phase(t, 6.8, 7.8)) * clouds.height;
                 const ra = envelope(t, 6.9, 7.6, 8.4, 9.2);
+                // dark, wet sky over the whole stream while it pours (under the pixel art)
+                p.fillStyle = `rgba(20,30,55,${0.42 * envelope(t, 0, 0.8, 6.6, 7.8)})`;
+                p.fillRect(0, 0, PW, PH);
                 if (ra > 0) {
                     p.globalAlpha = Math.round(ra * 4) / 4; // stepped fade, retro style
                     p.drawImage(rainbow, Math.round(PW / 2 - rainbow.width / 2), Math.round(PH * 0.55 - rainbow.height));
@@ -1293,7 +1327,7 @@
         const r = Math.min(W, H) * 0.065;
         const bx = rand(W * 0.35, W * 0.65), by = rand(H * 0.45, H * 0.62);
         const T0 = 2.1;
-        const fire = new Particles(), smoke = new Particles(), debris = new Particles(), embers = new Particles(), sparks = new Particles(), dust = new Particles();
+        const fire = new Particles(), smoke = new Particles(), debris = new Particles(), embers = new Particles(), sparks = new Particles(), dust = new Particles(), fog = new Particles();
         let exploded = false, landed = false, y = -2 * r, squash = 0;
         // small burning patches left on the ground, and a couple of delayed secondary blasts
         const flames = [0, 1, 2, 3, 4, 5].map(() => ({ x: bx + rand(-r * 2.6, r * 2.6), y: by + r * rand(0.7, 1.6), life: rand(2.5, 4.5), size: rand(0.6, 1.2) }));
@@ -1337,6 +1371,12 @@
                         }
                     }
                 });
+            }
+            // thick fog rolling out from the blast until it swallows the whole screen
+            const reach = Math.hypot(W, H);
+            for (let i = 0; i < 90; i++) {
+                const a = rand(0, TAU), sp = rand(0.15, 1) * reach * 0.9;
+                fog.emit({ x: bx + rand(-r, r), y: by + rand(-r, r), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.7, drag: 0.9, size: rand(180, 380), grow: rand(15, 35), life: rand(9, 12), age: -rand(0.2, 1.2), variant: randInt(0, 3), shade: pick(['92,88,86', '120,114,110', '70,66,66', '140,132,124']), vr: rand(-0.15, 0.15) });
             }
             for (let i = 0; i < 120; i++) {
                 const a = rand(0, TAU), sp = rand(50, 500);
@@ -1392,8 +1432,8 @@
                         }
                     }
                 }
-                fire.update(dt); smoke.update(dt); debris.update(dt); embers.update(dt); sparks.update(dt); dust.update(dt);
-                return t < T0 + 9;
+                fire.update(dt); smoke.update(dt); debris.update(dt); embers.update(dt); sparks.update(dt); dust.update(dt); fog.update(dt);
+                return t < T0 + 13;
             },
             draw(h, p, t) {
                 const a = t - T0;
@@ -1466,6 +1506,25 @@
                     h.restore();
                 }
                 h.globalAlpha = 1;
+                // lingering fog: a grey haze over everything, with drifting smoke banks on top
+                if (exploded) {
+                    const fa = envelope(a, 0.8, 2.5, 8, 12.5);
+                    if (fa > 0) {
+                        h.fillStyle = `rgba(78,74,72,${0.5 * fa})`;
+                        h.fillRect(0, 0, W, H);
+                    }
+                    for (const f of fog.list) {
+                        if (f.age < 0) continue;
+                        const k = lifeOf(f);
+                        h.globalAlpha = 0.7 * Math.min(1, f.age / 0.8) * (1 - phase(k, 0.6, 1));
+                        h.save();
+                        h.translate(f.x, f.y);
+                        h.rotate(f.rot);
+                        h.drawImage(smokeSprite(f.shade, f.variant), -f.size, -f.size, f.size * 2, f.size * 2);
+                        h.restore();
+                    }
+                    h.globalAlpha = 1;
+                }
                 // fireball
                 h.globalCompositeOperation = 'lighter';
                 for (const f of fire.list) {
@@ -1609,7 +1668,7 @@
     function rainStone(user, opts = {}) {
         setup();
         banner('storm', user, 'shattered a', 'Rain Stone');
-        vignette('storm', 6500);
+        vignette('storm', 14000);
         const stone = sprites.rainStone(), S = 2;
         const cx = W / 2 + rand(-W * 0.1, W * 0.1), cy = H * 0.5;
         const STRIKE = 2.3;
@@ -1623,7 +1682,12 @@
             const a = rand(0, TAU), l = rand(6, 13);
             cracks.push({ pts: boltPoints(rand(-3, 3), rand(0, 8), Math.cos(a) * l, 4 + Math.sin(a) * l * 1.3, 10), at: lerp(0.35, 0.95, i / 5) });
         }
-        const followUps = [{ at: 0.14, done: false }, { at: 0.42, done: false }];
+        const followUps = [{ at: 0.14, done: false }, { at: 0.42, done: false }, { at: 2.4, done: false }, { at: 4.1, done: false }, { at: 5.2, done: false }, { at: 7.3, done: false }];
+        // after the strike: a downpour, and drops running down the "glass" in front of the stream
+        const STORM = 10.5;
+        const streaks = [];
+        for (let i = 0; i < 650; i++) streaks.push({ x: rand(-W * 0.2, W), y: rand(-H, H), v: rand(1600, 2400), len: rand(30, 90), w: rand(1, 2.4) });
+        const glass = [];
 
         const drawRunes = (h, p, t, front) => {
             for (let i = 0; i < 8; i++) {
@@ -1662,8 +1726,29 @@
                 for (const f of followUps) {
                     if (struck && !f.done && t >= STRIKE + f.at) {
                         f.done = true;
-                        lightning({ x1: cx + rand(-W * 0.3, W * 0.3), y1: -20, x2: cx + rand(-120, 120), y2: sy + rand(-40, 80), rgb: '150,200,255', scale: 1.2 });
-                        shake(8, 0.2);
+                        const near = f.at < 1;
+                        const x1 = near ? cx + rand(-W * 0.3, W * 0.3) : rand(W * 0.05, W * 0.95);
+                        lightning({ x1, y1: -20, x2: near ? cx + rand(-120, 120) : x1 + rand(-W * 0.15, W * 0.15), y2: near ? sy + rand(-40, 80) : rand(H * 0.6, H), rgb: '150,200,255', scale: near ? 1.2 : 1.5 });
+                        shake(near ? 8 : 12, 0.25);
+                    }
+                }
+                if (struck) {
+                    const st = t - STRIKE;
+                    for (const r of streaks) {
+                        r.y += r.v * dt;
+                        r.x += r.v * 0.18 * dt;
+                        if (r.y > H + 100) { r.y = rand(-200, -20); r.x = rand(-W * 0.2, W); }
+                    }
+                    if (st < STORM - 2.5) {
+                        for (let i = count(14, dt); i > 0 && glass.length < 120; i--) {
+                            glass.push({ x: rand(0, W), y: rand(-20, H * 0.9), r: rand(5, 22), v: 0, slide: Math.random() < 0.55, trail: 0, t0: t });
+                        }
+                    }
+                    for (const g of glass) {
+                        if (!g.slide || t - g.t0 < 0.4) continue;
+                        g.v = Math.min(g.v + 260 * dt, 160 + g.r * 6);
+                        g.y += g.v * dt;
+                        g.trail += g.v * dt;
                     }
                 }
                 if (struck && t < STRIKE + 1.6) {
@@ -1673,9 +1758,54 @@
                 }
                 for (let i = arcs.length - 1; i >= 0; i--) if (t - arcs[i].t0 > 0.12) arcs.splice(i, 1);
                 shards.update(dt); drops.update(dt); crackle.update(dt);
-                return t < STRIKE + 2.8;
+                return t < STRIKE + STORM;
             },
             draw(h, p, t) {
+                if (struck) {
+                    const st = t - STRIKE;
+                    const k = envelope(st, 0, 0.6, STORM - 2.5, STORM);
+                    h.globalCompositeOperation = 'source-over';
+                    h.fillStyle = `rgba(10,18,36,${0.5 * k})`;
+                    h.fillRect(0, 0, W, H);
+                    h.lineCap = 'round';
+                    h.strokeStyle = `rgba(175,205,245,${0.42 * k})`;
+                    for (const wv of [1.2, 2.2]) {
+                        h.lineWidth = wv;
+                        h.beginPath();
+                        for (const r of streaks) {
+                            if ((r.w > 1.7) !== (wv > 2)) continue;
+                            h.moveTo(r.x, r.y);
+                            h.lineTo(r.x - r.len * 0.18, r.y - r.len);
+                        }
+                        h.stroke();
+                    }
+                    // droplets on the glass, some sliding down and leaving a wet trail
+                    for (const g of glass) {
+                        const ga = k * Math.min(1, (t - g.t0) * 6);
+                        if (ga <= 0) continue;
+                        if (g.trail > 0) {
+                            h.strokeStyle = `rgba(190,215,250,${0.16 * ga})`;
+                            h.lineWidth = g.r * 0.7;
+                            h.beginPath();
+                            h.moveTo(g.x, g.y - g.trail);
+                            h.lineTo(g.x, g.y);
+                            h.stroke();
+                        }
+                        h.fillStyle = `rgba(10,20,40,${0.35 * ga})`;
+                        h.beginPath();
+                        h.ellipse(g.x, g.y + g.r * 0.15, g.r, g.r * 1.1, 0, 0, TAU);
+                        h.fill();
+                        const dg = h.createRadialGradient(g.x, g.y + g.r * 0.35, 0, g.x, g.y, g.r);
+                        dg.addColorStop(0, `rgba(225,240,255,${0.55 * ga})`);
+                        dg.addColorStop(1, `rgba(140,180,230,${0.25 * ga})`);
+                        h.fillStyle = dg;
+                        h.beginPath();
+                        h.ellipse(g.x, g.y, g.r * 0.9, g.r, 0, 0, TAU);
+                        h.fill();
+                        h.fillStyle = `rgba(255,255,255,${0.85 * ga})`;
+                        circle(h, g.x - g.r * 0.35, g.y - g.r * 0.4, g.r * 0.2);
+                    }
+                }
                 h.globalCompositeOperation = 'lighter';
                 if (!struck) {
                     const charge = phase(t, 1, STRIKE);
@@ -1808,41 +1938,50 @@
         banner('shovel', user, 'flung mud with a', 'Shovel');
         const tool = sprites.shovel(), mudLoad = sprites.shovelMud();
         const SC = 2, OX = 11, OY = 74, TIP = 66; // pivot at the grip, blade tip 66 sprite px away
-        const FLING = 0.62;
+        const FLING = 0.62, CYCLE = 1.45, THROWS = 3;
         const dirt = new Particles(), puff = new Particles();
         const globs = [], splats = [], ghosts = [];
-        let angle = -1.2, pvx = -W * 0.05, pvy = H * 1.2, flung = false, firstSplat = false;
+        let angle = -1.2, pvx = -W * 0.05, pvy = H * 1.2, thrown = 0, firstSplat = false, lt = 0;
         const tipPos = () => [pvx + Math.sin(angle) * TIP * SC * PX, pvy - Math.cos(angle) * TIP * SC * PX];
+        // each throw aims at a fresh shuffle of screen cells, so three throws bury most of the screen
+        const cells = [];
+        for (let gy = 0; gy < 3; gy++) for (let gx = 0; gx < 4; gx++) cells.push([gx, gy]);
 
         add({
             update(dt, t) {
-                if (t < 0.45) {
-                    const k = easeOutCubic(phase(t, 0, 0.45));
+                const cyc = Math.min(THROWS - 1, Math.floor(t / CYCLE));
+                lt = t - cyc * CYCLE;
+                if (lt < 0.45) {
+                    const k = easeOutCubic(phase(lt, 0, 0.45));
                     angle = lerp(-1.2, -0.95, k);
                     pvx = lerp(-W * 0.05, W * 0.28, k);
                     pvy = lerp(H * 1.2, H * 1.0, k);
-                } else if (t < 0.7) {
-                    angle = lerp(-0.95, 0.55, easeInCubic(phase(t, 0.45, 0.7)));
-                } else if (t < 0.95) {
-                    angle = lerp(0.55, 0.75, easeOutCubic(phase(t, 0.7, 0.95)));
+                } else if (lt < 0.7) {
+                    angle = lerp(-0.95, 0.55, easeInCubic(phase(lt, 0.45, 0.7)));
+                } else if (lt < 0.95) {
+                    angle = lerp(0.55, 0.75, easeOutCubic(phase(lt, 0.7, 0.95)));
                 } else {
-                    const k = easeInOutSine(phase(t, 0.95, 1.6));
-                    angle = lerp(0.75, -1.4, k);
-                    pvx = lerp(W * 0.28, -W * 0.15, k);
+                    const k = easeInOutSine(phase(lt, 0.95, CYCLE));
+                    angle = lerp(0.75, -1.2, k);
+                    pvx = lerp(W * 0.28, -W * 0.05, k);
                     pvy = lerp(H * 1.0, H * 1.2, k);
                 }
                 // remember recent poses for the swing's motion trail
                 ghosts.unshift(angle);
                 if (ghosts.length > 7) ghosts.pop();
-                if (!flung && t >= FLING) {
-                    flung = true;
+                if (thrown <= cyc && lt >= FLING) {
+                    thrown++;
+                    firstSplat = false;
                     const [sx, sy] = tipPos();
+                    shake(6 + thrown * 3, 0.2);
                     for (let i = 0; i < 14; i++) {
                         puff.emit({ x: sx + rand(-30, 30), y: sy + rand(-30, 30), vx: rand(-60, 260), vy: rand(-200, 20), drag: 2, size: rand(30, 60), grow: 50, life: rand(0.6, 1.1), variant: randInt(0, 3) });
                     }
-                    const n = randInt(8, 12);
+                    const targets = shuffle(cells.slice());
+                    const n = randInt(9, 12);
                     for (let i = 0; i < n; i++) {
-                        globs.push({ sx, sy, tx: rand(W * 0.1, W * 0.9), ty: rand(H * 0.1, H * 0.8), S: rand(200, 450), d: rand(0.35, 0.6), t0: t + i * 0.035, arc: rand(150, 350), rot: rand(0, TAU) });
+                        const [gx, gy] = targets[i % targets.length];
+                        globs.push({ sx, sy, tx: W * (gx + rand(0.15, 0.85)) / 4, ty: H * (gy + rand(0.1, 0.9)) / 3, S: rand(260, 520), d: rand(0.35, 0.6), t0: t + i * 0.035, arc: rand(150, 350), rot: rand(0, TAU) });
                     }
                     for (let i = 0; i < 40; i++) {
                         const a = rand(-1.4, -0.2), sp = rand(400, 1100);
@@ -1873,7 +2012,7 @@
                 }
                 dirt.update(dt);
                 puff.update(dt);
-                return t < 2 || globs.length || splats.some(s => t - s.t0 < 12);
+                return t < CYCLE * THROWS || globs.length || splats.some(s => t - s.t0 < 12);
             },
             draw(h, p, t) {
                 // splats (on the "glass")
@@ -1924,7 +2063,8 @@
                 }
                 h.globalAlpha = 1;
                 // pixel shovel, with a short motion trail during the swing
-                if (t > 0.45 && t < 0.85) {
+                const swinging = t < CYCLE * (THROWS - 1) + 1.45;
+                if (swinging && lt > 0.45 && lt < 0.85) {
                     [5, 3, 1].forEach((gi, n) => {
                         if (ghosts[gi] == null) return;
                         p.globalAlpha = 0.12 + n * 0.1;
@@ -1932,9 +2072,9 @@
                     });
                     p.globalAlpha = 1;
                 }
-                if (t < 1.6) {
+                if (swinging) {
                     blitPxRot(p, tool, pvx, pvy, OX, OY, angle, SC);
-                    if (!flung) blitPxRot(p, mudLoad, pvx, pvy, OX, OY, angle, SC);
+                    if (lt < FLING) blitPxRot(p, mudLoad, pvx, pvy, OX, OY, angle, SC);
                 }
                 drawPixelParticles(p, dirt);
             }
