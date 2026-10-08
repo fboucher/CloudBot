@@ -8,7 +8,7 @@ jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Set outputs
       id: vars
       run: |
@@ -17,7 +17,7 @@ jobs:
         echo "MAJOR=${VERSION%%.*}" >> $GITHUB_OUTPUT
         echo "MINOR=$(echo $VERSION | cut -d. -f2)" >> $GITHUB_OUTPUT
     - name: Publish to Registry
-      uses: elgohr/Publish-Docker-Github-Action@master
+      uses: elgohr/Publish-Docker-Github-Action@v5
       with:
         name: ${{secrets.DOCKER_USER}}/cloudbot
         username: ${{ secrets.DOCKER_USER }}

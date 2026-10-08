@@ -34,6 +34,24 @@
     <h1 id="cbTitle"></h1>
     <p id="lastChatMsg"></p>
     <div id="imageViewer"></div>
+    <!-- Streamer Shoutout Overlay Card -->
+    <div id="streamerShoutoutCard">
+        <div class="streamer-card-glow"></div>
+        <div class="streamer-card-content">
+            <div class="streamer-avatar-container">
+                <img id="streamerAvatar" src="" alt="Streamer Avatar">
+            </div>
+            <div class="streamer-card-info">
+                <div class="streamer-tag">Live Streamer!</div>
+                <div id="streamerCardName" class="streamer-name"></div>
+            </div>
+            <div class="streamer-twitch-icon">
+                <svg viewBox="0 0 24 24" width="24" height="24">
+                    <path fill="#9146FF" d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/>
+                </svg>
+            </div>
+        </div>
+    </div>
     <div id="announcementContainer"></div>
     <div id="todoArea">
         <h4>To-Dos</h4>
@@ -124,7 +142,7 @@
             const bracketChannel = colonIndex === -1 ? null : bracketContent.slice(0, colonIndex).trim();
             const bracketUser = (atIndex === -1 || atIndex + 1 >= bracketContent.length)
                 ? null
-                : bracketContent.slice(atIndex + 1).trim().toLowerCase();
+                : sanitizeUsername(bracketContent.slice(atIndex + 1));
             const afterBracket = trimmed.slice(closingIndex + 1).trimStart();
             if (!afterBracket.startsWith('!')) {
                 return null;
@@ -202,6 +220,22 @@
                 if (data.shouldGreet && data.greetingMessage) {
                     CeebeeSay(data.greetingMessage);
                 }
+                if (data.shouldShoutout && data.shoutoutMessage) {
+                    CeebeeSay(data.shoutoutMessage);
+                    if (data.profileImageUrl) {
+                        const shoutoutCard = document.getElementById("streamerShoutoutCard");
+                        const avatarImg = document.getElementById("streamerAvatar");
+                        const nameDiv = document.getElementById("streamerCardName");
+                        if (shoutoutCard && avatarImg && nameDiv) {
+                            avatarImg.src = data.profileImageUrl;
+                            nameDiv.textContent = lowerUser;
+                            shoutoutCard.classList.add("show");
+                            setTimeout(() => {
+                                shoutoutCard.classList.remove("show");
+                            }, 5000);
+                        }
+                    }
+                }
             })
             .catch(err => console.error('Error reporting chat event:', err));
         }
@@ -226,7 +260,7 @@
                     } else if (data.onCooldown) {
                         ChatBotSay(`@${user}, you are on cooldown. Please wait ${data.remainingMinutes} more minute(s) before searching again.`);
                     } else if (data.success) {
-                        const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb' };
+                        const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb', 'shovel': '⛏️ Shovel' };
                         const itemStr = emojiMap[data.item] || data.item;
                         ChatBotSay(`@${user} searched the cloud forest and found a ${itemStr}!`);
                     }
@@ -246,7 +280,7 @@
                         if (data.inventory.length === 0) {
                             ChatBotSay(`@${user}'s bag is completely empty! Land drops or use !search to find RPG items.`);
                         } else {
-                            const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', umbrella: '☔ Umbrella', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb' };
+                            const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', umbrella: '☔ Umbrella', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb', 'shovel': '⛏️ Shovel' };
                             const itemsList = data.inventory.map(item => emojiMap[item] || item).join(', ');
                             ChatBotSay(`@${user}'s bag (${data.inventory.length}/5 items): ${itemsList}`);
                         }
@@ -261,21 +295,22 @@
                     return;
                 }
                 const requestedItem = message.toLowerCase().trim().replace(/[^a-z0-9-]/g, '');
-                const validItems = ['potion', 'shield', 'umbrella', 'rain-stone', 'sun-stone', 'bomb'];
+                const validItems = ['potion', 'shield', 'umbrella', 'rain-stone', 'sun-stone', 'bomb', 'shovel'];
                 const itemMap = {
                     'potion': 'potion', 'potion🧪': 'potion', '🧪': 'potion',
                     'shield': 'shield', 'shield🛡️': 'shield', '🛡️': 'shield',
                     'umbrella': 'umbrella', 'umbrella☔': 'umbrella', '☔': 'umbrella',
                     'rain-stone': 'rain-stone', 'rainstone': 'rain-stone', '🌧️': 'rain-stone',
                     'sun-stone': 'sun-stone', 'sunstone': 'sun-stone', '☀️': 'sun-stone',
-                    'bomb': 'bomb', 'bomb💣': 'bomb', '💣': 'bomb'
+                    'bomb': 'bomb', 'bomb💣': 'bomb', '💣': 'bomb',
+                    'shovel': 'shovel', 'shovel⛏️': 'shovel', '⛏️': 'shovel', 'shov': 'shovel'
                 };
                 const matchedItem = itemMap[requestedItem] || (validItems.includes(requestedItem) ? requestedItem : null);
                 if (!matchedItem) {
-                    ChatBotSay(`@${user}, that is not a valid item. Choose from: potion, shield, umbrella, rain-stone, sun-stone, bomb.`);
+                    ChatBotSay(`@${user}, that is not a valid item. Choose from: potion, shield, umbrella, rain-stone, sun-stone, bomb, shovel.`);
                     return;
                 }
-
+ 
                 fetch('/api/loot/use', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -288,12 +323,21 @@
                     } else if (data.noItem) {
                         ChatBotSay(`@${user}, you do not have that item in your bag.`);
                     } else if (data.success) {
-                        const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', umbrella: '☔ Umbrella', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb' };
+                        const emojiMap = { potion: '🧪 Potion', shield: '🛡️ Shield', umbrella: '☔ Umbrella', 'rain-stone': '🌧️ Rain Stone', 'sun-stone': '☀️ Sun Stone', bomb: '💣 Bomb', 'shovel': '⛏️ Shovel' };
                         const itemStr = emojiMap[matchedItem];
                         ChatBotSay(`@${user} used their ${itemStr}!`);
                     }
                 })
                 .catch(err => console.error('Error in !use:', err));
+            }
+            else if (command === "roll" || command === "dice" || command === "2d6") {
+                console.log("!roll was typed in chat");
+                const d1 = Math.floor(Math.random() * 6) + 1;
+                const d2 = Math.floor(Math.random() * 6) + 1;
+                const total = d1 + d2;
+                
+                triggerDiceRoll(d1, d2);
+                ChatBotSay(`@${user} rolled two dice: 🎲 ${d1} + 🎲 ${d2} = ${total}!`);
             }
 
             //== PUBLIC Commands Section =====================================
@@ -582,12 +626,9 @@
                 }
             }
 
-            if (flags.broadcaster) {
-                console.log("...broadcaster message");
-                ParseMessage(message);
-            }
-            else if (user === "Streamlabs") {
-                console.log("...Streamlabs message");
+            const trustedSenders = ['streamlabs', 'ceebee_bot', 'ceebee', 'streamelements', 'nightbot'];
+            if (flags.broadcaster || trustedSenders.includes(user)) {
+                console.log(`...parsing message from trusted source: ${user}`);
                 ParseMessage(message);
             }
         }
@@ -980,6 +1021,21 @@
 
             playSound("celebrationSound", SoundEnum.yeah);
 
+            // Clean up old sun overlay if exists
+            const oldSun = document.getElementById("sunOverlay");
+            if (oldSun) oldSun.remove();
+
+            // Create Sun and Lens Flare Overlay
+            const sunOverlay = document.createElement("div");
+            sunOverlay.id = "sunOverlay";
+            sunOverlay.className = "sun-overlay";
+            
+            const lensFlare = document.createElement("div");
+            lensFlare.className = "lens-flare";
+            sunOverlay.appendChild(lensFlare);
+            
+            document.body.appendChild(sunOverlay);
+
             for (let i = 0; i < 60; i++) {
                 setTimeout(() => {
                     const star = document.createElement("div");
@@ -996,9 +1052,52 @@
 
             weatherOverrideTimeout = setTimeout(() => {
                 weatherOverrideActive = false;
+                const sn = document.getElementById("sunOverlay");
+                if (sn) sn.remove();
                 console.log("[Weather] Star Celebration decayed. Returning to baseline.");
                 trackMessageVelocity();
             }, 10000);
+        }
+
+        function triggerShovel() {
+            console.log("[Loot] Shovel triggered! Splatting mud on screen...");
+            playSound("splatSound", SoundEnum.splat);
+            
+            // Create 8 to 12 mud splats at random screen locations
+            const splatCount = Math.floor(Math.random() * 5) + 8;
+            
+            for (let i = 0; i < splatCount; i++) {
+                setTimeout(() => {
+                    const splat = document.createElement("div");
+                    splat.className = "mud-splat";
+                    
+                    const x = Math.random() * 80 + 10;
+                    const y = Math.random() * 70 + 10;
+                    splat.style.left = `${x}%`;
+                    splat.style.top = `${y}%`;
+                    
+                    // Made 2.5 times larger (from 80-160px to 200-450px)
+                    const size = Math.random() * 250 + 200;
+                    splat.style.width = `${size}px`;
+                    splat.style.height = `${size}px`;
+                    
+                    const rotate = Math.random() * 360;
+                    splat.style.transform = `rotate(${rotate}deg)`;
+                    
+                    const r1 = Math.floor(Math.random() * 30) + 35;
+                    const r2 = Math.floor(Math.random() * 30) + 35;
+                    const r3 = Math.floor(Math.random() * 30) + 35;
+                    const r4 = Math.floor(Math.random() * 30) + 35;
+                    splat.style.borderRadius = `${r1}% ${100-r1}% ${r2}% ${100-r2}% / ${r3}% ${r4}% ${100-r4}% ${100-r3}%`;
+
+                    document.body.appendChild(splat);
+                    
+                    setTimeout(() => {
+                        splat.classList.add("fade-out");
+                        setTimeout(() => splat.remove(), 2000);
+                    }, 10000);
+                }, i * 150);
+            }
         }
 
         function playExplosionSound() {
@@ -1047,7 +1146,7 @@
                         const bubble = document.createElement("div");
                         bubble.className = "bubble-effect";
                         bubble.style.left = `${Math.random() * 100}%`;
-                        const size = Math.random() * 25 + 10;
+                        const size = Math.random() * 80 + 40;
                         bubble.style.width = `${size}px`;
                         bubble.style.height = `${size}px`;
                         bubble.style.animationDelay = `${Math.random() * 1.5}s`;
@@ -1058,41 +1157,33 @@
             } 
             else if (item === 'shield') {
                 playSound("shieldSound", SoundEnum.doorknock);
-                const positions = [
-                    { top: '25%', left: '20%' },
-                    { top: '65%', left: '80%' },
-                    { top: '70%', left: '30%' },
-                    { top: '30%', left: '70%' }
-                ];
-                positions.forEach((pos, idx) => {
+                for (let idx = 0; idx < 4; idx++) {
+                    const topRandom = Math.floor(Math.random() * 65) + 15; // 15% to 80%
+                    const leftRandom = Math.floor(Math.random() * 75) + 10; // 10% to 85%
                     setTimeout(() => {
                         const shield = document.createElement("div");
                         shield.className = "shield-overlay";
-                        shield.style.top = pos.top;
-                        shield.style.left = pos.left;
+                        shield.style.top = `${topRandom}%`;
+                        shield.style.left = `${leftRandom}%`;
                         document.body.appendChild(shield);
                         setTimeout(() => shield.remove(), 5000);
                     }, idx * 250);
-                });
+                }
             }
             else if (item === 'umbrella') {
                 playSound("umbrellaSound", SoundEnum.rainUmbrella);
-                const positions = [
-                    { top: '40%', left: '25%' },
-                    { top: '75%', left: '75%' },
-                    { top: '30%', left: '70%' },
-                    { top: '70%', left: '30%' }
-                ];
-                positions.forEach((pos, idx) => {
+                for (let idx = 0; idx < 4; idx++) {
+                    const topRandom = Math.floor(Math.random() * 65) + 15; // 15% to 80%
+                    const leftRandom = Math.floor(Math.random() * 75) + 10; // 10% to 85%
                     setTimeout(() => {
                         const umbrella = document.createElement("div");
                         umbrella.className = "umbrella-overlay";
-                        umbrella.style.top = pos.top;
-                        umbrella.style.left = pos.left;
+                        umbrella.style.top = `${topRandom}%`;
+                        umbrella.style.left = `${leftRandom}%`;
                         document.body.appendChild(umbrella);
                         setTimeout(() => umbrella.remove(), 6000);
                     }, idx * 300);
-                });
+                }
             }
             else if (item === 'bomb') {
                 playExplosionSound(); 
@@ -1114,6 +1205,9 @@
             else if (item === 'rain-stone') {
                 triggerThunderstorm();
             }
+            else if (item === 'shovel') {
+                triggerShovel();
+            }
         }
 
         // FIX #15: SSE subscription to overlay events
@@ -1132,6 +1226,9 @@
                     } else if (payload.event === 'use_item') {
                         console.log('User used item via SSE:', payload);
                         triggerItemEffect(payload.item, payload.user);
+                    } else if (payload.event === 'dice_roll') {
+                        console.log('Dice roll via SSE:', payload);
+                        triggerDiceRoll(payload.d1, payload.d2);
                     } else if (payload.event === 'test_weather') {
                         console.log('Simulating weather event via SSE:', payload.type);
                         if (payload.type === 'thunderstorm') {
@@ -1186,6 +1283,102 @@
                 noteEl.style.opacity = '0';
                 setTimeout(() => { noteEl.style.display = 'none'; }, 500);
             }, 5000);
+        }
+
+        function triggerDiceRoll(d1, d2) {
+            console.log(`[Dice] Rolling dice: ${d1} and ${d2}`);
+            playSound("diceSound", SoundEnum.dice);
+
+            const container = document.createElement("div");
+            container.id = "diceOverlayContainer";
+            container.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                perspective: 1000px;
+                pointer-events: none;
+                z-index: 10005;
+            `;
+
+            const getFaceHTML = (num) => {
+                const pipCoordinates = {
+                    1: [[2, 2]],
+                    2: [[1, 1], [3, 3]],
+                    3: [[1, 1], [2, 2], [3, 3]],
+                    4: [[1, 1], [1, 3], [3, 1], [3, 3]],
+                    5: [[1, 1], [1, 3], [2, 2], [3, 1], [3, 3]],
+                    6: [[1, 1], [1, 3], [2, 1], [2, 3], [3, 1], [3, 3]]
+                };
+                
+                let pipsHTML = "";
+                const coords = pipCoordinates[num] || [];
+                for (let r = 1; r <= 3; r++) {
+                    for (let c = 1; c <= 3; c++) {
+                        const hasPip = coords.some(([pr, pc]) => pr === r && pc === c);
+                        if (hasPip) {
+                            pipsHTML += `<span class="pip" style="grid-row:${r}; grid-column:${c};"></span>`;
+                        }
+                    }
+                }
+                return pipsHTML;
+            };
+
+            const createDie = (rolledVal, leftOffset, delay, animClass, colorClass) => {
+                const dieWrapper = document.createElement("div");
+                dieWrapper.className = `dice-container ${animClass}`;
+                dieWrapper.style.cssText = `
+                    position: absolute;
+                    left: ${leftOffset};
+                    width: 200px;
+                    height: 200px;
+                    top: -250px;
+                `;
+                
+                const die = document.createElement("div");
+                die.className = `dice ${colorClass}`;
+                die.innerHTML = `
+                    <div class="face front">${getFaceHTML(1)}</div>
+                    <div class="face back">${getFaceHTML(6)}</div>
+                    <div class="face right">${getFaceHTML(4)}</div>
+                    <div class="face left">${getFaceHTML(3)}</div>
+                    <div class="face top">${getFaceHTML(2)}</div>
+                    <div class="face bottom">${getFaceHTML(5)}</div>
+                `;
+
+                dieWrapper.appendChild(die);
+                container.appendChild(dieWrapper);
+
+                const faceRotations = {
+                    1: { x: 0, y: 0 },
+                    6: { x: 0, y: 180 },
+                    4: { x: 0, y: -90 },
+                    3: { x: 0, y: 90 },
+                    2: { x: -90, y: 0 },
+                    5: { x: 90, y: 0 }
+                };
+
+                setTimeout(() => {
+                    const rot = faceRotations[rolledVal] || { x: 0, y: 0 };
+                    const rx = 1440 + rot.x;
+                    const ry = 1440 + rot.y;
+                    const rz = 720 + (Math.random() * 90 - 45);
+                    
+                    die.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${rz}deg)`;
+                }, delay);
+            };
+
+            createDie(d1, "20%", 50, "dice-bounce-left", "red-dice");
+            createDie(d2, "70%", 200, "dice-bounce-right", "white-dice");
+
+            document.body.appendChild(container);
+
+            setTimeout(() => {
+                container.style.transition = "opacity 1.5s ease-out";
+                container.style.opacity = "0";
+                setTimeout(() => container.remove(), 1500);
+            }, 6000);
         }
     </script>
 </body>

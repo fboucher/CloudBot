@@ -23,15 +23,26 @@ td {
     padding: 8px;
 }
 
+#imageViewer {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 180px;
+}
+
 .textBubble {
-    position: absolute;
-    top: 30px;
-    left: 600px;
     z-index: 3;
+    transform: scale(2);
 }
 
 .nuage {
     z-index: 2;
+    transform: scale(2);
 }
 
 #todoArea {
@@ -303,6 +314,7 @@ h4 {
 }
 
 .announcement {
+    zoom: 1.5;
     min-width: 450px;
     max-width: 600px;
     padding: 24px 30px;
@@ -711,7 +723,7 @@ div.splat-toggle .splat {
     border-radius: 50%;
     z-index: 10000;
     pointer-events: none;
-    box-shadow: 0 0 10px rgba(46, 204, 113, 0.9), inset 0 0 4px rgba(255, 255, 255, 0.5);
+    box-shadow: 0 0 25px rgba(46, 204, 113, 0.85), inset 0 0 10px rgba(255, 255, 255, 0.7);
     animation: riseAndFade 8s ease-in forwards;
 }
 
@@ -800,11 +812,11 @@ div.splat-toggle .splat {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(120, 120, 120, 0.45);
+    background: radial-gradient(circle, rgba(40, 40, 45, 0.8) 0%, rgba(15, 15, 18, 0.9) 100%);
     z-index: 10001;
     pointer-events: none;
     opacity: 0;
-    backdrop-filter: blur(5px);
+    backdrop-filter: blur(8px);
     animation: smokeBillow 12s ease-out forwards;
 }
 
@@ -927,4 +939,348 @@ div.splat-toggle .splat {
     15% { opacity: 1; }
     25% { opacity: 0; }
     100% { opacity: 0; }
+}
+
+/* Streamer Shoutout Overlay Card */
+#streamerShoutoutCard {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    bottom: auto;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    background: rgba(20, 20, 25, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 32px;
+    padding: 32px 48px;
+    box-shadow: 0 40px 80px rgba(0, 0, 0, 0.5), inset 0 2px 0 rgba(255, 255, 255, 0.1);
+    transform: translate(-50%, -50%) scale(0.9);
+    opacity: 0;
+    transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    width: 640px;
+    overflow: hidden;
+}
+
+#streamerShoutoutCard.show {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+}
+
+.streamer-card-glow {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(145, 70, 255, 0.25), rgba(0, 204, 255, 0.25));
+    z-index: 1;
+    pointer-events: none;
+}
+
+.streamer-card-content {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    z-index: 2;
+}
+
+.streamer-avatar-container {
+    position: relative;
+    width: 128px;
+    height: 128px;
+    border-radius: 50%;
+    padding: 6px;
+    background: linear-gradient(45deg, #9146ff, #00ccff);
+    box-shadow: 0 0 30px rgba(145, 70, 255, 0.8);
+    flex-shrink: 0;
+}
+
+.streamer-avatar-container img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #111;
+    border: 4px solid #202028;
+    display: block;
+}
+
+.streamer-card-info {
+    margin-left: 32px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.streamer-tag {
+    font-family: 'Press Start 2P', cursive;
+    font-size: 16px;
+    color: #a970ff;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+    text-shadow: 0 0 16px rgba(145, 70, 255, 0.5);
+}
+
+.streamer-name {
+    font-family: 'VT323', monospace;
+    font-size: 56px;
+    color: #ffffff;
+    font-weight: bold;
+    line-height: 1.1;
+    text-shadow: 0 4px 8px rgba(0, 0, 0, 0.5), 0 0 16px rgba(255, 255, 255, 0.2);
+}
+
+.streamer-twitch-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: rgba(145, 70, 255, 0.25);
+    border: 2px solid rgba(145, 70, 255, 0.4);
+    box-shadow: 0 0 20px rgba(145, 70, 255, 0.3);
+    flex-shrink: 0;
+}
+
+.streamer-twitch-icon svg {
+    width: 48px;
+    height: 48px;
+    filter: drop-shadow(0 0 8px #9146ff);
+}
+
+/* ===== SUN STONE / LENS FLARE EFFECT ===== */
+.sun-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at 80% 20%, rgba(255, 255, 230, 0.5) 0%, rgba(255, 230, 180, 0.2) 50%, rgba(255, 255, 255, 0) 100%);
+    mix-blend-mode: screen;
+    pointer-events: none;
+    z-index: 10002;
+    opacity: 0;
+    animation: sunGlowFade 10s ease-in-out forwards;
+}
+
+.lens-flare {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 200, 0.8) 5%, rgba(255, 220, 150, 0) 25%),
+        radial-gradient(circle at 80% 20%, rgba(255, 220, 150, 0) 28%, rgba(255, 220, 150, 0.15) 30%, rgba(255, 220, 150, 0) 32%),
+        radial-gradient(circle at 45% 55%, rgba(0, 180, 255, 0.08) 0%, rgba(0, 180, 255, 0) 12%),
+        radial-gradient(circle at 35% 65%, rgba(255, 100, 100, 0.06) 0%, rgba(255, 100, 100, 0) 8%),
+        radial-gradient(circle at 20% 80%, rgba(0, 255, 150, 0.05) 0%, rgba(0, 255, 150, 0) 18%);
+    pointer-events: none;
+}
+
+@keyframes sunGlowFade {
+    0% { opacity: 0; }
+    15% { opacity: 1; }
+    85% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* ===== MUD STONE SPLAT EFFECT ===== */
+.mud-splat {
+    position: fixed;
+    z-index: 10000;
+    background: radial-gradient(circle at 35% 35%, #5d4037 0%, #3e2723 100%);
+    box-shadow: 
+        0 8px 16px rgba(0, 0, 0, 0.4), 
+        inset -4px -4px 8px rgba(0, 0, 0, 0.6), 
+        inset 4px 4px 8px rgba(255, 255, 255, 0.15);
+    pointer-events: none;
+    opacity: 0;
+    animation: 
+        mudImpact 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, 
+        mudDrip 10s linear forwards;
+    transition: opacity 2s ease-out;
+}
+
+.mud-splat.fade-out {
+    opacity: 0 !important;
+}
+
+@keyframes mudImpact {
+    0% {
+        opacity: 0;
+        transform: scale(0);
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+@keyframes mudDrip {
+    0% {
+        margin-top: 0px;
+    }
+    100% {
+        margin-top: 50px;
+    }
+}
+
+/* ===== 3D DICE OVERLAY EFFECT ===== */
+.dice-container {
+    perspective: 1000px;
+    transform-style: preserve-3d;
+}
+
+.dice-container.dice-bounce-left {
+    animation: diceFallAndBounceLeft 3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.dice-container.dice-bounce-right {
+    animation: diceFallAndBounceRight 3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.dice {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    transform-style: preserve-3d;
+    transition: transform 3s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.face {
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    background: #ffffff;
+    border: 8px solid #1a1a1a;
+    border-radius: 32px;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    padding: 20px;
+    backface-visibility: hidden;
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.15), 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+/* Face positioning (200px size = 100px translateZ) */
+.face.front  { transform: rotateY(0deg) translateZ(100px); }
+.face.back   { transform: rotateY(180deg) translateZ(100px); }
+.face.right  { transform: rotateY(90deg) translateZ(100px); }
+.face.left   { transform: rotateY(-90deg) translateZ(100px); }
+.face.top    { transform: rotateX(90deg) translateZ(100px); }
+.face.bottom { transform: rotateX(-90deg) translateZ(100px); }
+
+/* Pips styling */
+.face .pip {
+    display: block;
+    width: 32px;
+    height: 32px;
+    background-color: #2c3e50;
+    border-radius: 50%;
+    margin: auto;
+    box-shadow: inset 2px 2px 5px rgba(0,0,0,0.6);
+}
+
+/* Traditional red dot on Face 1 */
+.face.front .pip {
+    width: 48px;
+    height: 48px;
+    background-color: #e74c3c;
+}
+
+/* ===== RED DICE OVERLAY STYLING ===== */
+.dice.red-dice .face {
+    background: radial-gradient(circle at 35% 35%, #e74c3c 0%, #c0392b 100%);
+    border-color: #7f0000;
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.dice.red-dice .face .pip {
+    background-color: #ffffff;
+    box-shadow: inset 1px 1px 4px rgba(0,0,0,0.3);
+}
+
+.dice.red-dice .face.front .pip {
+    background-color: #ffffff;
+}
+
+/* ===== WHITE DICE OVERLAY STYLING ===== */
+.dice.white-dice .face {
+    background: radial-gradient(circle at 35% 35%, #ffffff 0%, #ecf0f1 100%);
+}
+
+@keyframes diceFallAndBounceLeft {
+    0% {
+        top: -250px;
+        left: 20%;
+    }
+    35% {
+        top: calc(100vh - 280px);
+        left: 30%;
+    }
+    50% {
+        top: calc(100vh - 450px);
+        left: 34%;
+    }
+    65% {
+        top: calc(100vh - 280px);
+        left: 38%;
+    }
+    78% {
+        top: calc(100vh - 350px);
+        left: 40%;
+    }
+    90% {
+        top: calc(100vh - 280px);
+        left: 42%;
+    }
+    95% {
+        top: calc(100vh - 300px);
+        left: 43%;
+    }
+    100% {
+        top: calc(100vh - 280px);
+        left: 43%;
+    }
+}
+
+@keyframes diceFallAndBounceRight {
+    0% {
+        top: -250px;
+        left: 80%;
+    }
+    35% {
+        top: calc(100vh - 280px);
+        left: 70%;
+    }
+    50% {
+        top: calc(100vh - 450px);
+        left: 66%;
+    }
+    65% {
+        top: calc(100vh - 280px);
+        left: 62%;
+    }
+    78% {
+        top: calc(100vh - 350px);
+        left: 60%;
+    }
+    90% {
+        top: calc(100vh - 280px);
+        left: 58%;
+    }
+    95% {
+        top: calc(100vh - 300px);
+        left: 57%;
+    }
+    100% {
+        top: calc(100vh - 280px);
+        left: 57%;
+    }
 }

@@ -61,6 +61,14 @@ Upcomming Available Commands
 How to use it
 -------------
 
+### Environment Variables (Twitch API Setup)
+For streamer shoutouts, the bot queries the Twitch Helix API. This requires a Twitch Developer Application client ID and client secret.
+Create a `.env` file in the root directory (or inside `src`) with the following variables:
+```env
+CLIENT_ID=your_twitch_client_id
+SECRET=your_twitch_client_secret
+```
+
 ### Directly from the code
 
 The Cloudbot now required a server. A tiny one but it's not a static HTML web page anymore. It's using Node.js. You can run it locally or host it somewhere (ex: Azure).
@@ -88,7 +96,7 @@ This project is now available in a container. You can find it on: [https://hub.d
 
 - The container by default uses the port 3000, you can map it to a different one if you want to keep 3000 available for some other node development (in the command below, the chat bot will be available at http://localhost:3001). 
 
-- The `${PWD}` is the current local folder on the host. This folder MUST CONTAINED: 
+- The `${PWD}` is the current local folder on the host. This folder MUST CONTAIN: 
   - a file `secret.js`  with a auth key in it.
 
     ```javascript
@@ -97,16 +105,18 @@ This project is now available in a container. You can find it on: [https://hub.d
 
   - The database (`cloudbot.db`) is created automatically on first run — no manual setup needed.
 
+Pass the Twitch API credentials as environment variables using `-e CLIENT_ID=... -e SECRET=...`.
+
 Here is how to run with **podman** (use `--userns=keep-id` so the container can write to your local `io` folder):
 
 ```bash
-podman run -p 3001:3000 -d --userns=keep-id -v ${PWD}/src/io:/usr/src/app/io --name cloudbot cloudbot:local
+podman run -p 3001:3000 -d --userns=keep-id -v ${PWD}/src/io:/usr/src/app/io -e CLIENT_ID=your_twitch_client_id -e SECRET=your_twitch_client_secret --name cloudbot cloudbot:local
 ```
 
 Or with Docker:
 
 ```bash
-docker run -p 3001:3000 -d -v ${PWD}/src/io:/usr/src/app/io --name cloudbot fboucher/cloudbot:latest
+docker run -p 3001:3000 -d -v ${PWD}/src/io:/usr/src/app/io -e CLIENT_ID=your_twitch_client_id -e SECRET=your_twitch_client_secret --name cloudbot fboucher/cloudbot:latest
 ```
 
 Then open `http://localhost:3001/admin` in your browser to start a stream session, or type `!start [projectName]` in Twitch chat.

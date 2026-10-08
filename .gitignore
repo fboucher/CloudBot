@@ -157,3 +157,7 @@ src/io/cloudbot.db
 .squad-workstream
 
 !src/io/soul_sample.md
+
+# Local test HTTP files
+test.http
+
