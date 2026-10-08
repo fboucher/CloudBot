@@ -42,7 +42,7 @@ td {
 
 .nuage {
     z-index: 2;
-    transform: scale(2);
+    transform: scale(1);
 }
 
 #todoArea {
