@@ -213,7 +213,9 @@ ChatBotShow = function (expression, imgText) {
 
     const fileName = "CB-" + expression + ".gif";
     document.querySelector("#imageViewer").innerHTML = "<img src='public/medias/" + fileName + "' class='nuage'>";
-    document.querySelector("#imageViewer").innerHTML += "<img src='public/medias/generated/" + imgText + "' class='textBubble'>";
+    if (imgText) {
+        document.querySelector("#imageViewer").innerHTML += "<img src='public/medias/generated/" + imgText + "' class='textBubble'>";
+    }
     setTimeout(() => { clean(); }, 5000);
 }
 
@@ -451,7 +453,7 @@ Attention = function (user, message) {
             console.log('Success:', result);
 
             setTimeout(() => {
-                ChatBotShow('Thumbs-up', result.msg)
+                ChatBotShow('Talking', result.msg)
                 playSound("hmmhmm", SoundEnum.hmmhmm);
             }, 1000);
 
@@ -1599,16 +1601,16 @@ function handleEffect(effect) {
     switch (effect.type) {
         case 'hello':
             if (effect.image) {
-                ChatBotShow('Thumbs-up', effect.image);
+                ChatBotShow('Hello', effect.image);
             } else {
-                cloud('Thumbs-up');
+                cloud('Hello');
             }
             playSound('yeah', SoundEnum.yeah);
             break;
 
         case 'attention':
             if (effect.image) {
-                ChatBotShow('Thumbs-up', effect.image);
+                ChatBotShow('Talking', effect.image);
             }
             playSound('hmmhmm', SoundEnum.hmmhmm);
             break;

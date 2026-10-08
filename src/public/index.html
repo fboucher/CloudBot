@@ -220,6 +220,7 @@
             .then(data => {
                 if (data.shouldGreet && data.greetingMessage) {
                     CeebeeSay(data.greetingMessage);
+                    cloud("Hello");
                 }
                 if (data.shouldShoutout && data.shoutoutMessage) {
                     CeebeeSay(data.shoutoutMessage);
@@ -345,6 +346,9 @@
             //== 
 
             //-- fun ---------
+            else if (command === "yes") {
+                ChatBotShow('Thumbs-up');
+            }
             else if (command === "shout") {
                 ChatBotShout(message);
             }
@@ -568,6 +572,11 @@
             const bracketCommand = extractBracketCommand(message);
             if (bracketCommand) {
                 ComfyJS.onCommand(bracketCommand.user, bracketCommand.command, bracketCommand.message, flags, self, extra);
+            }
+
+            // Ceebee laughs along when someone types lol / lul
+            if (/\b(lol|lul)\b/i.test(message) && user !== "ceebee" && user !== "ceebee_bot") {
+                ChatBotShow('Laughing');
             }
 
             // Check if Ceebee is mentioned in normal chat
