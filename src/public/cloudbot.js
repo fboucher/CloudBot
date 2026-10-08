@@ -427,7 +427,7 @@ hello = function (user) {
             //ChatBotSay(result.msg);
 
             setTimeout(() => {
-                ChatBotShow('Thumbs-up', result.msg)
+                ChatBotShow('Hello', result.msg)
             }, 1000);
 
         })
