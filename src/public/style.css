@@ -1192,7 +1192,7 @@ div.splat-toggle .splat {
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    filter: drop-shadow(3px 0 0 #2b1600) drop-shadow(-3px 0 0 #2b1600) drop-shadow(0 3px 0 #2b1600) drop-shadow(0 -3px 0 #2b1600) drop-shadow(0 6px 0 #000) drop-shadow(0 0 22px rgba(255, 200, 60, 0.7));
+    filter: drop-shadow(3px 0 0 #2b1600) drop-shadow(-3px 0 0 #2b1600) drop-shadow(0 3px 0 #2b1600) drop-shadow(0 -3px 0 #2b1600) drop-shadow(0 6px 0 #000);
 }
 
 .fx-dice-total__tag {
@@ -1208,12 +1208,21 @@ div.splat-toggle .splat {
     background: linear-gradient(180deg, #ffe0e0 0%, #ff6b6b 45%, #b30000 55%, #ff9a9a 100%);
     -webkit-background-clip: text;
     background-clip: text;
-    filter: drop-shadow(3px 0 0 #2b0000) drop-shadow(-3px 0 0 #2b0000) drop-shadow(0 3px 0 #2b0000) drop-shadow(0 -3px 0 #2b0000) drop-shadow(0 6px 0 #000) drop-shadow(0 0 22px rgba(255, 40, 40, 0.7));
+    filter: drop-shadow(3px 0 0 #2b0000) drop-shadow(-3px 0 0 #2b0000) drop-shadow(0 3px 0 #2b0000) drop-shadow(0 -3px 0 #2b0000) drop-shadow(0 6px 0 #000);
 }
 
 .fx-dice-total--fail .fx-dice-total__tag {
     color: #ff6b6b;
     text-shadow: 3px 3px 0 #000, 0 0 16px #ff0000;
+}
+
+.fx-dice-total__num--lock {
+    animation: fxNumLock 0.35s cubic-bezier(0.2, 1.8, 0.4, 1) both;
+}
+
+@keyframes fxNumLock {
+    0% { transform: scale(1.6); }
+    100% { transform: scale(1); }
 }
 
 @keyframes fxTotalIn {

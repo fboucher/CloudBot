@@ -739,8 +739,11 @@
         const fh = flask.height * S * PX, fw = flask.width * S * PX;
         const cx = W / 2 + rand(-W * 0.12, W * 0.12), restY = H * 0.58;
         const glowP = new Particles(), bub = new Particles(), crosses = new Particles(), bokehP = new Particles(), sparks = new Particles();
-        let fx = cx, fy = H + fh, popped = false, corkP = null;
+        const twinkles = new Particles(), twinkle = sprites.sparkle('#b6ffd0');
+        let fx = cx, fy = H + fh, popped = false, corkP = null, burst = false;
         const rings = [];
+        // regen ticks: the first heal is big, then smaller ones (and a rare critical heal)
+        const heal = () => (Math.random() < 0.1 ? ['+9999 HP!', '#fff36d'] : [`+${randInt(120, 999)} HP`, '#6dff9e']);
 
         add({
             update(dt, t) {
@@ -757,7 +760,8 @@
                         const a = rand(0, TAU), sp = rand(200, 800);
                         sparks.emit({ x: fx, y: neckY, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 200, drag: 2.5, life: rand(0.4, 0.9), size: rand(6, 14), color: pick(['150,255,190', '220,255,200', '90,255,160']) });
                     }
-                    floatText('+999 HP', fx, top - 30, '#6dff9e');
+                    const [txt, col] = heal();
+                    floatText(txt, fx, top - 30, col);
                 }
                 if (corkP) {
                     corkP.vy += 2400 * dt;
@@ -776,7 +780,21 @@
                     for (let i = count(6, dt); i > 0; i--) {
                         crosses.emit({ x: rand(W * 0.08, W * 0.92), y: rand(H * 0.3, H * 0.9), vy: -70, life: rand(1.2, 1.8), sprite: cross });
                     }
-                    if (t - rings[rings.length - 1] > 1.1) rings.push(t);
+                    if (t - rings[rings.length - 1] > 1.1) {
+                        rings.push(t);
+                        floatText(`+${randInt(20, 99)}`, fx + rand(-fw, fw), top + rand(-20, 60), '#a8ffc8', 1600);
+                    }
+                    for (let i = count(10, dt); i > 0; i--) {
+                        twinkles.emit({ x: rand(0, W), y: rand(H * 0.1, H * 0.95), vy: -30, life: rand(0.5, 0.9), sprite: twinkle });
+                    }
+                }
+                if (!burst && t >= 6.8) {
+                    burst = true;
+                    for (let i = 0; i < 30; i++) {
+                        const a = rand(0, TAU), sp = rand(150, 600);
+                        crosses.emit({ x: fx, y: fy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 150, g: 500, drag: 1.2, life: rand(0.8, 1.4), sprite: cross });
+                        sparks.emit({ x: fx, y: fy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, drag: 2.5, life: rand(0.4, 0.9), size: rand(8, 16), color: '150,255,190' });
+                    }
                 }
                 if (t < 6) {
                     for (let i = count(2.5, dt); i > 0; i--) {
@@ -784,8 +802,8 @@
                         bokehP.emit({ x: left ? rand(0, W * 0.25) : rand(W * 0.75, W), y: rand(H * 0.2, H), vx: rand(-10, 10), vy: rand(-40, -15), size: rand(50, 130), life: rand(2.5, 4), color: pick(['120,255,180', '180,255,140']), alpha: 0.28 });
                     }
                 }
-                glowP.update(dt); bub.update(dt); crosses.update(dt); bokehP.update(dt); sparks.update(dt);
-                return t < 8;
+                glowP.update(dt); bub.update(dt); crosses.update(dt); bokehP.update(dt); sparks.update(dt); twinkles.update(dt);
+                return t < 8.4;
             },
             draw(h, p, t) {
                 const a = envelope(t, 0.2, 1, 6.3, 7.3);
@@ -804,6 +822,17 @@
                     h.lineTo(fx - 260, -20);
                     h.closePath();
                     h.fill();
+                }
+                // healing wave sweeping up the screen
+                const wk = phase(t, 1.6, 3.4);
+                if (wk > 0 && wk < 1) {
+                    const wy = lerp(H + 80, -80, easeInOutSine(wk));
+                    const wg = h.createLinearGradient(0, wy - 90, 0, wy + 90);
+                    wg.addColorStop(0, 'rgba(120,255,180,0)');
+                    wg.addColorStop(0.5, `rgba(120,255,180,${0.22 * (1 - wk * 0.5)})`);
+                    wg.addColorStop(1, 'rgba(120,255,180,0)');
+                    h.fillStyle = wg;
+                    h.fillRect(0, wy - 90, W, 180);
                 }
                 drawGlow(h, '80,255,150', fx, fy, fw * 1.3 * (1 + 0.05 * Math.sin(t * 4)), 0.55 * a);
                 drawGlow(h, '80,255,150', fx, fy + fh * 0.45, fw * 1.6, 0.35 * a);
@@ -830,6 +859,7 @@
                 if (corkP) blitPxRot(p, cork, corkP.x, corkP.y, 6, 4.5, corkP.rot, S);
                 drawPixelParticles(p, bub);
                 drawPixelParticles(p, crosses);
+                drawPixelParticles(p, twinkles);
             }
         });
     }
@@ -852,9 +882,11 @@
             }
         }
         const HEX = [0, 1, 2, 3, 4, 5].map(i => [Math.cos(Math.PI / 6 + i * Math.PI / 3), Math.sin(Math.PI / 6 + i * Math.PI / 3)]);
-        const impacts = [], bolts = [];
+        const impacts = [], bolts = [], cracks = [];
         const sparks = new Particles(), frags = new Particles();
-        const schedule = [1.0, 1.4, 1.75, 2.05, 2.4, 2.7, 3.05, 3.45];
+        const schedule = [1.0, 1.4, 1.75, 2.05, 2.4, 2.7, 3.05, 3.7];
+        // incoming attacks come in a few flavours: fire, arcane, acid
+        const AMMO = [['255,80,50', '255,170,110', '255,120,80'], ['190,80,255', '220,170,255', '200,120,255'], ['120,255,80', '200,255,160', '150,255,100']];
         const END = 5.4;
         let si = 0, dissolved = false;
 
@@ -872,7 +904,8 @@
                     const x = cx + Math.cos(a) * far, y = cy + Math.sin(a) * far;
                     const tx = cx + rand(-R * 0.3, R * 0.3), ty = cy + rand(-R * 0.3, R * 0.3);
                     const len = Math.hypot(tx - x, ty - y);
-                    bolts.push({ x, y, vx: (tx - x) / len * 2300, vy: (ty - y) / len * 2300, hit: false, age: 0 });
+                    const heavy = si === schedule.length;
+                    bolts.push({ x, y, vx: (tx - x) / len * 2300, vy: (ty - y) / len * 2300, hit: false, age: 0, heavy, ammo: heavy ? AMMO[0] : pick(AMMO) });
                 }
                 for (let i = bolts.length - 1; i >= 0; i--) {
                     const b = bolts[i];
@@ -886,13 +919,19 @@
                         const dot = b.vx * nx + b.vy * ny;
                         b.vx = (b.vx - 2 * dot * nx) * 0.6;
                         b.vy = (b.vy - 2 * dot * ny) * 0.6;
-                        impacts.push({ x: b.x - cx, y: b.y - cy, t });
+                        impacts.push({ x: b.x - cx, y: b.y - cy, t, heavy: b.heavy });
                         const base = Math.atan2(ny, nx);
-                        for (let k = 0; k < 32; k++) {
-                            const a = base + rand(-1.3, 1.3), sp = rand(300, 1000);
-                            sparks.emit({ x: b.x, y: b.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 600, drag: 3, life: rand(0.3, 0.7), color: pick(['180,230,255', '255,255,255', '120,200,255', '255,180,140']), streak: 0.04 });
+                        for (let k = 0; k < (b.heavy ? 70 : 32); k++) {
+                            const a = base + rand(-1.3, 1.3), sp = rand(300, b.heavy ? 1500 : 1000);
+                            sparks.emit({ x: b.x, y: b.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 600, drag: 3, life: rand(0.3, 0.7), color: pick(['180,230,255', '255,255,255', '120,200,255', b.ammo[2]]), streak: 0.04 });
                         }
-                        shake(5, 0.15);
+                        // the barrier cracks a little where it was hit
+                        for (let k = randInt(3, b.heavy ? 8 : 5); k > 0; k--) {
+                            const a = base + Math.PI + rand(-0.9, 0.9), l = R * rand(0.12, b.heavy ? 0.45 : 0.25);
+                            cracks.push({ pts: boltPoints(b.x - cx, b.y - cy, b.x - cx + Math.cos(a) * l, b.y - cy + Math.sin(a) * l, l * 0.18), t });
+                        }
+                        if (si === 1) floatText('BLOCKED!', b.x, b.y - 40, '#8fdcff', 1600);
+                        shake(b.heavy ? 14 : 5, b.heavy ? 0.35 : 0.15);
                     }
                     if (b.hit) b.age += dt;
                     if (b.age > 0.6) bolts.splice(i, 1);
@@ -976,6 +1015,29 @@
                     h.arc(0, 0, R * 1.13, 0, TAU);
                     h.stroke();
                     h.setLineDash([]);
+                    h.rotate(t * 0.9);
+                    // specular sweep gliding over the dome
+                    const sw = t * 1.3;
+                    h.strokeStyle = `rgba(220,245,255,${0.22 * fade})`;
+                    h.lineWidth = R * 0.12;
+                    h.beginPath();
+                    h.arc(0, 0, R * 0.86, sw, sw + 0.8);
+                    h.stroke();
+                    h.restore();
+                    // cracks, in shield space
+                    h.save();
+                    h.translate(cx, cy);
+                    h.lineJoin = 'round';
+                    for (const c of cracks) {
+                        const ca = fade * (1 - phase(t - c.t, 1.5, 3)) * Math.min(1, (t - c.t) * 8);
+                        if (ca <= 0) continue;
+                        h.strokeStyle = `rgba(150,220,255,${0.25 * ca})`;
+                        h.lineWidth = 6;
+                        strokePath(h, c.pts);
+                        h.strokeStyle = `rgba(235,250,255,${0.9 * ca})`;
+                        h.lineWidth = 1.5;
+                        strokePath(h, c.pts);
+                    }
                     h.restore();
                 }
                 drawGlow(h, '140,210,255', cx, cy, R * 1.6, (1 - phase(t, 0, 0.5)) * 0.8, true);
@@ -984,19 +1046,20 @@
                 for (const b of bolts) {
                     const a = b.hit ? 1 - b.age / 0.6 : 1;
                     const tx = b.x - b.vx * 0.06, ty = b.y - b.vy * 0.06;
-                    for (const [w, col, al] of [[16, '255,80,50', 0.3], [6, '255,170,110', 0.8], [2, '255,255,255', 1]]) {
+                    const bw = b.heavy ? 2 : 1;
+                    for (const [w, col, al] of [[16, b.ammo[0], 0.3], [6, b.ammo[1], 0.8], [2, '255,255,255', 1]]) {
                         h.strokeStyle = `rgba(${col},${al * a})`;
-                        h.lineWidth = w;
+                        h.lineWidth = w * bw;
                         h.beginPath();
                         h.moveTo(tx, ty);
                         h.lineTo(b.x, b.y);
                         h.stroke();
                     }
-                    drawGlow(h, '255,120,80', b.x, b.y, 50, a, true);
+                    drawGlow(h, b.ammo[2], b.x, b.y, 50 * bw, a, true);
                 }
                 for (const im of impacts) {
                     const age = t - im.t;
-                    if (age < 0.4) drawGlow(h, '200,240,255', cx + im.x, cy + im.y, 120 * (1 + age * 2), 1 - age / 0.4, true);
+                    if (age < 0.4) drawGlow(h, '200,240,255', cx + im.x, cy + im.y, (im.heavy ? 220 : 120) * (1 + age * 2), 1 - age / 0.4, true);
                 }
                 h.globalAlpha = 1;
                 drawSparks(h, sparks, 2.5);
@@ -1047,6 +1110,26 @@
         const splashes = new Particles();
         const clouds = sprites.cloudBand(PW);
         const CH = 15;
+        const ripples = [];
+        const flashes = [rand(1.5, 2.5), rand(3.8, 5)];
+        // pixel rainbow once the rain stops
+        const rainbow = cached('rainbow' + PW, () => {
+            const R = Math.round(PW * 0.3), w = R * 2 + 4, c = makeCanvas(w, R + 2), g = c.getContext('2d');
+            const img = g.createImageData(w, R + 2);
+            const bands = ['#ff4d4d', '#ff9f43', '#ffe14d', '#5ee06b', '#4da6ff', '#8a5cff'];
+            for (let y = 0; y <= R + 1; y++) {
+                for (let x = 0; x < w; x++) {
+                    const d = Math.hypot(x - w / 2, y - (R + 1));
+                    const bi = Math.floor((R - d) / 3);
+                    if (bi < 0 || bi >= bands.length) continue;
+                    const [r, gg, b] = hexToRgb(bands[bi]);
+                    const i = (y * w + x) * 4;
+                    img.data[i] = r; img.data[i + 1] = gg; img.data[i + 2] = b; img.data[i + 3] = 200;
+                }
+            }
+            g.putImageData(img, 0, 0);
+            return c;
+        });
 
         add({
             update(dt, t) {
@@ -1079,12 +1162,18 @@
                             for (let k = 0; k < 2; k++) {
                                 splashes.emit({ x: d.x * PX, y: top * PX, vx: rand(-120, 120) + Math.sign(dx) * 90, vy: rand(-280, -120), g: 1400, life: 0.35, color: '#d8ecff' });
                             }
+                            // water running off the canopy edge
+                            if (Math.random() < 0.15) {
+                                const side = Math.sign(dx) || 1;
+                                splashes.emit({ x: (u.x + side * hwu) * PX, y: (u.y + 1) * PX, vx: side * 20, vy: 60, g: 1600, life: 0.8, color: '#9ec9ff' });
+                            }
                             hit = true;
                             break;
                         }
                     }
                     if (!hit && d.y > PH) {
                         if (Math.random() < 0.5) splashes.emit({ x: d.x * PX, y: H - 4, vx: rand(-80, 80), vy: rand(-200, -80), g: 1400, life: 0.25, color: '#b8d8ff' });
+                        if (Math.random() < 0.25 && ripples.length < 40) ripples.push({ x: d.x, y: PH - rand(2, 10), age: 0 });
                         hit = true;
                     }
                     if (hit) {
@@ -1093,10 +1182,27 @@
                     }
                 }
                 splashes.update(dt);
-                return t < 8;
+                for (let i = ripples.length - 1; i >= 0; i--) {
+                    ripples[i].age += dt;
+                    if (ripples[i].age > 0.6) ripples.splice(i, 1);
+                }
+                return t < 9.2;
             },
             draw(h, p, t) {
                 const cy = lerp(-clouds.height, 0, easeOutCubic(phase(t, 0, 0.8))) - easeInCubic(phase(t, 6.8, 7.8)) * clouds.height;
+                const ra = envelope(t, 6.9, 7.6, 8.4, 9.2);
+                if (ra > 0) {
+                    p.globalAlpha = Math.round(ra * 4) / 4; // stepped fade, retro style
+                    p.drawImage(rainbow, Math.round(PW / 2 - rainbow.width / 2), Math.round(PH * 0.55 - rainbow.height));
+                    p.globalAlpha = 1;
+                }
+                // puddle ripples
+                p.fillStyle = '#cfe6ff';
+                for (const r of ripples) {
+                    const rr = 1 + r.age * 10;
+                    if (Math.floor(r.age * 20) % 2 && r.age > 0.4) continue;
+                    for (let a = 0; a < TAU; a += 0.5) p.fillRect(Math.round(r.x + Math.cos(a) * rr), Math.round(r.y + Math.sin(a) * rr * 0.3), 1, 1);
+                }
                 const active = Math.floor(drops.length * envelope(t, 0, 0.8, 6.6, 7.6));
                 for (let i = 0; i < active; i++) {
                     const d = drops[i];
@@ -1109,6 +1215,17 @@
                 }
                 drawPixelParticles(p, splashes);
                 p.drawImage(clouds, 0, Math.round(cy));
+                // lightning flickering inside the clouds
+                for (const f of flashes) {
+                    const fa = flicker(t - f);
+                    if (t < f || fa <= 0) continue;
+                    h.globalCompositeOperation = 'lighter';
+                    const fg = h.createLinearGradient(0, 0, 0, clouds.height * PX * 1.6);
+                    fg.addColorStop(0, `rgba(220,230,255,${0.55 * fa})`);
+                    fg.addColorStop(1, 'rgba(220,230,255,0)');
+                    h.fillStyle = fg;
+                    h.fillRect(0, 0, W, clouds.height * PX * 1.6);
+                }
             }
         });
     }
@@ -1178,6 +1295,16 @@
         const T0 = 2.1;
         const fire = new Particles(), smoke = new Particles(), debris = new Particles(), embers = new Particles(), sparks = new Particles(), dust = new Particles();
         let exploded = false, landed = false, y = -2 * r, squash = 0;
+        // small burning patches left on the ground, and a couple of delayed secondary blasts
+        const flames = [0, 1, 2, 3, 4, 5].map(() => ({ x: bx + rand(-r * 2.6, r * 2.6), y: by + r * rand(0.7, 1.6), life: rand(2.5, 4.5), size: rand(0.6, 1.2) }));
+        const pops = [{ at: 0.35, done: false }, { at: 0.65, done: false }];
+
+        function fireBurst(x, y, n, speed) {
+            for (let i = 0; i < n; i++) {
+                const a = rand(0, TAU), sp = rand(80, speed);
+                fire.emit({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.8, drag: 2.6, g: -90, size: rand(30, 80), grow: 40, life: rand(0.5, 1.2) });
+            }
+        }
 
         function explode() {
             exploded = true;
@@ -1242,6 +1369,29 @@
                     }
                 }
                 if (!exploded && t >= T0) explode();
+                if (exploded) {
+                    const a = t - T0;
+                    // rising mushroom column
+                    if (a < 1.2) {
+                        for (let i = count(110 * (1 - a / 1.2), dt); i > 0; i--) {
+                            fire.emit({ x: bx + rand(-r * 0.4, r * 0.4), y: by - rand(0, r), vx: rand(-160, 160), vy: -rand(350, 750), drag: 1.6, g: -40, size: rand(35, 80), grow: 60, life: rand(0.8, 1.5) });
+                        }
+                    }
+                    for (const pp of pops) {
+                        if (!pp.done && a >= pp.at) {
+                            pp.done = true;
+                            fireBurst(bx + rand(-r * 2.5, r * 2.5), by + rand(-r * 1.5, r * 0.5), 40, 450);
+                            shake(9, 0.25);
+                        }
+                    }
+                    for (const f of flames) {
+                        if (a < f.life) {
+                            for (let i = count(14, dt); i > 0; i--) {
+                                fire.emit({ x: f.x + rand(-12, 12) * f.size, y: f.y, vx: rand(-20, 20), vy: -rand(80, 180), g: -60, size: rand(14, 30) * f.size * (1 - a / f.life), grow: -10, life: rand(0.3, 0.6) });
+                            }
+                        }
+                    }
+                }
                 fire.update(dt); smoke.update(dt); debris.update(dt); embers.update(dt); sparks.update(dt); dust.update(dt);
                 return t < T0 + 9;
             },
@@ -1308,9 +1458,6 @@
                     d.pts.forEach(([px, py], i) => (i ? h.lineTo(px, py) : h.moveTo(px, py)));
                     h.closePath();
                     h.fill();
-                    h.strokeStyle = 'rgba(120,90,60,0.6)';
-                    h.lineWidth = 1.5;
-                    h.stroke();
                     if (d.hot) {
                         h.globalCompositeOperation = 'lighter';
                         drawGlow(h, '255,120,40', 0, 0, 22, 0.8 * (1 - phase(d.age, 0, 1.8)));
@@ -1469,7 +1616,14 @@
         const shards = new Particles(), drops = new Particles(), crackle = new Particles();
         const shardSprites = ['#c9eeff', '#5fb0ff', '#2258d8', '#e2f7ff'].map(c => sprites.shard(c));
         const arcs = [];
-        let sy = H + 200, struck = false, nextArc = STRIKE - 1.3;
+        let sy = H + 200, struck = false, nextArc = STRIKE - 1.3, jitter = 0;
+        // cracks spreading across the gem while it charges (stone-local, in art pixels)
+        const cracks = [];
+        for (let i = 0; i < 6; i++) {
+            const a = rand(0, TAU), l = rand(6, 13);
+            cracks.push({ pts: boltPoints(rand(-3, 3), rand(0, 8), Math.cos(a) * l, 4 + Math.sin(a) * l * 1.3, 10), at: lerp(0.35, 0.95, i / 5) });
+        }
+        const followUps = [{ at: 0.14, done: false }, { at: 0.42, done: false }];
 
         const drawRunes = (h, p, t, front) => {
             for (let i = 0; i < 8; i++) {
@@ -1486,6 +1640,7 @@
         add({
             update(dt, t) {
                 sy = t < 1.2 ? lerp(H + 200, cy, easeOutBack(phase(t, 0, 1.2))) : cy + Math.sin(t * 2.4) * 6;
+                jitter = phase(t, STRIKE - 0.6, STRIKE) * PX;
                 if (!struck && t >= nextArc && t < STRIKE) {
                     nextArc = t + rand(0.05, 0.12);
                     const a = rand(0, TAU), rr = rand(90, 220);
@@ -1504,6 +1659,13 @@
                         drops.emit({ x: cx + rand(-20, 20), y: sy, vx: rand(-500, 500), vy: rand(-1100, -300), g: 1800, life: rand(0.8, 1.5), color: pick(['#9fd8ff', '#d8f0ff', '#5fb0ff']), px: randInt(1, 2) });
                     }
                 }
+                for (const f of followUps) {
+                    if (struck && !f.done && t >= STRIKE + f.at) {
+                        f.done = true;
+                        lightning({ x1: cx + rand(-W * 0.3, W * 0.3), y1: -20, x2: cx + rand(-120, 120), y2: sy + rand(-40, 80), rgb: '150,200,255', scale: 1.2 });
+                        shake(8, 0.2);
+                    }
+                }
                 if (struck && t < STRIKE + 1.6) {
                     for (let i = count(25, dt); i > 0; i--) {
                         crackle.emit({ x: cx + rand(-260, 260), y: sy + rand(-200, 200), vx: rand(-40, 40), vy: rand(60, 200), life: rand(0.2, 0.5), size: rand(6, 14), color: '150,220,255', core: true });
@@ -1519,7 +1681,20 @@
                     const charge = phase(t, 1, STRIKE);
                     drawGlow(h, '80,160,255', cx, sy, 170 + 120 * charge, 0.55 + 0.35 * Math.sin(t * 25) * charge, true);
                     drawRunes(h, p, t, false);
-                    blitPx(p, stone, cx, sy, S);
+                    const jx = rand(-1, 1) * jitter, jy = rand(-1, 1) * jitter;
+                    blitPx(p, stone, cx + jx, sy + jy, S);
+                    // glowing cracks, drawn as hard pixels on the sprite
+                    p.fillStyle = '#e8fbff';
+                    for (const c of cracks) {
+                        if (charge < c.at) continue;
+                        for (let i = 1; i < c.pts.length; i++) {
+                            const [x0, y0] = c.pts[i - 1], [x1, y1] = c.pts[i];
+                            const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) * S) + 1;
+                            for (let k = 0; k <= n; k++) {
+                                p.fillRect(Math.round((cx + jx) / PX + lerp(x0, x1, k / n) * S), Math.round((sy + jy) / PX + lerp(y0, y1, k / n) * S), 1, 1);
+                            }
+                        }
+                    }
                     drawRunes(h, p, t, true);
                     for (const a of arcs) drawStrike(h, a.s, 1 - (t - a.t0) / 0.12, '120,220,255', 0.8);
                 } else {
@@ -1634,8 +1809,8 @@
         const tool = sprites.shovel(), mudLoad = sprites.shovelMud();
         const SC = 2, OX = 11, OY = 74, TIP = 66; // pivot at the grip, blade tip 66 sprite px away
         const FLING = 0.62;
-        const dirt = new Particles();
-        const globs = [], splats = [];
+        const dirt = new Particles(), puff = new Particles();
+        const globs = [], splats = [], ghosts = [];
         let angle = -1.2, pvx = -W * 0.05, pvy = H * 1.2, flung = false, firstSplat = false;
         const tipPos = () => [pvx + Math.sin(angle) * TIP * SC * PX, pvy - Math.cos(angle) * TIP * SC * PX];
 
@@ -1656,9 +1831,15 @@
                     pvx = lerp(W * 0.28, -W * 0.15, k);
                     pvy = lerp(H * 1.0, H * 1.2, k);
                 }
+                // remember recent poses for the swing's motion trail
+                ghosts.unshift(angle);
+                if (ghosts.length > 7) ghosts.pop();
                 if (!flung && t >= FLING) {
                     flung = true;
                     const [sx, sy] = tipPos();
+                    for (let i = 0; i < 14; i++) {
+                        puff.emit({ x: sx + rand(-30, 30), y: sy + rand(-30, 30), vx: rand(-60, 260), vy: rand(-200, 20), drag: 2, size: rand(30, 60), grow: 50, life: rand(0.6, 1.1), variant: randInt(0, 3) });
+                    }
                     const n = randInt(8, 12);
                     for (let i = 0; i < n; i++) {
                         globs.push({ sx, sy, tx: rand(W * 0.1, W * 0.9), ty: rand(H * 0.1, H * 0.8), S: rand(200, 450), d: rand(0.35, 0.6), t0: t + i * 0.035, arc: rand(150, 350), rot: rand(0, TAU) });
@@ -1674,13 +1855,24 @@
                         globs.splice(i, 1);
                         const sp = makeSplat(gl.S);
                         splats.push({ x: gl.tx, y: gl.ty, t0: t, rot: rand(0, TAU), ...sp });
+                        for (let k = 0; k < 10; k++) {
+                            const a = rand(0, TAU), v = rand(200, 600);
+                            dirt.emit({ x: gl.tx, y: gl.ty, vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: 1200, life: rand(0.3, 0.6), color: pick(['#6b4528', '#4a2f1a']), px: 1 });
+                        }
                         if (!firstSplat) {
                             firstSplat = true;
                             if (opts.onFirstSplat) opts.onFirstSplat();
                         }
                     }
                 }
+                for (const gl of globs) {
+                    const u = (t - gl.t0) / gl.d;
+                    if (u > 0 && u < 1 && Math.random() < 0.5) {
+                        dirt.emit({ x: lerp(gl.sx, gl.tx, u), y: lerp(gl.sy, gl.ty, u) - Math.sin(Math.PI * u) * gl.arc, vx: rand(-40, 40), vy: rand(-40, 40), g: 900, life: rand(0.3, 0.6), color: '#5a3a22', px: 1 });
+                    }
+                }
                 dirt.update(dt);
+                puff.update(dt);
                 return t < 2 || globs.length || splats.some(s => t - s.t0 < 12);
             },
             draw(h, p, t) {
@@ -1692,7 +1884,8 @@
                     const sc = a < 0.12 ? lerp(1.3, 1, a / 0.12) : 1;
                     h.globalAlpha = alpha;
                     h.save();
-                    h.translate(s.x, s.y);
+                    // heavy mud slowly slides down the glass
+                    h.translate(s.x, s.y + 40 * easeInCubic(phase(a, 1, 11)));
                     for (const d of s.drips) {
                         const L = d.maxL * easeOutCubic(phase(a, 0.3, 0.3 + d.dur));
                         if (L <= 0) continue;
@@ -1724,7 +1917,21 @@
                     h.fillStyle = 'rgba(255,240,220,0.4)';
                     circle(h, x - rr * 0.35, y - rr * 0.4, rr * 0.15);
                 }
-                // pixel shovel
+                for (const d of puff.list) {
+                    const k = lifeOf(d);
+                    h.globalAlpha = 0.5 * (1 - k);
+                    h.drawImage(smokeSprite('120,85,55', d.variant), d.x - d.size, d.y - d.size, d.size * 2, d.size * 2);
+                }
+                h.globalAlpha = 1;
+                // pixel shovel, with a short motion trail during the swing
+                if (t > 0.45 && t < 0.85) {
+                    [5, 3, 1].forEach((gi, n) => {
+                        if (ghosts[gi] == null) return;
+                        p.globalAlpha = 0.12 + n * 0.1;
+                        blitPxRot(p, tool, pvx, pvy, OX, OY, ghosts[gi], SC);
+                    });
+                    p.globalAlpha = 1;
+                }
                 if (t < 1.6) {
                     blitPxRot(p, tool, pvx, pvy, OX, OY, angle, SC);
                     if (!flung) blitPxRot(p, mudLoad, pvx, pvy, OX, OY, angle, SC);
@@ -1860,6 +2067,14 @@
                 return t < END;
             },
             draw(h, p, t) {
+                // soft table spotlight where the dice land
+                const la = envelope(t, 0, 0.6, END - 1.2, END - 0.2);
+                h.save();
+                h.globalCompositeOperation = 'lighter';
+                h.translate(W / 2, floorY);
+                h.scale(1, 0.22);
+                drawGlow(h, '255,235,200', 0, 0, W * 0.28, 0.35 * la);
+                h.restore();
                 for (const d of dust.list) {
                     const k = lifeOf(d);
                     h.globalAlpha = 0.4 * (1 - k);
@@ -1867,7 +2082,7 @@
                 }
                 h.globalAlpha = 1;
                 if (revealed && crit) {
-                    const a = envelope(t, settle + 0.2, settle + 0.5, END - 1.5, END - 0.5);
+                    const a = envelope(t, settle + 0.85, settle + 1.1, END - 1.5, END - 0.5);
                     drawRays(h, W / 2, floorY - size * 1.9, 18, t * 0.5, Math.hypot(W, H) * 0.6, W * 0.05, '255,215,90', 0.45 * a);
                 }
                 drawGlowParticles(h, sparks);
@@ -1888,8 +2103,20 @@
             }
             const num = document.createElement('div');
             num.className = 'fx-dice-total__num';
-            num.textContent = String(total);
             el.appendChild(num);
+            layer.appendChild(el);
+            // slot-machine count before locking on the real total
+            const spin = setInterval(() => { num.textContent = String(randInt(2, 12)); }, 55);
+            num.textContent = String(randInt(2, 12));
+            setTimeout(() => {
+                clearInterval(spin);
+                num.textContent = String(total);
+                num.classList.add('fx-dice-total__num--lock');
+                lockIn(el);
+            }, 650);
+        }
+
+        function lockIn(el) {
             const tagText = crit ? 'CRITICAL!' : fail ? 'CRITICAL FAIL' : d1 === d2 ? 'DOUBLES!' : '';
             if (tagText) {
                 const tag = document.createElement('div');
@@ -1897,7 +2124,6 @@
                 tag.textContent = tagText;
                 el.appendChild(tag);
             }
-            layer.appendChild(el);
             const burstRgb = fail ? '255,80,60' : '255,210,90';
             for (let i = 0; i < (crit ? 80 : 30); i++) {
                 const a = rand(0, TAU), sp = rand(150, crit ? 900 : 500);
