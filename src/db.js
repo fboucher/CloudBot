@@ -3,6 +3,37 @@ const path = require("path");
 let db;
 const dbPath = path.join(__dirname, "io", "cloudbot.db") + "?nolock=1";
 
+const sanitizeUsername = (name) =>
+  String(name || "")
+    .trim()
+    .replace(/^@+/, "")
+    .replace(/[,.:;!?]+$/, "")
+    .trim()
+    .toLowerCase();
+
+// Collapse game score entries that belong to the same player ("@User", "@@user", "user")
+// into one: counts are added up, scores keep the best value.
+function mergeUserScores(users) {
+  const merged = new Map();
+  for (const u of users) {
+    const name = sanitizeUsername(u.user);
+    if (!name) continue;
+    const prev = merged.get(name);
+    if (!prev) {
+      merged.set(name, { ...u, user: name });
+      continue;
+    }
+    prev.dropCount = (prev.dropCount || 0) + (u.dropCount || 0);
+    prev.landedCount = (prev.landedCount || 0) + (u.landedCount || 0);
+    prev.highScore = Math.max(prev.highScore || 0, u.highScore || 0);
+    prev.bestHighScore = Math.max(prev.bestHighScore || 0, u.bestHighScore || 0);
+    if (u.lastUpdate && (!prev.lastUpdate || new Date(u.lastUpdate) > new Date(prev.lastUpdate))) {
+      prev.lastUpdate = u.lastUpdate;
+    }
+  }
+  return [...merged.values()];
+}
+
 async function initDb() {
   const { connect } = await import("@tursodatabase/database");
   db = await connect(dbPath);
@@ -218,6 +249,37 @@ async function createTables() {
       console.error("Migration error cleaning '@' usernames:", e.message);
     }
 
+    // Migration: merge duplicate game score rows for the same player in a session
+    try {
+      const rows = await db.prepare("SELECT * FROM users ORDER BY session_id, id").all();
+      const bySession = new Map();
+      for (const r of rows) {
+        if (!bySession.has(r.session_id)) bySession.set(r.session_id, []);
+        bySession.get(r.session_id).push(r);
+      }
+      let mergedSessions = 0;
+      for (const [sessionId, sessionRows] of bySession) {
+        const users = sessionRows.map(r => ({
+          user: r.username, dropCount: r.drop_count, landedCount: r.landed_count,
+          highScore: r.high_score, bestHighScore: r.best_high_score, lastUpdate: r.last_update
+        }));
+        const merged = mergeUserScores(users);
+        const unchanged = merged.length === sessionRows.length && sessionRows.every(r => r.username === sanitizeUsername(r.username));
+        if (unchanged) continue;
+        await db.prepare("DELETE FROM users WHERE session_id = ?").run(sessionId);
+        for (const u of merged) {
+          await db.prepare(
+            `INSERT INTO users (session_id, username, drop_count, landed_count, high_score, best_high_score, last_update)
+                  VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).run(sessionId, u.user, u.dropCount || 0, u.landedCount || 0, u.highScore || 0, u.bestHighScore || 0, u.lastUpdate || null);
+        }
+        mergedSessions++;
+      }
+      if (mergedSessions > 0) console.log(`Migration: Merged duplicate player scores in ${mergedSessions} session(s)`);
+    } catch (e) {
+      console.error("Migration error merging duplicate player scores:", e.message);
+    }
+
     const counterRow = await db.prepare("SELECT * FROM stream_counter WHERE id = 1").get();
     if (!counterRow) {
       await db.prepare("INSERT INTO stream_counter (id, current_stream_number, last_stream_date) VALUES (?, ?, ?)").run(1, 0, "");
@@ -287,19 +349,10 @@ async function getAllSessions() {
 async function saveSessionData(sessionId, data) {
   if (!db) await initDb();
 
-  const sanitizeUsername = (name) =>
-    String(name || "")
-      .trim()
-      .replace(/^@+/, "")
-      .replace(/[,.:;!?]+$/, "")
-      .trim()
-      .toLowerCase();
-
   if (data.UserSession) {
     await db.prepare("DELETE FROM users WHERE session_id = ?").run(sessionId);
-    for (const user of data.UserSession) {
-      const cleanUsername = sanitizeUsername(user.user);
-      if (!cleanUsername) continue;
+    for (const user of mergeUserScores(data.UserSession)) {
+      const cleanUsername = user.user;
       await db.prepare(
         `INSERT INTO users (session_id, username, drop_count, landed_count, high_score, best_high_score, last_update)
               VALUES (?, ?, ?, ?, ?, ?, ?)`
@@ -419,14 +472,14 @@ async function loadSessionData(sessionId) {
     data.Notes = notesRows.map(n => n.text);
   }
 
-  data.UserSession = (await db.prepare("SELECT * FROM users WHERE session_id = ?").all(sessionId)).map(u => ({
+  data.UserSession = mergeUserScores((await db.prepare("SELECT * FROM users WHERE session_id = ?").all(sessionId)).map(u => ({
     user: u.username,
     dropCount: u.drop_count,
     landedCount: u.landed_count,
     highScore: u.high_score,
     bestHighScore: u.best_high_score,
     lastUpdate: u.last_update
-  }));
+  })));
 
   data.Todos = (await db.prepare("SELECT * FROM todos WHERE session_id = ?").all(sessionId)).map(t => ({
     id: t.id,
