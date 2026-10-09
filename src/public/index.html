@@ -360,7 +360,7 @@
                 ChatBotSay(message);
             }
             else if (flags.broadcaster && command === "cloud") {
-                cloud("Thumbs-up");
+                cloud("Tada");
             }
             else if (flags.broadcaster && command === "clean") {
                 console.log("!clean was typed in chat");
@@ -537,18 +537,15 @@
             }
             else if (command === "bonjour") {
                 console.log("!bonjour was typed in chat");
-                let i = Math.floor(Math.random() * 3);
-                console.log("i = ", i);
-                switch (i) {
-                    case 0:
-                        playSound("bonjour", SoundEnum.bonjourHi);
-                        break;
-                    case 1:
+                // surlydev gets the "sir" versions, everyone else the regular bonjour
+                if (user.toLowerCase() === "surlydev") {
+                    if (Math.random() < 0.5) {
                         playSound("sirbonjour", SoundEnum.sirbonjour);
-                        break;
-                    case 2:
+                    } else {
                         playSound("sirbonjourhowareyou", SoundEnum.sirbonjourhowareyou);
-                        break;
+                    }
+                } else {
+                    playSound("bonjour", SoundEnum.bonjourHi);
                 }
             }
             else if (command === "knock") {
