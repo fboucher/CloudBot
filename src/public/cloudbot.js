@@ -172,6 +172,34 @@ sanitizeUsername = function (name) {
         .toLowerCase();
 }
 
+// Load saved scores as UserSession objects, merging entries for the same player
+// ("@User", "@@user", "user") so one player never shows up more than once.
+loadUserSessions = function (savedUsers) {
+    const merged = [];
+    for (const o of savedUsers || []) {
+        const name = sanitizeUsername(o.user);
+        if (!name) continue;
+        const existing = merged.find(u => u.user === name);
+        if (!existing) {
+            const newUser = new UserSession();
+            for (const [key, value] of Object.entries(o)) {
+                newUser[key] = value;
+            }
+            newUser.user = name;
+            merged.push(newUser);
+            continue;
+        }
+        existing.dropCount = (existing.dropCount || 0) + (o.dropCount || 0);
+        existing.landedCount = (existing.landedCount || 0) + (o.landedCount || 0);
+        existing.highScore = Math.max(existing.highScore || 0, o.highScore || 0);
+        existing.bestHighScore = Math.max(existing.bestHighScore || 0, o.bestHighScore || 0);
+        if (o.lastUpdate && (!existing.lastUpdate || new Date(o.lastUpdate) > new Date(existing.lastUpdate))) {
+            existing.lastUpdate = o.lastUpdate;
+        }
+    }
+    return merged;
+}
+
 getUserPosition = function (userName) {
     console.log("... Searching for: " + userName);
     userName = sanitizeUsername(userName);
@@ -659,12 +687,7 @@ LoadStreamSession = function (data, projectName, isReload, callback) {
 
 
     // loading users scores
-    _streamSession.UserSession = data.UserSession.map((o) => {
-        const newUser = new UserSession();
-        for (const [key, value] of Object.entries(o)) {
-            newUser[key] = value;
-        } return newUser;
-    });
+    _streamSession.UserSession = loadUserSessions(data.UserSession);
 
     if (callback !== undefined && callback !== null) {
         callback(projectName);
@@ -1789,12 +1812,7 @@ async function loadSessionFromDb() {
         }
 
         if (data.UserSession) {
-            _streamSession.UserSession = data.UserSession.map((o) => {
-                const newUser = new UserSession();
-                for (const [key, value] of Object.entries(o)) {
-                    newUser[key] = value;
-                } return newUser;
-            });
+            _streamSession.UserSession = loadUserSessions(data.UserSession);
         }
 
         if (data.NewFollowers) {
