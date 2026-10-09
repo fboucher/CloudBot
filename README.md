@@ -1,5 +1,5 @@
 # Cloud Bot
-![Release Docker Image](https://img.shields.io/github/actions/workflow/status/FBoucher/CloudBot/release-docker-image.yml?branch=main&style=flat-square&label=release%20docker) ![Build Beta Docker](https://img.shields.io/github/actions/workflow/status/FBoucher/CloudBot/simple-docker-image.yml?branch=main&style=flat-square&label=build%20beta%20docker) ![GitHub Release](https://img.shields.io/github/v/release/FBoucher/CloudBot?style=flat-square) ![Docker Pulls](https://img.shields.io/docker/pulls/fboucher/cloudbot?style=flat-square) ![License](https://img.shields.io/github/license/FBoucher/CloudBot?style=flat-square)
+[![Release Docker Image](https://img.shields.io/github/actions/workflow/status/FBoucher/CloudBot/release-docker-image.yml?event=release&style=flat-square&label=release%20docker)](https://github.com/FBoucher/CloudBot/actions/workflows/release-docker-image.yml) [![Build Beta Docker](https://img.shields.io/github/actions/workflow/status/FBoucher/CloudBot/simple-docker-image.yml?branch=main&style=flat-square&label=build%20beta%20docker)](https://github.com/FBoucher/CloudBot/actions/workflows/simple-docker-image.yml) [![GitHub Release](https://img.shields.io/github/v/release/FBoucher/CloudBot?style=flat-square)](https://github.com/FBoucher/CloudBot/releases) [![Docker Pulls](https://img.shields.io/docker/pulls/fboucher/cloudbot?style=flat-square)](https://hub.docker.com/r/fboucher/cloudbot) [![License](https://img.shields.io/github/license/FBoucher/CloudBot?style=flat-square)](LICENSE)
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
 [![All Contributors](https://img.shields.io/badge/all_contributors-2-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
@@ -13,46 +13,69 @@ First it was a pretext to learn (or refresh) my JavaScript knowledge, but it bec
 Currently Available Commands
 ----------------------------
 
-Games:
-- **!stats**: Display current user stats
+### Games & RPG
+- **!drop**: Drop from the top of the screen onto the moving cloud to score points and climb the leaderboard!
+- **!search**, **!loot**: Search the cloud forest for RPG items (10 min cooldown).
+- **!bag**, **!inventory**: View your inventory of collected RPG items (holds up to 5 items).
+- **!use** `<item>`: Use an RPG item (`potion`, `shield`, `umbrella`, `rain-stone`, `sun-stone`, `bomb`, `shovel`) to trigger visual effects on stream.
+- **!roll**, **!dice**, **!2d6**: Roll two 6-sided dice with sound effects and a 3D animated dice overlay.
+- **!rpg**, **!rpg-help**, **!loot-help**: Display RPG Loot Game rules and commands in chat.
+- **!stats**: Display current user stats (total drops, landings, and high score).
+- **!scores**: Display the highest scores leaderboard on the stream overlay.
 
-Sounds:
-- **!bonjour**: play sound "Bonjour Hi" 3 different version at random
-- **!bad**: play sound "Bonjour Hi"
-- **!yeah**: play sound "Yeeeeeeaaaah!"
-- **!knock** : Play sound "Realistic knock on a door"
-- **!previously** : Play sound "Previously on Frank's channel" said by Jeff Fritz
+### CeeBee (Visuals & AI)
+- **!ceebee** `<message>`: Chat with Ceebee the AI assistant (or tag `@ceebee` in chat).
+- **!cloud**: Show Ceebee spinning like a tornado and striking a "Ta-da!" pose.
+- **!yes**: Show Ceebee giving a thumbs-up.
+- **!shout** `<text>`: Display a large shouting text overlay across the screen.
+- *(Passive)*: Chat messages with `lol` or `lul` trigger Ceebee's laughing animation.
 
-CB:
-- **!cloud** : Show CD (aka Cloud Bot) GIF
+### Weather & Environment
+- **!rain**: Summon dark storm clouds, animated rainfall, and rain sound effects.
+- **!sun**: Clear weather overrides and bring back the sunny sky.
 
-Tools: 
-- **!time** <text>: Add a time log to the show notes (those are used to create timestamps on YouTube)
-- **!attention** <text>: Play a notification sound and draw the text in the screen.
-- **!note** <text>: Add a note/ code snippet / url useful during the stream
-- **!cmd**, **!command**, **!commands**: Display in the chat the URL back to this list.
-- **!referal**, **!referals**: Display in the chat the URL(s) of Frank's referal(s).
-- **!livecoder**, **!livecoders**: Provide more info about Live Codersin the chat.
+### Sounds
+- **!bonjour**: Play sound "Bonjour Hi" (3 random variations; special "sir bonjour" variations for `@surlydev`).
+- **!bad**: Play sound "I have a bad feeling about this".
+- **!yeah**: Play sound "Yeeeeeeaaaah!".
+- **!knock**: Play sound "Realistic knock on a door".
+- **!previously**: Play sound "Previously on Frank's channel" said by Jeff Fritz.
 
-Only Broadcaster:
-- **!scores**: display table of highest scores
-- **!clean**: hide/ clean all previous text in the screen
-- **!load**: Load the file containing the previous session data.
-- **!save**: Save in a local file `streamSession.json` the current session data.
-- **!talk**: The bot will repete the message
-- **!so**  <text>: shout-out! to user.
+### Tools
+- **!time** `<text>`: Add a time log to the show notes (used to generate timestamps on YouTube).
+- **!attention** `<text>`: Play a notification sound and display speech bubble text on screen.
+- **!note** `<text>`: Add a note, code snippet, or URL useful during the stream.
+- **!cmd**, **!command**, **!commands**: Display in the chat the URL back to this command list.
+- **!referral**, **!referrals**: Display referral link(s) (e.g. GitKraken).
+- **!livecoder**, **!livecoders**: Provide more info about the Live Coders stream team in chat.
 
-- **!todo-add** <text>:  Add a new To-Do
-- **!todo-start** <number>:  Set the identified To-Do as active
-- **!todo-cancel** <number>:  Set the identified To-Do as cancelled
-- **!todo-done** <number>:  Set the identified To-Do as done/ closed
+### Broadcaster Only
+- **!start** `<projectName>`: Start a new stream session and initialize logging.
+- **!stop**: End the stream session and display the scrolling StreamNotes end-screen overlay.
+- **!hide**: Hide the StreamNotes panel.
+- **!so** `<username>`: Shout-out another streamer with Twitch Helix API profile info and animated overlay banner.
+- **!hello**: Greet chat and display Ceebee greeting animation.
+- **!clean**: Hide and clean all active overlays, text bubbles, and images from the screen.
+- **!talk** `<text>`: Make the bot repeat a message in chat.
+- **!load**: Load previous session data.
+- **!save**: Save current session data locally.
+- **!ok-bye**: Disconnect the bot from chat.
 
-- **!reminder-add** <reminder Key Name> | reminder description:  Create a new reminder.
-- **!reminder-stop** <reminder Key Name>:  Set the reminder with the name equal to <reminder Key Name> to DONE.
-- **!reminder-pause** <reminder Key Name>:  Pause the reminder with the name equal to <reminder Key Name>. Set its status to inactive.
+#### To-Do List Management
+- **!todo-add** `<text>`: Add a new To-Do item.
+- **!todo-start** `<number>`: Set the identified To-Do to in-progress.
+- **!todo-done** `<number>`: Mark the identified To-Do as completed.
+- **!todo-cancel** `<number>`: Cancel the identified To-Do.
+- **!todo-show**: Display the To-Do list overlay on screen.
+- **!todo-hide**: Hide the To-Do list overlay from the screen.
+
+#### Stream Reminders
+- **!reminder-add** `<Reminder Name> | <description>`: Create a new reminder (use `|` to separate name and description).
+- **!reminder-pause** `<Reminder Name>`: Pause the reminder (set status to inactive).
+- **!reminder-stop** `<Reminder Name>`: Mark the reminder as done.
 
 
-Upcomming Available Commands
+Upcoming Available Commands
 ----------------------------
 
 - lift
@@ -120,6 +143,16 @@ docker run -p 3001:3000 -d -v ${PWD}/src/io:/usr/src/app/io -e CLIENT_ID=your_tw
 ```
 
 Then open `http://localhost:3001/admin` in your browser to start a stream session, or type `!start [projectName]` in Twitch chat.
+
+### Web Admin Panel
+
+CloudBot includes a built-in web dashboard accessible at `http://localhost:3000/admin` (or `http://localhost:3001/admin` when using Docker/Podman):
+
+- **Dashboard**: Real-time session status, active participant count, and quick controls.
+- **Current Session**: Manage the live stream session, add/edit notes, track stream events, and maintain live To-Dos and Reminders.
+- **Session History**: Browse past sessions and copy/export generated Markdown show notes (ready for YouTube descriptions and timestamps).
+- **Users & Leaderboard**: Track user drop game statistics, view high scores, and manage participant streamer flags.
+- **Ceebee AI Settings**: Configure LLM providers (OpenAI / Azure OpenAI endpoints and keys), edit Ceebee's system prompt (`soul.md`), upload knowledge base documents (`io/knowledge/`), and configure chat auto-participation.
 
 ~ **Have fun!**
 
