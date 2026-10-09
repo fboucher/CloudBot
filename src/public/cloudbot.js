@@ -212,9 +212,31 @@ cloud = function (expression) {
 ChatBotShow = function (expression, imgText) {
 
     const fileName = "CB-" + expression + ".gif";
-    document.querySelector("#imageViewer").innerHTML = "<img src='public/medias/" + fileName + "' class='nuage'>";
-    document.querySelector("#imageViewer").innerHTML += "<img src='public/medias/generated/" + imgText + "' class='textBubble'>";
+    const viewer = document.querySelector("#imageViewer");
+    // Attention messages are long: push Ceebee further left to leave room for the text
+    const ceebeeClass = expression === 'Talking' ? 'nuage nuage-left' : 'nuage';
+    viewer.innerHTML = "<img src='public/medias/" + fileName + "' class='" + ceebeeClass + "'>";
+    if (imgText) {
+        const bubble = new Image();
+        bubble.className = 'textBubble';
+        bubble.style.visibility = 'hidden';
+        // Attention text is long: keep it at its natural size at most
+        const maxScale = expression === 'Talking' ? 1 : 2;
+        bubble.onload = () => fitTextBubble(bubble, maxScale);
+        bubble.src = 'public/medias/generated/' + imgText;
+        viewer.appendChild(bubble);
+    }
     setTimeout(() => { clean(); }, 5000);
+}
+
+// Scale the text bubble up to maxScale, but never past the right edge or the screen height
+fitTextBubble = function (bubble, maxScale) {
+    const left = bubble.getBoundingClientRect().left;
+    const availableWidth = window.innerWidth - left - 20;
+    const availableHeight = window.innerHeight * 0.9;
+    const scale = Math.min(maxScale, availableWidth / bubble.naturalWidth, availableHeight / bubble.naturalHeight);
+    bubble.style.transform = 'scale(' + scale + ')';
+    bubble.style.visibility = 'visible';
 }
 
 sleep = function (ms) {
@@ -425,7 +447,7 @@ hello = function (user) {
             //ChatBotSay(result.msg);
 
             setTimeout(() => {
-                ChatBotShow('Thumbs-up', result.msg)
+                ChatBotShow('Hello', result.msg)
             }, 1000);
 
         })
@@ -451,7 +473,7 @@ Attention = function (user, message) {
             console.log('Success:', result);
 
             setTimeout(() => {
-                ChatBotShow('Thumbs-up', result.msg)
+                ChatBotShow('Talking', result.msg)
                 playSound("hmmhmm", SoundEnum.hmmhmm);
             }, 1000);
 
@@ -1599,16 +1621,16 @@ function handleEffect(effect) {
     switch (effect.type) {
         case 'hello':
             if (effect.image) {
-                ChatBotShow('Thumbs-up', effect.image);
+                ChatBotShow('Hello', effect.image);
             } else {
-                cloud('Thumbs-up');
+                cloud('Hello');
             }
             playSound('yeah', SoundEnum.yeah);
             break;
 
         case 'attention':
             if (effect.image) {
-                ChatBotShow('Thumbs-up', effect.image);
+                ChatBotShow('Talking', effect.image);
             }
             playSound('hmmhmm', SoundEnum.hmmhmm);
             break;

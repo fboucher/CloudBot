@@ -220,6 +220,7 @@
             .then(data => {
                 if (data.shouldGreet && data.greetingMessage) {
                     CeebeeSay(data.greetingMessage);
+                    cloud("Hello");
                 }
                 if (data.shouldShoutout && data.shoutoutMessage) {
                     CeebeeSay(data.shoutoutMessage);
@@ -345,6 +346,9 @@
             //== 
 
             //-- fun ---------
+            else if (command === "yes") {
+                ChatBotShow('Thumbs-up');
+            }
             else if (command === "shout") {
                 ChatBotShout(message);
             }
@@ -356,7 +360,7 @@
                 ChatBotSay(message);
             }
             else if (flags.broadcaster && command === "cloud") {
-                cloud("Thumbs-up");
+                cloud("Tada");
             }
             else if (flags.broadcaster && command === "clean") {
                 console.log("!clean was typed in chat");
@@ -533,18 +537,15 @@
             }
             else if (command === "bonjour") {
                 console.log("!bonjour was typed in chat");
-                let i = Math.floor(Math.random() * 3);
-                console.log("i = ", i);
-                switch (i) {
-                    case 0:
-                        playSound("bonjour", SoundEnum.bonjourHi);
-                        break;
-                    case 1:
+                // surlydev gets the "sir" versions, everyone else the regular bonjour
+                if (user.toLowerCase() === "surlydev") {
+                    if (Math.random() < 0.5) {
                         playSound("sirbonjour", SoundEnum.sirbonjour);
-                        break;
-                    case 2:
+                    } else {
                         playSound("sirbonjourhowareyou", SoundEnum.sirbonjourhowareyou);
-                        break;
+                    }
+                } else {
+                    playSound("bonjour", SoundEnum.bonjourHi);
                 }
             }
             else if (command === "knock") {
@@ -568,6 +569,11 @@
             const bracketCommand = extractBracketCommand(message);
             if (bracketCommand) {
                 ComfyJS.onCommand(bracketCommand.user, bracketCommand.command, bracketCommand.message, flags, self, extra);
+            }
+
+            // Ceebee laughs along when someone types lol / lul
+            if (/\b(lol|lul)\b/i.test(message) && user !== "ceebee" && user !== "ceebee_bot") {
+                ChatBotShow('Laughing');
             }
 
             // Check if Ceebee is mentioned in normal chat

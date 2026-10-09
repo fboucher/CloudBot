@@ -26,23 +26,30 @@ td {
 #imageViewer {
     position: fixed;
     top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    left: 1vw;
+    transform: translateY(-50%);
     z-index: 10000;
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 180px;
+    justify-content: flex-start;
+    gap: 0;
 }
 
 .textBubble {
     z-index: 3;
+    flex-shrink: 0;
     transform: scale(2);
+    transform-origin: left center;
 }
 
 .nuage {
     z-index: 2;
-    transform: scale(2);
+    flex-shrink: 0;
+    transform: scale(1);
+}
+
+.nuage-left {
+    margin-left: -150px;
 }
 
 #todoArea {
