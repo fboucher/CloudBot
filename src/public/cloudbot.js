@@ -172,6 +172,34 @@ sanitizeUsername = function (name) {
         .toLowerCase();
 }
 
+// Load saved scores as UserSession objects, merging entries for the same player
+// ("@User", "@@user", "user") so one player never shows up more than once.
+loadUserSessions = function (savedUsers) {
+    const merged = [];
+    for (const o of savedUsers || []) {
+        const name = sanitizeUsername(o.user);
+        if (!name) continue;
+        const existing = merged.find(u => u.user === name);
+        if (!existing) {
+            const newUser = new UserSession();
+            for (const [key, value] of Object.entries(o)) {
+                newUser[key] = value;
+            }
+            newUser.user = name;
+            merged.push(newUser);
+            continue;
+        }
+        existing.dropCount = (existing.dropCount || 0) + (o.dropCount || 0);
+        existing.landedCount = (existing.landedCount || 0) + (o.landedCount || 0);
+        existing.highScore = Math.max(existing.highScore || 0, o.highScore || 0);
+        existing.bestHighScore = Math.max(existing.bestHighScore || 0, o.bestHighScore || 0);
+        if (o.lastUpdate && (!existing.lastUpdate || new Date(o.lastUpdate) > new Date(existing.lastUpdate))) {
+            existing.lastUpdate = o.lastUpdate;
+        }
+    }
+    return merged;
+}
+
 getUserPosition = function (userName) {
     console.log("... Searching for: " + userName);
     userName = sanitizeUsername(userName);
@@ -212,9 +240,31 @@ cloud = function (expression) {
 ChatBotShow = function (expression, imgText) {
 
     const fileName = "CB-" + expression + ".gif";
-    document.querySelector("#imageViewer").innerHTML = "<img src='public/medias/" + fileName + "' class='nuage'>";
-    document.querySelector("#imageViewer").innerHTML += "<img src='public/medias/generated/" + imgText + "' class='textBubble'>";
+    const viewer = document.querySelector("#imageViewer");
+    // Attention messages are long: push Ceebee further left to leave room for the text
+    const ceebeeClass = expression === 'Talking' ? 'nuage nuage-left' : 'nuage';
+    viewer.innerHTML = "<img src='public/medias/" + fileName + "' class='" + ceebeeClass + "'>";
+    if (imgText) {
+        const bubble = new Image();
+        bubble.className = 'textBubble';
+        bubble.style.visibility = 'hidden';
+        // Attention text is long: keep it at its natural size at most
+        const maxScale = expression === 'Talking' ? 1 : 2;
+        bubble.onload = () => fitTextBubble(bubble, maxScale);
+        bubble.src = 'public/medias/generated/' + imgText;
+        viewer.appendChild(bubble);
+    }
     setTimeout(() => { clean(); }, 5000);
+}
+
+// Scale the text bubble up to maxScale, but never past the right edge or the screen height
+fitTextBubble = function (bubble, maxScale) {
+    const left = bubble.getBoundingClientRect().left;
+    const availableWidth = window.innerWidth - left - 20;
+    const availableHeight = window.innerHeight * 0.9;
+    const scale = Math.min(maxScale, availableWidth / bubble.naturalWidth, availableHeight / bubble.naturalHeight);
+    bubble.style.transform = 'scale(' + scale + ')';
+    bubble.style.visibility = 'visible';
 }
 
 sleep = function (ms) {
@@ -425,7 +475,7 @@ hello = function (user) {
             //ChatBotSay(result.msg);
 
             setTimeout(() => {
-                ChatBotShow('Thumbs-up', result.msg)
+                ChatBotShow('Hello', result.msg)
             }, 1000);
 
         })
@@ -451,7 +501,7 @@ Attention = function (user, message) {
             console.log('Success:', result);
 
             setTimeout(() => {
-                ChatBotShow('Thumbs-up', result.msg)
+                ChatBotShow('Talking', result.msg)
                 playSound("hmmhmm", SoundEnum.hmmhmm);
             }, 1000);
 
@@ -637,12 +687,7 @@ LoadStreamSession = function (data, projectName, isReload, callback) {
 
 
     // loading users scores
-    _streamSession.UserSession = data.UserSession.map((o) => {
-        const newUser = new UserSession();
-        for (const [key, value] of Object.entries(o)) {
-            newUser[key] = value;
-        } return newUser;
-    });
+    _streamSession.UserSession = loadUserSessions(data.UserSession);
 
     if (callback !== undefined && callback !== null) {
         callback(projectName);
@@ -1599,16 +1644,16 @@ function handleEffect(effect) {
     switch (effect.type) {
         case 'hello':
             if (effect.image) {
-                ChatBotShow('Thumbs-up', effect.image);
+                ChatBotShow('Hello', effect.image);
             } else {
-                cloud('Thumbs-up');
+                cloud('Hello');
             }
             playSound('yeah', SoundEnum.yeah);
             break;
 
         case 'attention':
             if (effect.image) {
-                ChatBotShow('Thumbs-up', effect.image);
+                ChatBotShow('Talking', effect.image);
             }
             playSound('hmmhmm', SoundEnum.hmmhmm);
             break;
@@ -1767,12 +1812,7 @@ async function loadSessionFromDb() {
         }
 
         if (data.UserSession) {
-            _streamSession.UserSession = data.UserSession.map((o) => {
-                const newUser = new UserSession();
-                for (const [key, value] of Object.entries(o)) {
-                    newUser[key] = value;
-                } return newUser;
-            });
+            _streamSession.UserSession = loadUserSessions(data.UserSession);
         }
 
         if (data.NewFollowers) {

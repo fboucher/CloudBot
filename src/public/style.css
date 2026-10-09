@@ -26,23 +26,30 @@ td {
 #imageViewer {
     position: fixed;
     top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    left: 1vw;
+    transform: translateY(-50%);
     z-index: 10000;
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 180px;
+    justify-content: flex-start;
+    gap: 0;
 }
 
 .textBubble {
     z-index: 3;
+    flex-shrink: 0;
     transform: scale(2);
+    transform-origin: left center;
 }
 
 .nuage {
     z-index: 2;
-    transform: scale(2);
+    flex-shrink: 0;
+    transform: scale(1);
+}
+
+.nuage-left {
+    margin-left: -150px;
 }
 
 #todoArea {
@@ -711,187 +718,9 @@ div.splat-toggle .splat {
     font-size: 0.8em;
 }
 
-/* ===== RPG LOOT GAME EFFECTS ===== */
+/* ===== WEATHER EFFECTS (loot item visuals live in fx.js, styles at the end of this file) ===== */
 
-/* 1. Healing Bubbles (Potion) */
-.bubble-effect {
-    position: fixed;
-    bottom: -50px;
-    width: 20px;
-    height: 20px;
-    background: rgba(46, 204, 113, 0.7);
-    border-radius: 50%;
-    z-index: 10000;
-    pointer-events: none;
-    box-shadow: 0 0 25px rgba(46, 204, 113, 0.85), inset 0 0 10px rgba(255, 255, 255, 0.7);
-    animation: riseAndFade 8s ease-in forwards;
-}
-
-@keyframes riseAndFade {
-    0% {
-        transform: translateY(0) scale(0.5);
-        opacity: 0;
-    }
-    10% {
-        opacity: 1;
-    }
-    80% {
-        opacity: 1;
-    }
-    100% {
-        transform: translateY(-110vh) scale(1.5);
-        opacity: 0;
-    }
-}
-
-/* 2. Shield Deflection (Enlarged and positioned dynamically) */
-.shield-overlay {
-    position: fixed;
-    width: 600px;
-    height: 600px;
-    border: 15px solid rgba(52, 152, 219, 0.85);
-    border-radius: 50%;
-    box-shadow: 0 0 60px rgba(52, 152, 219, 0.95), inset 0 0 50px rgba(52, 152, 219, 0.6);
-    background-color: rgba(52, 152, 219, 0.15);
-    z-index: 10000;
-    pointer-events: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    animation: shieldPulse 5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-}
-
-.shield-overlay::after {
-    content: '🛡️';
-    font-size: 250px;
-    filter: drop-shadow(0 0 25px rgba(52, 152, 219, 0.95));
-}
-
-@keyframes shieldPulse {
-    0% {
-        transform: translate(-50%, -50%) scale(0.2);
-        opacity: 0;
-    }
-    20% {
-        transform: translate(-50%, -50%) scale(1.3);
-        opacity: 0.9;
-    }
-    30% {
-        transform: translate(-50%, -50%) scale(1.2);
-    }
-    85% {
-        opacity: 0.9;
-        transform: translate(-50%, -50%) scale(1.2);
-    }
-    100% {
-        transform: translate(-50%, -50%) scale(0.9);
-        opacity: 0;
-    }
-}
-
-/* 3. Screen Shake & Smoke (Bomb) */
-.screen-shake {
-    animation: shakeEffect 2s cubic-bezier(.36,.07,.19,.97) both;
-}
-
-@keyframes shakeEffect {
-    5%, 95% { transform: translate3d(-3px, 0, 0); }
-    10%, 90% { transform: translate3d(5px, 0, 0); }
-    15%, 85% { transform: translate3d(-7px, 0, 0); }
-    20%, 80% { transform: translate3d(9px, 0, 0); }
-    25%, 75% { transform: translate3d(-11px, 0, 0); }
-    30%, 70% { transform: translate3d(11px, 0, 0); }
-    35%, 45%, 55%, 65% { transform: translate3d(-13px, 0, 0); }
-    40%, 50%, 60% { transform: translate3d(13px, 0, 0); }
-}
-
-.smoke-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(circle, rgba(40, 40, 45, 0.8) 0%, rgba(15, 15, 18, 0.9) 100%);
-    z-index: 10001;
-    pointer-events: none;
-    opacity: 0;
-    backdrop-filter: blur(8px);
-    animation: smokeBillow 12s ease-out forwards;
-}
-
-@keyframes smokeBillow {
-    0% { opacity: 0; filter: blur(0px); }
-    15% { opacity: 1; filter: blur(6px); }
-    75% { opacity: 0.8; filter: blur(5px); }
-    100% { opacity: 0; filter: blur(0px); }
-}
-
-/* 4. Umbrella protective overlay */
-.umbrella-overlay {
-    position: fixed;
-    width: 450px;
-    height: 450px;
-    border-radius: 50%;
-    /* alternating slate-blue and soft-white sectors with 3D lighting reflection */
-    background: 
-        radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 65%),
-        conic-gradient(from 0deg, 
-            #2b5c8f 0deg 45deg, 
-            #eef2f5 45deg 90deg, 
-            #2b5c8f 90deg 135deg, 
-            #eef2f5 135deg 180deg, 
-            #2b5c8f 180deg 225deg, 
-            #eef2f5 225deg 270deg, 
-            #2b5c8f 270deg 315deg, 
-            #eef2f5 315deg 360deg
-        );
-    border: 3px solid #1a3c61;
-    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.4);
-    z-index: 9999;
-    pointer-events: none;
-    opacity: 0;
-    animation: umbrellaOpen 6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-}
-
-.umbrella-overlay::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 18px;
-    height: 18px;
-    background: radial-gradient(circle at 30% 30%, #ffffff 0%, #bdc3c7 70%, #7f8c8d 100%);
-    border-radius: 50%;
-    border: 1px solid #34495e;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.5);
-}
-
-@keyframes umbrellaOpen {
-    0% {
-        transform: translate(-50%, -120vh) scale(0.2) rotate(0deg);
-        opacity: 0;
-    }
-    20% {
-        transform: translate(-50%, -50%) scale(1.2) rotate(180deg);
-        opacity: 0.95;
-    }
-    35% {
-        transform: translate(-50%, -50%) scale(1) rotate(360deg);
-        opacity: 0.95;
-    }
-    80% {
-        opacity: 0.95;
-        transform: translate(-50%, -50%) scale(1) rotate(1080deg);
-    }
-    100% {
-        transform: translate(-50%, 120vh) scale(0.8) rotate(1440deg);
-        opacity: 0;
-    }
-}
-
-/* 5. Star Celebration Overlay */
+/* Star Celebration Overlay (sub/cheer weather) */
 .celebration-star {
     position: fixed;
     top: -50px;
@@ -918,7 +747,7 @@ div.splat-toggle .splat {
     }
 }
 
-/* 6. Thunder Flash (Thunderstorm Raid) */
+/* Thunder Flash (Thunderstorm Raid) */
 .thunder-flash {
     position: fixed;
     top: 0;
@@ -1090,197 +919,325 @@ div.splat-toggle .splat {
     100% { opacity: 0; }
 }
 
-/* ===== MUD STONE SPLAT EFFECT ===== */
-.mud-splat {
+/* ===== LOOT ITEM EFFECTS (driven by fx.js) ===== */
+.fx-canvas {
     position: fixed;
-    z-index: 10000;
-    background: radial-gradient(circle at 35% 35%, #5d4037 0%, #3e2723 100%);
-    box-shadow: 
-        0 8px 16px rgba(0, 0, 0, 0.4), 
-        inset -4px -4px 8px rgba(0, 0, 0, 0.6), 
-        inset 4px 4px 8px rgba(255, 255, 255, 0.15);
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+}
+
+.fx-canvas--pixel {
+    z-index: 10003;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+.fx-canvas--hi {
+    z-index: 10004;
+}
+
+/* RPG dialogue window announcing who used the item */
+#fxBannerStack {
+    position: fixed;
+    top: 4%;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    z-index: 10010;
+    pointer-events: none;
+}
+
+.fx-banner {
+    --fx-item: #7dfcb2;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 22px;
+    line-height: 1.4;
+    color: #ffffff;
+    padding: 18px 28px;
+    white-space: nowrap;
+    background: linear-gradient(180deg, #3b4fc4 0%, #1b2477 55%, #0c1145 100%);
+    border: 4px solid #f4f4f4;
+    border-radius: 10px;
+    box-shadow:
+        0 0 0 4px #0b0d2a,
+        0 14px 30px rgba(0, 0, 0, 0.55),
+        inset 0 0 0 2px rgba(0, 0, 0, 0.35),
+        inset 0 4px 0 rgba(255, 255, 255, 0.25);
+    text-shadow: 3px 3px 0 #000;
+    animation: fxBannerIn 0.45s steps(6) both;
+}
+
+.fx-banner--out {
+    animation: fxBannerOut 0.5s steps(5) forwards;
+}
+
+.fx-banner__user {
+    color: #ffe066;
+}
+
+.fx-banner__item {
+    color: var(--fx-item);
+    text-transform: uppercase;
+    text-shadow: 3px 3px 0 #000, 0 0 14px var(--fx-item);
+}
+
+.fx-banner--potion { --fx-item: #6dff9e; }
+.fx-banner--shield { --fx-item: #8fdcff; }
+.fx-banner--umbrella { --fx-item: #ff8fa3; }
+.fx-banner--bomb { --fx-item: #ff9f43; }
+.fx-banner--sun { --fx-item: #ffd23f; }
+.fx-banner--storm { --fx-item: #9fd8ff; }
+.fx-banner--shovel { --fx-item: #d9a066; }
+
+@keyframes fxBannerIn {
+    0% { transform: scale(0.3, 0.05); opacity: 0; }
+    40% { transform: scale(1, 0.05); opacity: 1; }
+    100% { transform: scale(1, 1); opacity: 1; }
+}
+
+@keyframes fxBannerOut {
+    0% { transform: scale(1, 1); opacity: 1; }
+    60% { transform: scale(1, 0.05); opacity: 1; }
+    100% { transform: scale(0.3, 0.05); opacity: 0; }
+}
+
+/* RPG damage-number popup */
+.fx-float-text {
+    --c: #ffffff;
+    position: fixed;
+    z-index: 10011;
+    pointer-events: none;
+    white-space: nowrap;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 54px;
+    color: var(--c);
+    text-shadow: 4px 4px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 0 0 24px var(--c);
+    transform: translate(-50%, -50%);
+    animation: fxFloat 2.2s ease-out forwards;
+}
+
+@keyframes fxFloat {
+    0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0; }
+    12% { transform: translate(-50%, -80%) scale(1.25); opacity: 1; }
+    22% { transform: translate(-50%, -70%) scale(1); }
+    80% { opacity: 1; }
+    100% { transform: translate(-50%, -190%) scale(1); opacity: 0; }
+}
+
+/* Cinematic edge grading behind the HD-2D effects */
+.fx-vignette {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 10002;
     pointer-events: none;
     opacity: 0;
-    animation: 
-        mudImpact 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, 
-        mudDrip 10s linear forwards;
-    transition: opacity 2s ease-out;
+    animation: fxVignette 6s ease-in-out forwards;
 }
 
-.mud-splat.fade-out {
-    opacity: 0 !important;
+.fx-vignette--potion { background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 45%, rgba(10, 70, 40, 0.45) 100%); }
+.fx-vignette--sun { background: radial-gradient(ellipse at center, rgba(255, 220, 140, 0.08) 30%, rgba(255, 150, 40, 0.4) 100%); }
+.fx-vignette--storm { background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 35%, rgba(5, 15, 45, 0.7) 100%); }
+.fx-vignette--fail { background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 40%, rgba(120, 0, 0, 0.55) 100%); }
+
+@keyframes fxVignette {
+    0% { opacity: 0; }
+    12% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
 }
 
-@keyframes mudImpact {
-    0% {
-        opacity: 0;
-        transform: scale(0);
-    }
-    100% {
-        opacity: 1;
-    }
+/* 3D dice */
+.fx-dice-layer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    perspective: 1400px;
+    pointer-events: none;
+    z-index: 10005;
+    transition: opacity 1s ease-out;
 }
 
-@keyframes mudDrip {
-    0% {
-        margin-top: 0px;
-    }
-    100% {
-        margin-top: 50px;
-    }
+.fx-dice-layer--out {
+    opacity: 0;
 }
 
-/* ===== 3D DICE OVERLAY EFFECT ===== */
-.dice-container {
-    perspective: 1000px;
-    transform-style: preserve-3d;
-}
-
-.dice-container.dice-bounce-left {
-    animation: diceFallAndBounceLeft 3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-}
-
-.dice-container.dice-bounce-right {
-    animation: diceFallAndBounceRight 3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-}
-
-.dice {
-    position: relative;
-    width: 200px;
-    height: 200px;
-    transform-style: preserve-3d;
-    transition: transform 3s cubic-bezier(0.2, 0.8, 0.3, 1);
-}
-
-.face {
+.fx-die-wrap,
+.fx-die-shadow {
     position: absolute;
-    width: 200px;
-    height: 200px;
-    background: #ffffff;
-    border: 8px solid #1a1a1a;
-    border-radius: 32px;
+    left: 0;
+    top: 0;
+    will-change: transform;
+}
+
+.fx-die-wrap {
+    width: var(--s);
+    height: var(--s);
+    transform-style: preserve-3d;
+}
+
+.fx-die-shadow {
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0) 70%);
+    transform-origin: 50% 50%;
+}
+
+.fx-die {
+    position: relative;
+    width: var(--s);
+    height: var(--s);
+    transform-style: preserve-3d;
+}
+
+.fx-die__face,
+.fx-die__core {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     box-sizing: border-box;
+}
+
+.fx-die__face {
+    border-radius: 20%;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     grid-template-rows: repeat(3, 1fr);
-    padding: 20px;
+    padding: 14%;
     backface-visibility: hidden;
-    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.15), 0 10px 30px rgba(0, 0, 0, 0.4);
 }
 
-/* Face positioning (200px size = 100px translateZ) */
-.face.front  { transform: rotateY(0deg) translateZ(100px); }
-.face.back   { transform: rotateY(180deg) translateZ(100px); }
-.face.right  { transform: rotateY(90deg) translateZ(100px); }
-.face.left   { transform: rotateY(-90deg) translateZ(100px); }
-.face.top    { transform: rotateX(90deg) translateZ(100px); }
-.face.bottom { transform: rotateX(-90deg) translateZ(100px); }
+.fx-die__face--front { transform: translateZ(calc(var(--s) / 2)); }
+.fx-die__face--back { transform: rotateY(180deg) translateZ(calc(var(--s) / 2)); }
+.fx-die__face--right { transform: rotateY(90deg) translateZ(calc(var(--s) / 2)); }
+.fx-die__face--left { transform: rotateY(-90deg) translateZ(calc(var(--s) / 2)); }
+.fx-die__face--top { transform: rotateX(90deg) translateZ(calc(var(--s) / 2)); }
+.fx-die__face--bottom { transform: rotateX(-90deg) translateZ(calc(var(--s) / 2)); }
 
-/* Pips styling */
-.face .pip {
-    display: block;
-    width: 32px;
-    height: 32px;
-    background-color: #2c3e50;
+/* inner planes fill the gaps left by the rounded corners */
+.fx-die__core { border-radius: 6%; }
+.fx-die__core--x { transform: rotateY(90deg) scale(0.97); }
+.fx-die__core--y { transform: rotateX(90deg) scale(0.97); }
+.fx-die__core--z { transform: scale(0.97); }
+
+.fx-pip {
+    place-self: center;
+    width: 72%;
+    aspect-ratio: 1;
     border-radius: 50%;
-    margin: auto;
-    box-shadow: inset 2px 2px 5px rgba(0,0,0,0.6);
 }
 
-/* Traditional red dot on Face 1 */
-.face.front .pip {
-    width: 48px;
-    height: 48px;
-    background-color: #e74c3c;
+.fx-die__face--front .fx-pip {
+    width: 115%;
 }
 
-/* ===== RED DICE OVERLAY STYLING ===== */
-.dice.red-dice .face {
-    background: radial-gradient(circle at 35% 35%, #e74c3c 0%, #c0392b 100%);
-    border-color: #7f0000;
-    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.4);
+.fx-die--red .fx-die__face {
+    background: radial-gradient(circle at 30% 25%, #ff7a6b 0%, #e0352a 45%, #9c140d 100%);
+    box-shadow:
+        inset 0 0 0 2px rgba(255, 255, 255, 0.12),
+        inset -10px -12px 24px rgba(60, 0, 0, 0.45),
+        inset 10px 10px 18px rgba(255, 200, 190, 0.3);
 }
 
-.dice.red-dice .face .pip {
-    background-color: #ffffff;
-    box-shadow: inset 1px 1px 4px rgba(0,0,0,0.3);
+.fx-die--red .fx-die__core { background: #b81e14; }
+
+.fx-die--red .fx-pip {
+    background: radial-gradient(circle at 40% 35%, #ffffff, #e6e6e6 60%, #bdbdbd);
+    box-shadow: inset 2px 3px 4px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
-.dice.red-dice .face.front .pip {
-    background-color: #ffffff;
+.fx-die--white .fx-die__face {
+    background: radial-gradient(circle at 30% 25%, #ffffff 0%, #f4efe4 50%, #cfc5b0 100%);
+    box-shadow:
+        inset 0 0 0 2px rgba(255, 255, 255, 0.6),
+        inset -10px -12px 24px rgba(80, 60, 30, 0.25),
+        inset 10px 10px 18px rgba(255, 255, 255, 0.7);
 }
 
-/* ===== WHITE DICE OVERLAY STYLING ===== */
-.dice.white-dice .face {
-    background: radial-gradient(circle at 35% 35%, #ffffff 0%, #ecf0f1 100%);
+.fx-die--white .fx-die__core { background: #e6dfcf; }
+
+.fx-die--white .fx-pip {
+    background: radial-gradient(circle at 40% 35%, #3a3a46, #111118);
+    box-shadow: inset 2px 3px 4px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
-@keyframes diceFallAndBounceLeft {
-    0% {
-        top: -250px;
-        left: 20%;
-    }
-    35% {
-        top: calc(100vh - 280px);
-        left: 30%;
-    }
-    50% {
-        top: calc(100vh - 450px);
-        left: 34%;
-    }
-    65% {
-        top: calc(100vh - 280px);
-        left: 38%;
-    }
-    78% {
-        top: calc(100vh - 350px);
-        left: 40%;
-    }
-    90% {
-        top: calc(100vh - 280px);
-        left: 42%;
-    }
-    95% {
-        top: calc(100vh - 300px);
-        left: 43%;
-    }
-    100% {
-        top: calc(100vh - 280px);
-        left: 43%;
-    }
+.fx-die--white .fx-die__face--front .fx-pip {
+    background: radial-gradient(circle at 40% 35%, #ff5a4a, #b3150b);
 }
 
-@keyframes diceFallAndBounceRight {
-    0% {
-        top: -250px;
-        left: 80%;
-    }
-    35% {
-        top: calc(100vh - 280px);
-        left: 70%;
-    }
-    50% {
-        top: calc(100vh - 450px);
-        left: 66%;
-    }
-    65% {
-        top: calc(100vh - 280px);
-        left: 62%;
-    }
-    78% {
-        top: calc(100vh - 350px);
-        left: 60%;
-    }
-    90% {
-        top: calc(100vh - 280px);
-        left: 58%;
-    }
-    95% {
-        top: calc(100vh - 300px);
-        left: 57%;
-    }
-    100% {
-        top: calc(100vh - 280px);
-        left: 57%;
-    }
+.fx-dice-total {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    font-family: 'Press Start 2P', monospace;
+    animation: fxTotalIn 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.fx-dice-total__who {
+    font-size: 20px;
+    color: #ffffff;
+    text-shadow: 3px 3px 0 #000;
+    margin-bottom: 16px;
+    white-space: nowrap;
+}
+
+.fx-dice-total__num {
+    font-size: 120px;
+    line-height: 1;
+    background: linear-gradient(180deg, #fffbe6 0%, #ffd34d 45%, #e08a00 55%, #ffe9a3 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(3px 0 0 #2b1600) drop-shadow(-3px 0 0 #2b1600) drop-shadow(0 3px 0 #2b1600) drop-shadow(0 -3px 0 #2b1600) drop-shadow(0 6px 0 #000);
+}
+
+.fx-dice-total__tag {
+    margin-top: 16px;
+    font-size: 28px;
+    color: #ffe066;
+    white-space: nowrap;
+    text-shadow: 3px 3px 0 #000, 0 0 16px #ffb000;
+    animation: fxTagBlink 0.5s steps(2) infinite alternate;
+}
+
+.fx-dice-total--fail .fx-dice-total__num {
+    background: linear-gradient(180deg, #ffe0e0 0%, #ff6b6b 45%, #b30000 55%, #ff9a9a 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    filter: drop-shadow(3px 0 0 #2b0000) drop-shadow(-3px 0 0 #2b0000) drop-shadow(0 3px 0 #2b0000) drop-shadow(0 -3px 0 #2b0000) drop-shadow(0 6px 0 #000);
+}
+
+.fx-dice-total--fail .fx-dice-total__tag {
+    color: #ff6b6b;
+    text-shadow: 3px 3px 0 #000, 0 0 16px #ff0000;
+}
+
+.fx-dice-total__num--lock {
+    animation: fxNumLock 0.35s cubic-bezier(0.2, 1.8, 0.4, 1) both;
+}
+
+@keyframes fxNumLock {
+    0% { transform: scale(1.6); }
+    100% { transform: scale(1); }
+}
+
+@keyframes fxTotalIn {
+    0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0; }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+@keyframes fxTagBlink {
+    0% { opacity: 1; }
+    100% { opacity: 0.55; }
 }
