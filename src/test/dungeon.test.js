@@ -38,7 +38,8 @@ function startStub() {
     });
     app.post('/api/v1/channels/:channel/stream', auth, (req, res) => {
         stub.streams.push({ channel: req.params.channel, body: req.body });
-        res.json({ status: 'ok', state: req.body.state });
+        // Like Chatacombs: the adventure status after the change overrides 'ok'
+        res.json({ status: 'ok', state: req.body.state, changed: true, ...(req.body.state === 'ended' ? { status: 'abandoned' } : { status: 'voting' }) });
     });
     app.get('/api/v1/channels/:channel/events', auth, (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream');
@@ -177,8 +178,8 @@ describe('dungeon adapter against a stub Chatacombs', () => {
     test('admin stop and restart always post, even after the same state', async () => {
         fresh();
         await dungeon.setStream('ended');
-        assert.deepEqual(await dungeon.forceStream('stop'), { ok: true, sent: ['ended'] });
-        assert.deepEqual(await dungeon.forceStream('restart'), { ok: true, sent: ['ended', 'started'] });
+        assert.deepEqual(await dungeon.forceStream('stop'), { ok: true, sent: ['ended'], channel: 'mychannel', status: 'abandoned', changed: true });
+        assert.deepEqual(await dungeon.forceStream('restart'), { ok: true, sent: ['ended', 'started'], channel: 'mychannel', status: 'voting', changed: true });
         assert.deepEqual(stub.streams.map(s => s.body.state), ['ended', 'ended', 'ended', 'started']);
         // The restart counts as the current state, so a normal start right after is not repeated
         assert.equal(await dungeon.setStream('started'), false);
@@ -352,8 +353,8 @@ describe('CloudBot server wiring', () => {
         await until(() => stub.streams.at(-1)?.body.state === 'started');
         stub.streams.length = 0;
 
-        assert.deepEqual(await post('/api/dungeon/stream', { action: 'stop' }), { ok: true, sent: ['ended'] });
-        assert.deepEqual(await post('/api/dungeon/stream', { action: 'restart' }), { ok: true, sent: ['ended', 'started'] });
+        assert.deepEqual(await post('/api/dungeon/stream', { action: 'stop' }), { ok: true, sent: ['ended'], channel: 'fboucheros', status: 'abandoned', changed: true });
+        assert.deepEqual(await post('/api/dungeon/stream', { action: 'restart' }), { ok: true, sent: ['ended', 'started'], channel: 'fboucheros', status: 'voting', changed: true });
         assert.deepEqual(stub.streams.map(s => s.body), [{ state: 'ended' }, { state: 'ended' }, { state: 'started' }]);
         assert.equal(stub.streams[0].channel, 'fboucheros');
 

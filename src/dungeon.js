@@ -142,18 +142,24 @@ function createDungeon({ getSettings, broadcast, isStreamLive = async () => fals
         if (!config.ready) return { ok: false, sent: [], code: 'not_configured', error: 'Dungeon is off or not configured' };
         const key = `${config.url}|${config.channel}`;
         const sent = [];
+        let reply = {};
         for (const state of states) {
             try {
-                await post(config, 'stream', { state });
+                const res = await post(config, 'stream', { state });
+                reply = await res.json().catch(() => ({}));
             } catch (err) {
                 const reason = err.name === 'TimeoutError' ? 'timed out' : err.message;
                 logger.warn(`[Dungeon] Stream ${state} (admin) failed: ${reason}`);
-                return { ok: false, sent, code: 'unreachable', error: `Could not reach Chatacombs at ${config.url} (${reason})` };
+                return { ok: false, sent, channel: config.channel, code: 'unreachable', error: `Could not reach Chatacombs at ${config.url} (${reason})` };
             }
             lastStreamState = { key, state };
             sent.push(state);
         }
-        return { ok: true, sent };
+        // Chatacombs answers with the adventure status after the change and whether anything changed
+        const status = typeof reply.status === 'string' && reply.status !== 'ok' ? reply.status : null;
+        const changed = typeof reply.changed === 'boolean' ? reply.changed : null;
+        logger.log(`[Dungeon] Admin ${action} on channel ${config.channel}: sent ${sent.join(', ')}, adventure is now ${status || 'unknown'}${changed === false ? ' (unchanged)' : ''}`);
+        return { ok: true, sent, channel: config.channel, status, changed };
     }
 
     // Chatacombs keeps stream state in memory, so after it restarts (or the relay first connects)

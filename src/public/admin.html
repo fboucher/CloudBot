@@ -864,6 +864,7 @@
             setupNavigation();
             loadVersion();
             setupSessionConfigModal();
+            refreshDungeonQuickActions();
             setInterval(loadActiveSession, 5000);
             setInterval(pollForEffects, 2000);
             setInterval(renderSessionNotes, 5000);
@@ -1857,6 +1858,18 @@
             }
         }
 
+        // Say what Chatacombs actually did, and on which channel, so a mismatch with the overlay is visible
+        function describeDungeonResult(action, result) {
+            const where = `channel "${result.channel}"`;
+            const status = result.status;
+            if (action === 'stop') {
+                if (result.changed === false) return `Nothing to stop on ${where}: Chatacombs says the adventure is ${status || 'not running'}.`;
+                return `Dungeon stopped on ${where}: the adventure has ended.`;
+            }
+            if (status && status !== 'voting') return `Chatacombs did not open a new theme vote on ${where} (adventure is ${status}).`;
+            return `New adventure on ${where}: the theme vote is open in chat.`;
+        }
+
         async function dungeonStreamAction(action) {
             const question = action === 'stop'
                 ? 'End the current Chatacombs adventure? The stream session keeps running.'
@@ -1870,7 +1883,7 @@
                 });
                 const result = await response.json().catch(() => ({}));
                 if (response.ok && result.ok) {
-                    showFeedback(action === 'stop' ? 'Dungeon stopped: the adventure has ended.' : 'New adventure started: the theme vote is open in chat.');
+                    showFeedback(describeDungeonResult(action, result), 8000);
                 } else {
                     showFeedback(`Dungeon ${action === 'stop' ? 'stop' : 'restart'} failed: ${result.error || `HTTP ${response.status}`}`, 8000);
                 }
@@ -2311,6 +2324,18 @@
             }
         }
 
+        // Quick Actions sits on the session page, so check the dungeon status on page load too
+        async function refreshDungeonQuickActions() {
+            try {
+                const status = await (await fetch('/api/dungeon/status')).json();
+                document.getElementById('dungeonQuickActions').style.display = status.active ? '' : 'none';
+                return status;
+            } catch (err) {
+                console.error('Error loading Dungeon status:', err);
+                return null;
+            }
+        }
+
         async function loadDungeonSettings(data) {
             try {
                 if (!data) data = await (await fetch('/api/ceebee/settings')).json();
@@ -2318,9 +2343,8 @@
                 document.getElementById('dungeonUrl').value = data.dungeon_url || '';
                 document.getElementById('dungeonApiKey').value = data.dungeon_api_key || '';
                 document.getElementById('dungeonChannel').value = data.dungeon_channel || '';
-                const status = await (await fetch('/api/dungeon/status')).json();
-                updateDungeonStatusText(status.relaying);
-                document.getElementById('dungeonQuickActions').style.display = status.active ? '' : 'none';
+                const status = await refreshDungeonQuickActions();
+                updateDungeonStatusText(status?.relaying);
             } catch (err) {
                 console.error('Error loading Dungeon settings:', err);
             }
