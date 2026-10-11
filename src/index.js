@@ -1905,6 +1905,16 @@ app.get('/api/dungeon/status', async (req, res) => {
     }
 });
 
+// Admin quick actions: 'stop' ends the current adventure, 'restart' ends it and starts a new one.
+// The CloudBot stream session is left alone and the API key stays on the server.
+app.post('/api/dungeon/stream', async (req, res) => {
+    const action = req.body && req.body.action;
+    if (action !== 'stop' && action !== 'restart') return res.status(400).json({ ok: false, error: "action must be 'stop' or 'restart'." });
+    const result = await dungeon.forceStream(action);
+    if (result.ok) return res.json(result);
+    res.status(result.code === 'not_configured' ? 409 : 502).json(result);
+});
+
 app.post('/api/ceebee/chat', async (req, res) => {
     try {
         const { message, user } = req.body;
