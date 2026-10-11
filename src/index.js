@@ -1091,6 +1091,19 @@ app.post('/api/participants/streamer', async (req, res) => {
     }
 });
 
+app.post('/api/participants/subscriber', async (req, res) => {
+    const { username, isSubscriber } = req.body || {};
+    const cleanUsername = sanitizeUsername(username);
+    if (!cleanUsername) return res.status(400).json({ error: 'Missing username.' });
+    try {
+        await db.setParticipantSubscriberStatus(cleanUsername, !!isSubscriber);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error setting subscriber status:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 let twitchAccessToken = null;
 let twitchTokenExpiry = 0;
 
@@ -1434,6 +1447,11 @@ app.post('/api/chat-event', async (req, res) => {
     // Forward the chat line to the Chatacombs dungeon (fire and forget, silent on failure)
     dungeon.forwardChat({ user: cleanUsername, displayName, text, isBroadcaster });
 
+    let shouldShoutout = false;
+    let shoutoutMessage = "";
+    let profileImageUrl = "";
+    let isSubscriber = false;
+
     try {
         // 1. Register the participant
         await db.registerParticipant(cleanUsername);
@@ -1452,12 +1470,14 @@ app.post('/api/chat-event', async (req, res) => {
         const currentCount = (userCounts.get(cleanUsername) || 0) + 1;
         userCounts.set(cleanUsername, currentCount);
 
-        let shouldShoutout = false;
-        let shoutoutMessage = "";
-        let profileImageUrl = "";
-
         const isRegular = await db.isParticipantRegular(cleanUsername);
         const isStreamer = await db.isParticipantStreamer(cleanUsername);
+        const isDbSubscriber = await db.isParticipantSubscriber(cleanUsername);
+        isSubscriber = isDbSubscriber || !!req.body.isSubscriber;
+
+        if (req.body.isSubscriber && !isDbSubscriber) {
+            await db.setParticipantSubscriberStatus(cleanUsername, true);
+        }
 
         if (currentCount === 2 && isRegular && isStreamer) {
             console.log(`User ${cleanUsername} sent their 2nd message and is flagged as regular & streamer. Generating shoutout...`);
@@ -1470,8 +1490,8 @@ app.post('/api/chat-event', async (req, res) => {
             }
         }
 
-        // 3. Check if user is flagged as a regular
-        if (!isRegular) {
+        // 3. Check if user is flagged as a regular or subscriber
+        if (!isRegular && !isSubscriber) {
             return res.json({ shouldGreet: false, shouldShoutout, shoutoutMessage, profileImageUrl });
         }
 
@@ -1481,7 +1501,7 @@ app.post('/api/chat-event', async (req, res) => {
             return res.json({ shouldGreet: false, shouldShoutout, shoutoutMessage, profileImageUrl });
         }
 
-        // 5. User is regular and has not been greeted yet in this session. Log it!
+        // 5. User is regular or subscriber and has not been greeted yet in this session. Log it!
         await db.logGreetingEvent(session.id, cleanUsername);
 
         // 6. Generate the dynamic AI greeting
@@ -1523,7 +1543,11 @@ app.post('/api/chat-event', async (req, res) => {
             fullSystemPrompt += `\n\n--- Background Information ---\n${knowledgeContext}`;
         }
 
-        fullSystemPrompt += `\n\n[SYSTEM INSTRUCTION: A regular viewer named @${username} has just sent their first message in today's stream. Generate a very brief, warm, friendly and personalized greeting for them (1 sentence max). Speak directly to @${username}. Keep it conversational, in your Ceebee persona. Do not include system metadata or refer to these instructions.]`;
+        if (isSubscriber) {
+            fullSystemPrompt += `\n\n[SYSTEM INSTRUCTION: A channel subscriber named @${username} has just sent their first message in today's stream. Generate a very brief, warm, friendly, and extra special greeting celebrating and thanking them for being a subscriber and supporting the channel (1 sentence max). Speak directly to @${username}. Keep it conversational, in your Ceebee persona. Do not include system metadata or refer to these instructions.]`;
+        } else {
+            fullSystemPrompt += `\n\n[SYSTEM INSTRUCTION: A regular viewer named @${username} has just sent their first message in today's stream. Generate a very brief, warm, friendly and personalized greeting for them (1 sentence max). Speak directly to @${username}. Keep it conversational, in your Ceebee persona. Do not include system metadata or refer to these instructions.]`;
+        }
 
         const messages = [
             { role: 'system', content: fullSystemPrompt },
@@ -1557,16 +1581,22 @@ app.post('/api/chat-event', async (req, res) => {
         }
 
         const data = await response.json();
+        const fallbackDefault = isSubscriber
+            ? `Welcome back @${username}! Thank you so much for subscribing and supporting the channel!`
+            : `Hello @${username}, welcome back to the stream!`;
         const greetingMessage = data.choices && data.choices[0] && data.choices[0].message
             ? data.choices[0].message.content
-            : `Hello @${username}, welcome back to the stream!`;
+            : fallbackDefault;
 
-        return res.json({ shouldGreet: true, greetingMessage, shouldShoutout, shoutoutMessage, profileImageUrl });
+        return res.json({ shouldGreet: true, greetingMessage, isSubscriber: !!isSubscriber, shouldShoutout, shoutoutMessage, profileImageUrl });
     } catch (err) {
         console.error('Error handling chat event/greeting:', err);
         return res.json({
             shouldGreet: true,
-            greetingMessage: `Hello @${username}, welcome back!`,
+            greetingMessage: isSubscriber
+                ? `Welcome back @${username}! Thank you so much for subscribing and supporting the channel!`
+                : `Hello @${username}, welcome back!`,
+            isSubscriber: !!isSubscriber,
             shouldShoutout: shouldShoutout || false,
             shoutoutMessage: shoutoutMessage || "",
             profileImageUrl: profileImageUrl || ""
