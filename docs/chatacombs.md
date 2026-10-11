@@ -27,6 +27,14 @@ The game itself (rooms, monsters, votes, timers and the Chatacombs overlay) live
 | **Enable Dungeon** | Turns the integration on or off. Off means nothing is forwarded or relayed. |
 | **Service URL** | Where CloudBot reaches Chatacombs, for example `http://localhost:8080`. See [Docker networking](#docker-networking) when CloudBot runs in a container. |
 | **Channel** | Your Twitch channel name, for example `fboucheros`. A leading `#` is removed and the name is lowercased. It **must match the channel in the Chatacombs overlay URL** you added to OBS, otherwise the game runs on one channel and the overlay shows another. |
+
+The Chatacombs overlay URL in OBS looks like this, with the channel in the path:
+
+```text
+http://localhost:8080/overlay/fboucheros?key=<OVERLAY_KEY>&audio=1&theme=dark
+```
+
+Here `fboucheros` is the channel, so the **Channel** field in CloudBot must be `fboucheros` too.
 | **API Key** | The same value as the `API_KEY` the Chatacombs container runs with. It is stored on the CloudBot server and is never sent to the overlay. |
 
 The note under the fields tells you where things stand:
