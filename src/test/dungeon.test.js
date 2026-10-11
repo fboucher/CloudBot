@@ -115,7 +115,9 @@ describe('dungeon adapter against a stub Chatacombs', () => {
     before(async () => { stub = await startStub(); });
     after(async () => { dungeon?.stopRelay(); await stopServer(stub.server); });
 
+    let live = false;
     const fresh = (overrides = {}) => {
+        live = false;
         settings = { dungeon_enabled: 1, dungeon_url: stub.url + '/', dungeon_api_key: API_KEY, dungeon_channel: 'MyChannel', ...overrides };
         broadcasts = [];
         stub.messages.length = 0;
@@ -124,6 +126,7 @@ describe('dungeon adapter against a stub Chatacombs', () => {
         dungeon = createDungeon({
             getSettings: async () => settings,
             broadcast: (p) => broadcasts.push(p),
+            isStreamLive: async () => live,
             logger: quietLogger,
             reconnectMinMs: 50,
             reconnectMaxMs: 200
@@ -169,6 +172,24 @@ describe('dungeon adapter against a stub Chatacombs', () => {
         await dungeon.setStream('started');
         assert.deepEqual(stub.streams.map(s => s.body.state), ['started', 'ended', 'started']);
         assert.equal(stub.streams[0].channel, 'mychannel');
+    });
+
+    test('re-sends started on every (re)connect while a stream is live', async () => {
+        fresh();
+        await dungeon.reconcile();
+        await until(() => stub.eventClients.size === 1);
+        await wait(50);
+        assert.equal(stub.streams.length, 0, 'no live stream, nothing sent');
+
+        live = true;
+        stub.dropAll(); // e.g. Chatacombs restarted and lost its in-memory stream state
+        await until(() => stub.streams.length === 1);
+        assert.deepEqual(stub.streams[0].body, { state: 'started' });
+
+        // The resync counts as the current state, so a normal start right after is not repeated
+        assert.equal(await dungeon.setStream('started'), false);
+        dungeon.stopRelay();
+        await until(() => stub.eventClients.size === 0);
     });
 
     test('relays say lines and game moments, and reconnects after a drop', async () => {

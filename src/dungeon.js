@@ -74,7 +74,7 @@ function parseSseFrame(frame) {
     }
 }
 
-function createDungeon({ getSettings, broadcast, fetchImpl = (...args) => fetch(...args), logger = console, reconnectMinMs = RECONNECT_MIN_MS, reconnectMaxMs = RECONNECT_MAX_MS } = {}) {
+function createDungeon({ getSettings, broadcast, isStreamLive = async () => false, fetchImpl = (...args) => fetch(...args), logger = console, reconnectMinMs = RECONNECT_MIN_MS, reconnectMaxMs = RECONNECT_MAX_MS } = {}) {
     let relay = null; // { key, controller }
     let lastStreamState = null; // { key, state }
 
@@ -132,6 +132,29 @@ function createDungeon({ getSettings, broadcast, fetchImpl = (...args) => fetch(
         }
     }
 
+    // Chatacombs keeps stream state in memory, so after it restarts (or the relay first connects)
+    // re-send 'started' when CloudBot already has a live session. Chatacombs ignores a repeat.
+    async function resyncStream(config) {
+        let live = false;
+        try {
+            live = await isStreamLive();
+        } catch (err) {
+            logger.warn(`[Dungeon] Could not check stream state: ${err.message}`);
+        }
+        if (!live) return false;
+        const previous = lastStreamState;
+        const current = { key: `${config.url}|${config.channel}`, state: 'started' };
+        lastStreamState = current;
+        try {
+            await post(config, 'stream', { state: 'started' });
+            return true;
+        } catch (err) {
+            if (lastStreamState === current) lastStreamState = previous;
+            logger.warn(`[Dungeon] Stream resync failed: ${err.message}`);
+            return false;
+        }
+    }
+
     function handleEvent(event) {
         if (!event || typeof event !== 'object') return;
         if (event.kind === 'say') {
@@ -150,6 +173,7 @@ function createDungeon({ getSettings, broadcast, fetchImpl = (...args) => fetch(
         });
         if (!res.ok || !res.body) throw new Error(`events: HTTP ${res.status}`);
         logger.log(`[Dungeon] Connected to ${channelApi(config)}/events`);
+        resyncStream(config);
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buf = '';

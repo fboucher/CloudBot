@@ -420,7 +420,11 @@ function broadcastSSE(payload) {
 }
 
 // Chatacombs dungeon client: reads its config from the ceebee settings on every call
-const dungeon = createDungeon({ getSettings: () => db.getCeebeeSettings(), broadcast: broadcastSSE });
+const dungeon = createDungeon({
+    getSettings: () => db.getCeebeeSettings(),
+    broadcast: broadcastSSE,
+    isStreamLive: async () => !!(await db.getActiveSession())
+});
 
 app.post('/triggereffect', async (req, res) => {
     console.log('..triggering effect..', req.body);
