@@ -416,6 +416,14 @@
                                 <button class="btn btn-cb btn-sm" onclick="triggerShoutout()">
                                     <i class="bi bi-megaphone"></i> Shoutout
                                 </button>
+                                <span id="dungeonQuickActions" style="display: none;">
+                                    <button class="btn btn-cb btn-sm" onclick="dungeonStreamAction('stop')" title="End the current Chatacombs adventure. The stream session keeps running.">
+                                        <i class="bi bi-stop-circle"></i> Stop dungeon
+                                    </button>
+                                    <button class="btn btn-cb btn-sm" onclick="dungeonStreamAction('restart')" title="End the current Chatacombs adventure and open a new theme vote.">
+                                        <i class="bi bi-arrow-repeat"></i> New adventure
+                                    </button>
+                                </span>
                             </div>
                             <div id="actionFeedback" class="mt-2 text-muted small"></div>
                         </div>
@@ -1840,12 +1848,35 @@
             return notes;
         }
 
-        function showFeedback(msg) {
+        function showFeedback(msg, durationMs = 3000) {
             const el = document.getElementById('actionFeedback');
             if (el) {
                 el.innerText = msg;
                 clearTimeout(el._timer);
-                el._timer = setTimeout(() => { el.innerText = ''; }, 3000);
+                el._timer = setTimeout(() => { el.innerText = ''; }, durationMs);
+            }
+        }
+
+        async function dungeonStreamAction(action) {
+            const question = action === 'stop'
+                ? 'End the current Chatacombs adventure? The stream session keeps running.'
+                : 'End the current Chatacombs adventure and start a new one?';
+            if (!confirm(question)) return;
+            try {
+                const response = await fetch('/api/dungeon/stream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action })
+                });
+                const result = await response.json().catch(() => ({}));
+                if (response.ok && result.ok) {
+                    showFeedback(action === 'stop' ? 'Dungeon stopped: the adventure has ended.' : 'New adventure started: the theme vote is open in chat.');
+                } else {
+                    showFeedback(`Dungeon ${action === 'stop' ? 'stop' : 'restart'} failed: ${result.error || `HTTP ${response.status}`}`, 8000);
+                }
+            } catch (err) {
+                console.error('Error sending dungeon action:', err);
+                showFeedback('Dungeon action failed: CloudBot could not be reached.', 8000);
             }
         }
 
@@ -2289,6 +2320,7 @@
                 document.getElementById('dungeonChannel').value = data.dungeon_channel || '';
                 const status = await (await fetch('/api/dungeon/status')).json();
                 updateDungeonStatusText(status.relaying);
+                document.getElementById('dungeonQuickActions').style.display = status.active ? '' : 'none';
             } catch (err) {
                 console.error('Error loading Dungeon settings:', err);
             }

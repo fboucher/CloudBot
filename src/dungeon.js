@@ -132,6 +132,30 @@ function createDungeon({ getSettings, broadcast, isStreamLive = async () => fals
         }
     }
 
+    // Admin quick actions: always post, even when the same state was already sent.
+    // 'stop' ends the current adventure; 'restart' ends it and starts a new one (a fresh theme vote).
+    // Resolves to { ok, sent } or { ok: false, sent, code, error }; never rejects.
+    async function forceStream(action) {
+        const states = action === 'stop' ? ['ended'] : action === 'restart' ? ['ended', 'started'] : null;
+        if (!states) return { ok: false, sent: [], code: 'bad_action', error: 'Unknown action' };
+        const config = await loadConfig();
+        if (!config.ready) return { ok: false, sent: [], code: 'not_configured', error: 'Dungeon is off or not configured' };
+        const key = `${config.url}|${config.channel}`;
+        const sent = [];
+        for (const state of states) {
+            try {
+                await post(config, 'stream', { state });
+            } catch (err) {
+                const reason = err.name === 'TimeoutError' ? 'timed out' : err.message;
+                logger.warn(`[Dungeon] Stream ${state} (admin) failed: ${reason}`);
+                return { ok: false, sent, code: 'unreachable', error: `Could not reach Chatacombs at ${config.url} (${reason})` };
+            }
+            lastStreamState = { key, state };
+            sent.push(state);
+        }
+        return { ok: true, sent };
+    }
+
     // Chatacombs keeps stream state in memory, so after it restarts (or the relay first connects)
     // re-send 'started' when CloudBot already has a live session. Chatacombs ignores a repeat.
     async function resyncStream(config) {
@@ -239,7 +263,7 @@ function createDungeon({ getSettings, broadcast, isStreamLive = async () => fals
         return !!relay;
     }
 
-    return { forwardChat, setStream, reconcile, stopRelay, isRelaying, handleEvent };
+    return { forwardChat, setStream, forceStream, reconcile, stopRelay, isRelaying, handleEvent };
 }
 
 module.exports = { createDungeon, mapGameMoment, readConfig, parseSseFrame, d20ToTwoD6 };

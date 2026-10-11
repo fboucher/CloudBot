@@ -174,6 +174,31 @@ describe('dungeon adapter against a stub Chatacombs', () => {
         assert.equal(stub.streams[0].channel, 'mychannel');
     });
 
+    test('admin stop and restart always post, even after the same state', async () => {
+        fresh();
+        await dungeon.setStream('ended');
+        assert.deepEqual(await dungeon.forceStream('stop'), { ok: true, sent: ['ended'] });
+        assert.deepEqual(await dungeon.forceStream('restart'), { ok: true, sent: ['ended', 'started'] });
+        assert.deepEqual(stub.streams.map(s => s.body.state), ['ended', 'ended', 'ended', 'started']);
+        // The restart counts as the current state, so a normal start right after is not repeated
+        assert.equal(await dungeon.setStream('started'), false);
+        assert.equal(await dungeon.setStream('ended'), true);
+    });
+
+    test('admin actions report why nothing was sent', async () => {
+        fresh({ dungeon_enabled: 0 });
+        assert.equal((await dungeon.forceStream('stop')).code, 'not_configured');
+        fresh();
+        assert.equal((await dungeon.forceStream('pause')).code, 'bad_action');
+        fresh({ dungeon_url: 'http://127.0.0.1:1' });
+        const result = await dungeon.forceStream('restart');
+        assert.equal(result.ok, false);
+        assert.equal(result.code, 'unreachable');
+        assert.deepEqual(result.sent, []);
+        assert.match(result.error, /Could not reach Chatacombs at http:\/\/127\.0\.0\.1:1/);
+        assert.equal(stub.streams.length, 0);
+    });
+
     test('re-sends started on every (re)connect while a stream is live', async () => {
         fresh();
         await dungeon.reconcile();
@@ -322,6 +347,37 @@ describe('CloudBot server wiring', () => {
         assert.deepEqual(stub.streams.map(s => s.body), [{ state: 'started' }, { state: 'ended' }]);
     });
 
+    test('quick actions stop or restart the adventure without touching the session', async () => {
+        const started = await post('/api/stream/start', { projectName: 'Chatacombs' });
+        await until(() => stub.streams.at(-1)?.body.state === 'started');
+        stub.streams.length = 0;
+
+        assert.deepEqual(await post('/api/dungeon/stream', { action: 'stop' }), { ok: true, sent: ['ended'] });
+        assert.deepEqual(await post('/api/dungeon/stream', { action: 'restart' }), { ok: true, sent: ['ended', 'started'] });
+        assert.deepEqual(stub.streams.map(s => s.body), [{ state: 'ended' }, { state: 'ended' }, { state: 'started' }]);
+        assert.equal(stub.streams[0].channel, 'fboucheros');
+
+        const status = await get('/api/stream/status');
+        assert.equal(status.active, true);
+        assert.equal(status.session.id, started.sessionId);
+
+        const bad = await fetch(base + '/api/dungeon/stream', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'pause' }) });
+        assert.equal(bad.status, 400);
+
+        await post('/api/stream/stop', {});
+    });
+
+    test('quick actions say when Chatacombs cannot be reached', async () => {
+        const s = await get('/api/ceebee/settings');
+        await post('/api/ceebee/settings', { dungeon_enabled: true, dungeon_url: 'http://127.0.0.1:1', dungeon_api_key: API_KEY, dungeon_channel: 'fboucheros' });
+        const res = await fetch(base + '/api/dungeon/stream', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'stop' }) });
+        assert.equal(res.status, 502);
+        const body = await res.json();
+        assert.equal(body.ok, false);
+        assert.match(body.error, /Could not reach Chatacombs/);
+        await post('/api/ceebee/settings', { dungeon_enabled: true, dungeon_url: s.dungeon_url, dungeon_api_key: API_KEY, dungeon_channel: 'fboucheros' });
+    });
+
     test('Chatacombs events reach the overlay stream', async () => {
         const controller = new AbortController();
         const res = await fetch(base + '/api/stream/events', { signal: controller.signal });
@@ -352,6 +408,8 @@ describe('CloudBot server wiring', () => {
         const s = await get('/api/ceebee/settings');
         assert.equal(s.dungeon_url, stub.url);
         assert.equal((await get('/api/dungeon/status')).relaying, false);
+        const res = await fetch(base + '/api/dungeon/stream', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'stop' }) });
+        assert.equal(res.status, 409);
         stub.messages.length = 0;
         await post('/api/chat-event', { username: 'alice', text: '!explore' });
         await wait(100);
