@@ -218,14 +218,15 @@
                     username: lowerUser,
                     text: text || '',
                     displayName: (extra && extra.displayName) || user,
-                    isBroadcaster: !!(flags && flags.broadcaster)
+                    isBroadcaster: !!(flags && flags.broadcaster),
+                    isSubscriber: !!(flags && flags.subscriber)
                 })
             })
             .then(res => res.json())
             .then(data => {
                 if (data.shouldGreet && data.greetingMessage) {
                     CeebeeSay(data.greetingMessage);
-                    cloud("Hello");
+                    cloud(data.isSubscriber ? "Thumbs-up" : "Hello");
                 }
                 if (data.shouldShoutout && data.shoutoutMessage) {
                     CeebeeSay(data.shoutoutMessage);
@@ -659,6 +660,11 @@
         ComfyJS.onSub = (user, message, subTierInfo, extra) => {
             console.log("...onSub");
             LogSub(user, message, subTierInfo, 1, 0);
+            fetch('/api/participants/subscriber', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: user.toLowerCase(), isSubscriber: true })
+            }).catch(err => console.error("Error updating subscriber status:", err));
             if (ceebeeSettings.dynamic_weather_enabled) {
                 triggerRainbowSunshine();
             }
@@ -667,6 +673,11 @@
         ComfyJS.onResub = (user, message, streamMonths, cumulativeMonths, subTierInfo, extra) => {
             console.log("...onResub");
             LogSub(user, message, subTierInfo, streamMonths, cumulativeMonths);
+            fetch('/api/participants/subscriber', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: user.toLowerCase(), isSubscriber: true })
+            }).catch(err => console.error("Error updating subscriber status:", err));
             if (ceebeeSettings.dynamic_weather_enabled) {
                 triggerRainbowSunshine();
             }
