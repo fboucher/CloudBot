@@ -17,7 +17,7 @@ The game itself (rooms, monsters, votes, timers and the Chatacombs overlay) live
 
 ## Configure it in the admin console
 
-1. Start your Chatacombs container. Note the port it listens on and the `API_KEY` it runs with.
+1. Start your Chatacombs container. Note the port it listens on and the `API_KEY` from its `.env`.
 2. Open the CloudBot admin page (for example `http://localhost:3001/admin`).
 3. Open the **Ceebee AI** page from the sidebar and find the **Dungeon (Chatacombs)** card.
 4. Fill in the fields, then click **Save Dungeon**.
@@ -25,8 +25,9 @@ The game itself (rooms, monsters, votes, timers and the Chatacombs overlay) live
 | Field | What to enter |
 | --- | --- |
 | **Enable Dungeon** | Turns the integration on or off. Off means nothing is forwarded or relayed. |
-| **Service URL** | Where CloudBot reaches Chatacombs, for example `http://localhost:8080`. See [Docker networking](#docker-networking) when CloudBot runs in a container. |
+| **Service URL** | Where CloudBot reaches Chatacombs. When CloudBot runs in a container (the usual setup), use `http://host.docker.internal:8080`, not `localhost`. See [Docker networking](#docker-networking). When both run straight from the code on the same machine, `http://localhost:8080` works. |
 | **Channel** | Your Twitch channel name, for example `fboucheros`. A leading `#` is removed and the name is lowercased. It **must match the channel in the Chatacombs overlay URL** you added to OBS, otherwise the game runs on one channel and the overlay shows another. |
+| **API Key** | The `API_KEY` from the Chatacombs `.env`. **Not the `OVERLAY_KEY`**: that one only goes in the overlay URL in OBS. It is stored on the CloudBot server and is never sent to the overlay. |
 
 The Chatacombs overlay URL in OBS looks like this, with the channel in the path:
 
@@ -34,15 +35,24 @@ The Chatacombs overlay URL in OBS looks like this, with the channel in the path:
 http://localhost:8080/overlay/fboucheros?key=<OVERLAY_KEY>&audio=1&theme=dark
 ```
 
-Here `fboucheros` is the channel, so the **Channel** field in CloudBot must be `fboucheros` too.
-| **API Key** | The same value as the `API_KEY` the Chatacombs container runs with. It is stored on the CloudBot server and is never sent to the overlay. |
+Here `fboucheros` is the channel, so the **Channel** field in CloudBot must be `fboucheros` too. OBS runs on your machine, so the overlay URL uses `localhost` even when CloudBot needs `host.docker.internal`.
+
+Chatacombs has two keys, and each goes in one place:
+
+| Chatacombs `.env` | Where it goes |
+| --- | --- |
+| `API_KEY` | The **API Key** field in the CloudBot admin page. |
+| `OVERLAY_KEY` | The `key=` part of the overlay URL in OBS. |
 
 The note under the fields tells you where things stand:
 
 - *Dungeon is off*: the switch is off.
 - *Dungeon is on but needs a service URL, API key and channel*: one of the fields is empty.
 - *Dungeon is on (save to connect)*: the fields are filled in but not saved yet.
-- *Dungeon is on: chat is forwarded and narration and effects are relayed*: CloudBot is connected, or trying to connect, to Chatacombs.
+- *Dungeon is on: connecting to Chatacombs...*: CloudBot is trying to connect. The note updates a few seconds after you save.
+- *Dungeon is on and connected*: chat is forwarded and narration and effects are relayed.
+- *Chatacombs … rejected the API key*: the **API Key** field doesn't match the Chatacombs `API_KEY`. Check that it isn't the `OVERLAY_KEY`.
+- *Can't reach Chatacombs at …*: CloudBot can't open a connection to the **Service URL**. Inside a container, the page also warns when the URL uses `localhost`.
 
 ### Docker networking
 
@@ -65,7 +75,7 @@ If both containers are on the same Docker network, you can also use the Chatacom
 
 ## Check that it works
 
-1. **Admin page.** After saving, the note under the Dungeon fields should say *chat is forwarded and narration and effects are relayed*, and the **Stop dungeon** and **New adventure** buttons appear in **Quick Actions**.
+1. **Admin page.** After saving, the note under the Dungeon fields should say *Dungeon is on and connected* within a few seconds, and the **Stop dungeon** and **New adventure** buttons appear in **Quick Actions**.
 2. **CloudBot logs.** A working connection logs this line (with your URL and channel):
 
    ```text
@@ -122,6 +132,15 @@ Content-Type: application/json
 Real viewers and your fake players play in the same game, so you can mix both.
 
 ## Troubleshooting
+
+### Nothing happens
+
+Open the **Ceebee AI** page and read the note under the Dungeon fields. It says whether CloudBot is connected, and why not when it isn't. The two usual causes are:
+
+- **The OVERLAY_KEY in the API Key field.** Use the Chatacombs `API_KEY` instead.
+- **`localhost` in the Service URL while CloudBot runs in Docker.** Use `http://host.docker.internal:8080`.
+
+Then check that the **Channel** matches the channel in your overlay URL.
 
 ### The dungeon comes back stuck in an old adventure
 
