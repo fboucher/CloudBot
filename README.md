@@ -121,6 +121,12 @@ docker run -p 3001:3000 -d -v ${PWD}/src/io:/usr/src/app/io -e CLIENT_ID=your_tw
 
 Then open `http://localhost:3001/admin` in your browser to start a stream session, or type `!start [projectName]` in Twitch chat.
 
+### Chatacombs dungeon (optional)
+
+CloudBot can run a [Chatacombs](https://github.com/fboucher/chatacombs) chat dungeon on your stream. Start a Chatacombs container, then open the admin page, go to CeeBee > Dungeon (Chatacombs), switch it on and fill in the service URL (ex: `http://localhost:8080`), the `API_KEY` the container runs with and your Twitch channel.
+
+Once it is on, every chat line is forwarded to the dungeon, CeeBee speaks the dungeon narration in chat, starting and stopping a stream session starts and ends the adventure, and game moments trigger CloudBot effects (potion, dice, CB Wow, CB Tada, thunderstorm, rainbow sunshine). With the switch off nothing is sent. Run the adapter tests with `npm test` from inside `src`.
+
 ~ **Have fun!**
 
 ---

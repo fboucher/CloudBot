@@ -1,7 +1,7 @@
 const path = require("path");
 
 let db;
-const dbPath = path.join(__dirname, "io", "cloudbot.db") + "?nolock=1";
+const dbPath = (process.env.CLOUDBOT_DB_PATH || path.join(__dirname, "io", "cloudbot.db")) + "?nolock=1";
 
 const sanitizeUsername = (name) =>
   String(name || "")
@@ -131,7 +131,11 @@ async function createTables() {
       min_messages INTEGER DEFAULT 10,
       max_messages INTEGER DEFAULT 15,
       game_enabled INTEGER DEFAULT 1,
-      dynamic_weather_enabled INTEGER DEFAULT 1
+      dynamic_weather_enabled INTEGER DEFAULT 1,
+      dungeon_enabled INTEGER DEFAULT 0,
+      dungeon_url TEXT DEFAULT '',
+      dungeon_api_key TEXT DEFAULT '',
+      dungeon_channel TEXT DEFAULT 'fboucheros'
     )`,
     `CREATE TABLE IF NOT EXISTS participants (
       username TEXT PRIMARY KEY,
@@ -200,6 +204,22 @@ async function createTables() {
       console.log("Migration: Added dynamic_weather_enabled column to ceebee_settings");
     } catch (e) {
       // Column probably already exists, ignore
+    }
+
+    // Migration: Add Chatacombs dungeon columns to ceebee_settings if they don't exist (off by default)
+    const dungeonColumns = [
+      "dungeon_enabled INTEGER DEFAULT 0",
+      "dungeon_url TEXT DEFAULT ''",
+      "dungeon_api_key TEXT DEFAULT ''",
+      "dungeon_channel TEXT DEFAULT 'fboucheros'"
+    ];
+    for (const column of dungeonColumns) {
+      try {
+        await db.exec(`ALTER TABLE ceebee_settings ADD COLUMN ${column}`);
+        console.log(`Migration: Added ${column.split(' ')[0]} column to ceebee_settings`);
+      } catch (e) {
+        // Column probably already exists, ignore
+      }
     }
 
     // Migration: Add inventory column to participants if it doesn't exist
@@ -709,8 +729,8 @@ async function setCeebeeSoul(system_prompt) {
 
 async function getCeebeeSettings() {
   if (!db) await initDb();
-  const row = await db.prepare("SELECT auto_participate, min_messages, max_messages, game_enabled, dynamic_weather_enabled FROM ceebee_settings WHERE id = 1").get();
-  return row || { auto_participate: 0, min_messages: 10, max_messages: 15, game_enabled: 1, dynamic_weather_enabled: 1 };
+  const row = await db.prepare("SELECT auto_participate, min_messages, max_messages, game_enabled, dynamic_weather_enabled, dungeon_enabled, dungeon_url, dungeon_api_key, dungeon_channel FROM ceebee_settings WHERE id = 1").get();
+  return row || { auto_participate: 0, min_messages: 10, max_messages: 15, game_enabled: 1, dynamic_weather_enabled: 1, dungeon_enabled: 0, dungeon_url: '', dungeon_api_key: '', dungeon_channel: 'fboucheros' };
 }
 
 async function updateCeebeeSettings(auto_participate, min_messages, max_messages, game_enabled = 1, dynamic_weather_enabled = 1) {
@@ -718,6 +738,14 @@ async function updateCeebeeSettings(auto_participate, min_messages, max_messages
   await db.prepare(
     "UPDATE ceebee_settings SET auto_participate = ?, min_messages = ?, max_messages = ?, game_enabled = ?, dynamic_weather_enabled = ? WHERE id = 1"
   ).run(auto_participate ? 1 : 0, min_messages, max_messages, game_enabled ? 1 : 0, dynamic_weather_enabled ? 1 : 0);
+  return getCeebeeSettings();
+}
+
+async function updateDungeonSettings({ dungeon_enabled, dungeon_url, dungeon_api_key, dungeon_channel }) {
+  if (!db) await initDb();
+  await db.prepare(
+    "UPDATE ceebee_settings SET dungeon_enabled = ?, dungeon_url = ?, dungeon_api_key = ?, dungeon_channel = ? WHERE id = 1"
+  ).run(dungeon_enabled ? 1 : 0, dungeon_url || '', dungeon_api_key || '', dungeon_channel || '');
   return getCeebeeSettings();
 }
 
@@ -870,6 +898,7 @@ module.exports = {
   setCeebeeSoul,
   getCeebeeSettings,
   updateCeebeeSettings,
+  updateDungeonSettings,
   registerParticipant,
   setParticipantRegularStatus,
   isParticipantRegular,

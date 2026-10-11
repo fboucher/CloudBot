@@ -206,7 +206,7 @@
         //Add Default Reminders
         //_streamSession.Reminders.push(new Reminder("project", "Did you assign a project yet?"));
 
-        function handleUserChatEvent(user) {
+        function handleUserChatEvent(user, text, flags, extra) {
             const lowerUser = user.toLowerCase();
             const bots = ['ceebee_bot', 'ceebee', 'streamlabs', 'nightbot', 'streamelements'];
             if (bots.includes(lowerUser)) return;
@@ -214,7 +214,12 @@
             fetch('/api/chat-event', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: lowerUser })
+                body: JSON.stringify({
+                    username: lowerUser,
+                    text: text || '',
+                    displayName: (extra && extra.displayName) || user,
+                    isBroadcaster: !!(flags && flags.broadcaster)
+                })
             })
             .then(res => res.json())
             .then(data => {
@@ -244,8 +249,9 @@
 
         ComfyJS.onCommand = async (user, command, message, flags, extra) => {
 
+            const displayUser = user;
             user = user.toLowerCase();
-            handleUserChatEvent(user);
+            handleUserChatEvent(displayUser, `!${command} ${message || ''}`.trim(), flags, extra);
 
             //== RPG commands ==
             if (command === "search" || command === "loot") {
@@ -562,8 +568,9 @@
         }
 
         ComfyJS.onChat = (user, message, flags, self, extra) => {
+            // Lines CloudBot posts itself (e.g. relayed dungeon narration) are not chat to forward
+            handleUserChatEvent(user, self ? '' : message, flags, extra);
             user = user.toLowerCase();
-            handleUserChatEvent(user);
             trackMessageVelocity(message);
 
             const bracketCommand = extractBracketCommand(message);
@@ -1164,6 +1171,11 @@
                         } else if (payload.type === 'rainbow') {
                             triggerRainbowSunshine();
                         }
+                    } else if (payload.event === 'dungeon_say') {
+                        // Chatacombs narration: CeeBee speaks it in Twitch chat
+                        CeebeeSay(payload.text);
+                    } else if (payload.event === 'dungeon_game') {
+                        triggerDungeonEffect(payload.effect);
                     } else if (payload.event === 'test_mpm') {
                         console.log('Simulating chat velocity via SSE:', payload.mpm);
                         if (ceebeeSettings.dynamic_weather_enabled) {
@@ -1213,6 +1225,25 @@
             }, 5000);
         }
 
+        // Chatacombs game moments mapped (server-side) onto CloudBot's existing reactions
+        function triggerDungeonEffect(fx) {
+            if (!fx) return;
+            console.log('[Dungeon] effect:', fx);
+            if (fx.effect === 'potion') {
+                playBubbleSound();
+                CloudFX.potion(fx.user, { amount: fx.amount });
+            } else if (fx.effect === 'dice') {
+                triggerDiceRoll(fx.d1, fx.d2, fx.user);
+            } else if (fx.effect === 'thunderstorm') {
+                triggerThunderstorm();
+            } else if (fx.effect === 'sunshine') {
+                triggerRainbowSunshine();
+            }
+            if (fx.expression) cloud(fx.expression);
+            if (fx.sound && SoundEnum[fx.sound]) playSound(fx.sound, SoundEnum[fx.sound]);
+            if (fx.note) showOverlayNote(fx.note);
+        }
+
         function triggerDiceRoll(d1, d2, user) {
             console.log(`[Dice] Rolling dice: ${d1} and ${d2}`);
             playSound("diceSound", SoundEnum.dice);
@@ -1221,4 +1252,4 @@
     </script>
 </body>
 
-</html>
+</html>
