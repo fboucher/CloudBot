@@ -9,7 +9,7 @@
  * items, while others (bomb, shield, mud, dice) stay fully realistic.
  *
  * Public API (window.CloudFX):
- *   potion(user) shield(user) umbrella(user) bomb(user, {onExplode})
+ *   potion(user, {amount}) shield(user) umbrella(user) bomb(user, {onExplode})
  *   sunStone(user, {onBurst}) rainStone(user, {onStrike}) shovel(user, {onFirstSplat})
  *   dice(d1, d2, user) lightning(opts)
  */
@@ -740,7 +740,7 @@
     // ======================================================================
     // POTION - HD-2D: pixel flask, bloom, light shaft, healing particles
     // ======================================================================
-    function potion(user) {
+    function potion(user, opts = {}) {
         setup();
         banner('potion', user, 'drank a', 'Potion');
         vignette('potion', 7500);
@@ -753,7 +753,9 @@
         let fx = cx, fy = H + fh, popped = false, corkP = null, burst = false;
         const rings = [];
         // regen ticks: the first heal is big, then smaller ones (and a rare critical heal)
-        const heal = () => (Math.random() < 0.1 ? ['+9999 HP!', '#fff36d'] : [`+${randInt(120, 999)} HP`, '#6dff9e']);
+        // a caller-supplied amount (e.g. a Chatacombs heal) replaces the random first heal
+        const heal = () => (opts.amount > 0 ? [`+${opts.amount} HP`, '#6dff9e']
+            : Math.random() < 0.1 ? ['+9999 HP!', '#fff36d'] : [`+${randInt(120, 999)} HP`, '#6dff9e']);
 
         add({
             update(dt, t) {

@@ -49,6 +49,7 @@ try {
     console.warn('Warning: text2png could not be loaded (canvas dependency binary issue). Image features will be disabled:', err.message);
 }
 const db = require('./db');
+const { createDungeon } = require('./dungeon');
 const app = express();
 const sessionMessageCounts = new Map();
 const port = 3000;
@@ -417,6 +418,9 @@ function broadcastSSE(payload) {
         res.write(data);
     }
 }
+
+// Chatacombs dungeon client: reads its config from the ceebee settings on every call
+const dungeon = createDungeon({ getSettings: () => db.getCeebeeSettings(), broadcast: broadcastSSE });
 
 app.post('/triggereffect', async (req, res) => {
     console.log('..triggering effect..', req.body);
@@ -834,6 +838,7 @@ app.post('/api/stream/start', async (req, res) => {
         const sessionId = await db.startStreamSession(projectName, streamTitle || '', projectUrl || '', counter.currentStreamNumber);
         const session = await db.getSessionById(sessionId);
         broadcastSSE({ event: 'stream_started', sessionId, streamNumber: counter.currentStreamNumber });
+        dungeon.setStream('started');
         console.log(`Stream started: session=${sessionId}, #${counter.currentStreamNumber}`);
         res.json({ sessionId, streamNumber: counter.currentStreamNumber, session });
     } catch (err) {
@@ -850,6 +855,7 @@ app.post('/api/stream/stop', async (req, res) => {
         await db.endStreamSession(session.id);
         sessionMessageCounts.delete(session.id);
         broadcastSSE({ event: 'stream_stopped', sessionId: session.id });
+        dungeon.setStream('ended');
         console.log(`Stream stopped: session=${session.id}`);
 
         // Auto-generate show notes markdown file
@@ -1417,9 +1423,12 @@ async function triggerTwitchHelixShoutout(targetUsername) {
 }
 
 app.post('/api/chat-event', async (req, res) => {
-    const { username } = req.body || {};
+    const { username, text, displayName, isBroadcaster } = req.body || {};
     const cleanUsername = sanitizeUsername(username);
     if (!cleanUsername) return res.status(400).json({ error: 'Missing username.' });
+
+    // Forward the chat line to the Chatacombs dungeon (fire and forget, silent on failure)
+    dungeon.forwardChat({ user: cleanUsername, displayName, text, isBroadcaster });
 
     try {
         // 1. Register the participant
@@ -1820,15 +1829,43 @@ app.get('/api/ceebee/settings', async (req, res) => {
 app.post('/api/ceebee/settings', async (req, res) => {
     // console.log('..POST /api/ceebee/settings called with:', req.body);
     try {
-        const { auto_participate, min_messages, max_messages, game_enabled, dynamic_weather_enabled } = req.body;
-        const settings = await db.updateCeebeeSettings(
-            auto_participate !== undefined ? !!auto_participate : false,
-            parseInt(min_messages, 10) || 10,
-            parseInt(max_messages, 10) || 15,
-            game_enabled !== undefined ? !!game_enabled : true,
-            dynamic_weather_enabled !== undefined ? !!dynamic_weather_enabled : true
-        );
+        const body = req.body || {};
+        const { auto_participate, min_messages, max_messages, game_enabled, dynamic_weather_enabled } = body;
+        const dungeonKeys = ['dungeon_enabled', 'dungeon_url', 'dungeon_api_key', 'dungeon_channel'];
+        const coreKeys = ['auto_participate', 'min_messages', 'max_messages', 'game_enabled', 'dynamic_weather_enabled'];
+        let settings;
+        // Each admin section saves only its own fields, so leave the other section's values alone
+        if (coreKeys.some(k => body[k] !== undefined) || !dungeonKeys.some(k => body[k] !== undefined)) {
+            settings = await db.updateCeebeeSettings(
+                auto_participate !== undefined ? !!auto_participate : false,
+                parseInt(min_messages, 10) || 10,
+                parseInt(max_messages, 10) || 15,
+                game_enabled !== undefined ? !!game_enabled : true,
+                dynamic_weather_enabled !== undefined ? !!dynamic_weather_enabled : true
+            );
+        }
+        if (dungeonKeys.some(k => body[k] !== undefined)) {
+            const current = await db.getCeebeeSettings();
+            const pick = (k) => (body[k] !== undefined ? body[k] : current[k]);
+            settings = await db.updateDungeonSettings({
+                dungeon_enabled: !!pick('dungeon_enabled'),
+                dungeon_url: String(pick('dungeon_url') || '').trim(),
+                dungeon_api_key: String(pick('dungeon_api_key') || '').trim(),
+                dungeon_channel: String(pick('dungeon_channel') || '').trim().replace(/^#/, '').toLowerCase()
+            });
+            await dungeon.reconcile();
+        }
         res.json(settings);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/dungeon/status', async (req, res) => {
+    try {
+        const s = await db.getCeebeeSettings();
+        const configured = !!(s.dungeon_url && s.dungeon_api_key && s.dungeon_channel);
+        res.json({ enabled: !!s.dungeon_enabled, configured, active: !!s.dungeon_enabled && configured, relaying: dungeon.isRelaying() });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -2067,6 +2104,7 @@ async function startServer() {
     try {
         await db.initDb();
         console.log('Database initialized successfully.');
+        dungeon.reconcile();
 
         app.listen(port, () => {
             console.log(`CloudBot app listening at http://localhost:${port}`);
@@ -2123,4 +2161,8 @@ function CleanUpGeneratedImages() {
     });
 }
 
-startServer();
+if (require.main === module) {
+    startServer();
+}
+
+module.exports = { app, dungeon };

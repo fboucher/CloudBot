@@ -663,6 +663,36 @@
                         </div>
                     </div>
                     
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="card-title">Dungeon (Chatacombs)</span>
+                            <button class="btn btn-cb btn-sm" onclick="saveDungeonSettings()">
+                                <i class="bi bi-save"></i> Save Dungeon
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" role="switch" id="dungeonEnabledToggle" onchange="updateDungeonStatusText()">
+                                <label class="form-check-label text-light" for="dungeonEnabledToggle">Enable Dungeon (forward chat to Chatacombs and relay its narration and effects)</label>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label text-light">Service URL</label>
+                                    <input type="text" class="form-control bg-dark text-light border-secondary" id="dungeonUrl" placeholder="http://localhost:8080" oninput="updateDungeonStatusText()">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label text-light">Twitch Channel</label>
+                                    <input type="text" class="form-control bg-dark text-light border-secondary" id="dungeonChannel" placeholder="fboucheros" oninput="updateDungeonStatusText()">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-light">API Key</label>
+                                <input type="password" class="form-control bg-dark text-light border-secondary" id="dungeonApiKey" placeholder="The API_KEY the Chatacombs container runs with" oninput="updateDungeonStatusText()">
+                            </div>
+                            <p class="small mb-0" id="dungeonStatusText"></p>
+                        </div>
+                    </div>
+
                     <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <span class="card-title">Stream Context</span>
@@ -2200,8 +2230,64 @@
                 updateLabelText(minVal, maxVal);
                 document.getElementById('gameEnabledToggle').checked = data.game_enabled !== undefined ? !!data.game_enabled : true;
                 document.getElementById('weatherEnabledToggle').checked = data.dynamic_weather_enabled !== undefined ? !!data.dynamic_weather_enabled : true;
+                loadDungeonSettings(data);
             } catch (err) {
                 console.error('Error loading Ceebee settings:', err);
+            }
+        }
+
+        function updateDungeonStatusText(relaying) {
+            const el = document.getElementById('dungeonStatusText');
+            if (!el) return;
+            const enabled = document.getElementById('dungeonEnabledToggle').checked;
+            const configured = ['dungeonUrl', 'dungeonApiKey', 'dungeonChannel'].every(id => document.getElementById(id).value.trim() !== '');
+            if (!enabled) {
+                el.className = 'small mb-0 text-warning';
+                el.textContent = 'Dungeon is off: chat is not forwarded and no narration or effects are relayed.';
+            } else if (!configured) {
+                el.className = 'small mb-0 text-warning';
+                el.textContent = 'Dungeon is on but needs a service URL, API key and channel before anything is forwarded.';
+            } else {
+                el.className = 'small mb-0 text-success';
+                el.textContent = relaying === false
+                    ? 'Dungeon is on (save to connect).'
+                    : 'Dungeon is on: chat is forwarded and narration and effects are relayed.';
+            }
+        }
+
+        async function loadDungeonSettings(data) {
+            try {
+                if (!data) data = await (await fetch('/api/ceebee/settings')).json();
+                document.getElementById('dungeonEnabledToggle').checked = !!data.dungeon_enabled;
+                document.getElementById('dungeonUrl').value = data.dungeon_url || '';
+                document.getElementById('dungeonApiKey').value = data.dungeon_api_key || '';
+                document.getElementById('dungeonChannel').value = data.dungeon_channel || '';
+                const status = await (await fetch('/api/dungeon/status')).json();
+                updateDungeonStatusText(status.relaying);
+            } catch (err) {
+                console.error('Error loading Dungeon settings:', err);
+            }
+        }
+
+        async function saveDungeonSettings() {
+            const body = {
+                dungeon_enabled: document.getElementById('dungeonEnabledToggle').checked,
+                dungeon_url: document.getElementById('dungeonUrl').value.trim(),
+                dungeon_api_key: document.getElementById('dungeonApiKey').value.trim(),
+                dungeon_channel: document.getElementById('dungeonChannel').value.trim()
+            };
+            try {
+                const response = await fetch('/api/ceebee/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                await loadDungeonSettings(await response.json());
+                showFeedback('Dungeon settings saved.');
+            } catch (err) {
+                console.error('Error saving Dungeon settings:', err);
+                alert('Error saving dungeon settings: ' + err.message);
             }
         }
 
