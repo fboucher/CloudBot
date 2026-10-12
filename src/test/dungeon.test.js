@@ -200,6 +200,27 @@ describe('dungeon adapter against a stub Chatacombs', () => {
         assert.equal(stub.streams.length, 0);
     });
 
+    test('reports whether the event stream is connected, and why not', async () => {
+        fresh({ dungeon_api_key: 'fb-overlay-secret' });
+        await dungeon.reconcile();
+        const bad = await until(() => dungeon.connectionStatus().error);
+        assert.match(bad, /rejected the API key \(HTTP 401\)/);
+        assert.match(bad, /not the OVERLAY_KEY/);
+        assert.equal(dungeon.connectionStatus().connected, false);
+
+        fresh({ dungeon_url: 'http://127.0.0.1:1' });
+        await dungeon.reconcile();
+        assert.match(await until(() => dungeon.connectionStatus().error), /Can't reach Chatacombs at http:\/\/127\.0\.0\.1:1 \(.+\)\./);
+
+        fresh();
+        assert.deepEqual(dungeon.connectionStatus(), { connected: false, error: null });
+        await dungeon.reconcile();
+        await until(() => dungeon.connectionStatus().connected);
+        assert.equal(dungeon.connectionStatus().error, null);
+        dungeon.stopRelay();
+        await until(() => stub.eventClients.size === 0);
+    });
+
     test('re-sends started on every (re)connect while a stream is live', async () => {
         fresh();
         await dungeon.reconcile();
@@ -301,7 +322,7 @@ describe('CloudBot server wiring', () => {
         await post('/api/chat-event', { username: 'alice', text: '!explore' });
         await wait(100);
         assert.equal(stub.messages.length, 0);
-        assert.deepEqual(await get('/api/dungeon/status'), { enabled: false, configured: false, active: false, relaying: false });
+        assert.deepEqual(await get('/api/dungeon/status'), { enabled: false, configured: false, active: false, relaying: false, connected: false, error: null, warning: null });
     });
 
     test('saving each admin section keeps the other section intact', async () => {

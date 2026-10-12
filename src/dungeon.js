@@ -196,12 +196,21 @@ function createDungeon({ getSettings, broadcast, isStreamLive = async () => fals
         }
     }
 
-    async function readStream(config, signal) {
+    // Turn a relay failure into a sentence the admin page can show as is
+    function describeRelayError(config, err) {
+        if (err.status === 401 || err.status === 403) return `Chatacombs at ${config.url} rejected the API key (HTTP ${err.status}). Use the API_KEY from the Chatacombs .env, not the OVERLAY_KEY.`;
+        if (err.status) return `Chatacombs at ${config.url} answered HTTP ${err.status}.`;
+        return `Can't reach Chatacombs at ${config.url} (${err.cause?.code || err.cause?.message || err.message}).`;
+    }
+
+    async function readStream(config, signal, link) {
         const res = await fetchImpl(`${channelApi(config)}/events`, {
             headers: { Authorization: `Bearer ${config.apiKey}`, Accept: 'text/event-stream' },
             signal
         });
-        if (!res.ok || !res.body) throw new Error(`events: HTTP ${res.status}`);
+        if (!res.ok || !res.body) throw Object.assign(new Error(`events: HTTP ${res.status}`), { status: res.status });
+        link.connected = true;
+        link.error = null;
         logger.log(`[Dungeon] Connected to ${channelApi(config)}/events`);
         resyncStream(config);
         const reader = res.body.getReader();
@@ -224,14 +233,17 @@ function createDungeon({ getSettings, broadcast, isStreamLive = async () => fals
         }
     }
 
-    async function runRelay(config, controller) {
+    async function runRelay(config, controller, link) {
         let delay = reconnectMinMs;
         while (!controller.signal.aborted) {
             const startedAt = Date.now();
             try {
-                await readStream(config, controller.signal);
+                await readStream(config, controller.signal, link);
+                link.connected = false;
             } catch (err) {
+                link.connected = false;
                 if (controller.signal.aborted) break;
+                link.error = describeRelayError(config, err);
                 logger.warn(`[Dungeon] Event stream error: ${err.message}`);
             }
             if (controller.signal.aborted) break;
@@ -260,8 +272,8 @@ function createDungeon({ getSettings, broadcast, isStreamLive = async () => fals
         stopRelay();
         if (!key) return false;
         const controller = new AbortController();
-        relay = { key, controller };
-        runRelay(config, controller).catch(err => logger.error('[Dungeon] Relay stopped:', err.message));
+        relay = { key, controller, link: { connected: false, error: null } };
+        runRelay(config, controller, relay.link).catch(err => logger.error('[Dungeon] Relay stopped:', err.message));
         return true;
     }
 
@@ -269,7 +281,12 @@ function createDungeon({ getSettings, broadcast, isStreamLive = async () => fals
         return !!relay;
     }
 
-    return { forwardChat, setStream, forceStream, reconcile, stopRelay, isRelaying, handleEvent };
+    // Whether the event stream is up right now, and why it is not when it failed
+    function connectionStatus() {
+        return relay ? { connected: relay.link.connected, error: relay.link.error } : { connected: false, error: null };
+    }
+
+    return { forwardChat, setStream, forceStream, reconcile, stopRelay, isRelaying, connectionStatus, handleEvent };
 }
 
 module.exports = { createDungeon, mapGameMoment, readConfig, parseSseFrame, d20ToTwoD6 };

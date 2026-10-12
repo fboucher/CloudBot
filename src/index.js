@@ -1895,11 +1895,25 @@ app.post('/api/ceebee/settings', async (req, res) => {
     }
 });
 
+function runningInContainer() {
+    return fs.existsSync('/.dockerenv') || fs.existsSync('/run/.containerenv');
+}
+
 app.get('/api/dungeon/status', async (req, res) => {
     try {
         const s = await db.getCeebeeSettings();
         const configured = !!(s.dungeon_url && s.dungeon_api_key && s.dungeon_channel);
-        res.json({ enabled: !!s.dungeon_enabled, configured, active: !!s.dungeon_enabled && configured, relaying: dungeon.isRelaying() });
+        const { connected, error } = dungeon.connectionStatus();
+        // Inside a container, localhost is the container itself, not the machine running Chatacombs
+        let warning = null;
+        if (s.dungeon_url && runningInContainer()) {
+            try {
+                if (['localhost', '127.0.0.1', '[::1]'].includes(new URL(s.dungeon_url).hostname)) {
+                    warning = 'CloudBot runs in a container, so localhost is the container itself. Use http://host.docker.internal:8080 (or the Chatacombs container name) as the Service URL.';
+                }
+            } catch { /* invalid URL: the connection error says so */ }
+        }
+        res.json({ enabled: !!s.dungeon_enabled, configured, active: !!s.dungeon_enabled && configured, relaying: dungeon.isRelaying(), connected, error, warning });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
