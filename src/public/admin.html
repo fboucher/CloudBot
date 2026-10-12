@@ -102,6 +102,16 @@
         .btn-cb-danger {
             background-color: #dc3545;
         }
+
+        .btn-cb.btn-sm,
+        .btn-sm.btn-cb {
+            padding: 6px 14px;
+            font-size: 0.875rem;
+        }
+
+        #dungeonQuickActions {
+            display: contents;
+        }
         
         .status-indicator {
             width: 12px;
@@ -394,7 +404,7 @@
                             <span class="card-title">Quick Actions</span>
                         </div>
                         <div class="card-body">
-                            <div class="mb-3">
+                            <div class="d-flex flex-wrap gap-2 mb-3">
                                 <button class="btn btn-cb btn-sm" onclick="showAttentionPrompt()">
                                     <i class="bi bi-exclamation-triangle"></i> Attention
                                 </button>
