@@ -1243,8 +1243,6 @@
             if (fx.effect === 'potion') {
                 playBubbleSound();
                 CloudFX.potion(fx.user, { amount: fx.amount });
-            } else if (fx.effect === 'dice') {
-                triggerDiceRoll(fx.d1, fx.d2, fx.user);
             } else if (fx.effect === 'thunderstorm') {
                 triggerThunderstorm();
             } else if (fx.effect === 'sunshine') {

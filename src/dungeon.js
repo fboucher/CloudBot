@@ -10,26 +10,14 @@ const REQUEST_TIMEOUT_MS = 3000;
 const RECONNECT_MIN_MS = 3000;
 const RECONNECT_MAX_MS = 30000;
 
-// Chatacombs rolls a d20; CloudBot's dice overlay throws two d6.
-// Scale the d20 onto a 2..12 total so a natural 20 is double six and a natural 1 is snake eyes.
-function d20ToTwoD6(roll) {
-    const r = Math.min(20, Math.max(1, Math.round(Number(roll) || 1)));
-    const total = 2 + Math.round(((r - 1) * 10) / 19);
-    const d1 = Math.ceil(total / 2);
-    return { d1, d2: total - d1 };
-}
-
 // Map a Chatacombs `game` moment onto an existing CloudBot overlay effect.
 // Returns null for moments CloudBot does not react to.
+// dice_roll is left out on purpose: Chatacombs draws its own d20 on its overlay.
 function mapGameMoment(event) {
     if (!event || typeof event !== 'object') return null;
     switch (event.type) {
         case 'player_healed':
             return { effect: 'potion', user: event.target || event.user || '', amount: Number(event.amount) || 0 };
-        case 'dice_roll': {
-            const { d1, d2 } = d20ToTwoD6(event.roll);
-            return { effect: 'dice', d1, d2, user: event.displayName || event.user || '' };
-        }
         case 'rare_loot': {
             const found = event.item ? event.item : `${Number(event.gold) || 0} gold`;
             return { effect: 'cloud', expression: 'Wow', note: `${event.user || 'The party'} found ${found}!` };
@@ -289,4 +277,4 @@ function createDungeon({ getSettings, broadcast, isStreamLive = async () => fals
     return { forwardChat, setStream, forceStream, reconcile, stopRelay, isRelaying, connectionStatus, handleEvent };
 }
 
-module.exports = { createDungeon, mapGameMoment, readConfig, parseSseFrame, d20ToTwoD6 };
+module.exports = { createDungeon, mapGameMoment, readConfig, parseSseFrame };

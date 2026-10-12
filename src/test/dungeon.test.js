@@ -6,7 +6,7 @@ const os = require('os');
 const path = require('path');
 const express = require('express');
 
-const { createDungeon, mapGameMoment, d20ToTwoD6, parseSseFrame } = require('../dungeon');
+const { createDungeon, mapGameMoment, parseSseFrame } = require('../dungeon');
 
 const API_KEY = 'test-bot-secret';
 const quietLogger = { log() {}, warn() {}, error() {} };
@@ -71,8 +71,6 @@ describe('game moment mapping', () => {
     test('maps the six moments onto existing effects with payload values', () => {
         assert.deepEqual(mapGameMoment({ kind: 'game', type: 'player_healed', user: 'bob', target: 'alice', amount: 7 }),
             { effect: 'potion', user: 'alice', amount: 7 });
-        assert.deepEqual(mapGameMoment({ kind: 'game', type: 'dice_roll', user: 'alice', displayName: 'Alice', roll: 20 }),
-            { effect: 'dice', d1: 6, d2: 6, user: 'Alice' });
         assert.deepEqual(mapGameMoment({ kind: 'game', type: 'rare_loot', user: 'bob', gold: 5, item: 'Moon Blade' }),
             { effect: 'cloud', expression: 'Wow', note: 'bob found Moon Blade!' });
         assert.deepEqual(mapGameMoment({ kind: 'game', type: 'rare_loot', user: 'bob', gold: 12, item: null }),
@@ -87,18 +85,11 @@ describe('game moment mapping', () => {
 
     test('ignores unknown or malformed moments', () => {
         assert.equal(mapGameMoment({ kind: 'game', type: 'room_entered' }), null);
+        assert.equal(mapGameMoment({ kind: 'game', type: 'dice_roll', user: 'alice', roll: 20 }), null);
         assert.equal(mapGameMoment(null), null);
         assert.equal(mapGameMoment('nope'), null);
     });
 
-    test('scales a d20 onto two d6 keeping crits and fails', () => {
-        assert.deepEqual(d20ToTwoD6(1), { d1: 1, d2: 1 });
-        assert.deepEqual(d20ToTwoD6(20), { d1: 6, d2: 6 });
-        for (let r = 1; r <= 20; r++) {
-            const { d1, d2 } = d20ToTwoD6(r);
-            assert.ok(d1 >= 1 && d1 <= 6 && d2 >= 1 && d2 <= 6, `roll ${r}`);
-        }
-    });
 
     test('parses SSE frames and skips keep-alives and junk', () => {
         assert.deepEqual(parseSseFrame('event: say\ndata: {"kind":"say","text":"hi"}'), { kind: 'say', text: 'hi' });

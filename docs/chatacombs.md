@@ -10,7 +10,7 @@ Once the Dungeon is on and configured, CloudBot:
 
 - **Forwards chat.** Every chat line CloudBot receives is sent to Chatacombs, which reads the game commands (`!explore`, `!vote 1`, `!go north`, and so on) and ignores the rest.
 - **Speaks the dungeon lines.** Chatacombs sends its narration back to CloudBot, and CeeBee posts it in Twitch chat. Answers to viewers who talk to the dungeon bot by name (its `BOT_NAME`) come back the same way.
-- **Plays overlay effects.** Big game moments trigger CloudBot effects: a potion when someone is healed, the dice for a roll, CB Wow for rare loot, CB Tada when a monster is defeated, a thunderstorm when a boss appears and rainbow sunshine when the dungeon is cleared.
+- **Plays overlay effects.** Big game moments trigger CloudBot effects: a potion when someone is healed, CB Wow for rare loot, CB Tada when a monster is defeated, a thunderstorm when a boss appears and rainbow sunshine when the dungeon is cleared. Dice rolls are left to Chatacombs, which shows its own d20 on its overlay.
 - **Links the stream to the adventure.** Starting a stream session in CloudBot tells Chatacombs the stream `started`, which opens a theme vote for a new adventure. Stopping the session tells it the stream `ended`. CloudBot also resends `started` when it reconnects to a Chatacombs that restarted during a live session.
 
 The game itself (rooms, monsters, votes, timers and the Chatacombs overlay) lives in Chatacombs. CloudBot is only its link to chat and to the CloudBot overlay.
