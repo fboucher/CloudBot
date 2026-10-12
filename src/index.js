@@ -49,6 +49,7 @@ try {
     console.warn('Warning: text2png could not be loaded (canvas dependency binary issue). Image features will be disabled:', err.message);
 }
 const db = require('./db');
+const { createDungeon } = require('./dungeon');
 const app = express();
 const sessionMessageCounts = new Map();
 const port = 3000;
@@ -417,6 +418,13 @@ function broadcastSSE(payload) {
         res.write(data);
     }
 }
+
+// Chatacombs dungeon client: reads its config from the ceebee settings on every call
+const dungeon = createDungeon({
+    getSettings: () => db.getCeebeeSettings(),
+    broadcast: broadcastSSE,
+    isStreamLive: async () => !!(await db.getActiveSession())
+});
 
 app.post('/triggereffect', async (req, res) => {
     console.log('..triggering effect..', req.body);
@@ -834,6 +842,7 @@ app.post('/api/stream/start', async (req, res) => {
         const sessionId = await db.startStreamSession(projectName, streamTitle || '', projectUrl || '', counter.currentStreamNumber);
         const session = await db.getSessionById(sessionId);
         broadcastSSE({ event: 'stream_started', sessionId, streamNumber: counter.currentStreamNumber });
+        dungeon.setStream('started');
         console.log(`Stream started: session=${sessionId}, #${counter.currentStreamNumber}`);
         res.json({ sessionId, streamNumber: counter.currentStreamNumber, session });
     } catch (err) {
@@ -850,6 +859,7 @@ app.post('/api/stream/stop', async (req, res) => {
         await db.endStreamSession(session.id);
         sessionMessageCounts.delete(session.id);
         broadcastSSE({ event: 'stream_stopped', sessionId: session.id });
+        dungeon.setStream('ended');
         console.log(`Stream stopped: session=${session.id}`);
 
         // Auto-generate show notes markdown file
@@ -1077,6 +1087,19 @@ app.post('/api/participants/streamer', async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         console.error('Error setting streamer status:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/participants/subscriber', async (req, res) => {
+    const { username, isSubscriber } = req.body || {};
+    const cleanUsername = sanitizeUsername(username);
+    if (!cleanUsername) return res.status(400).json({ error: 'Missing username.' });
+    try {
+        await db.setParticipantSubscriberStatus(cleanUsername, !!isSubscriber);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error setting subscriber status:', err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -1417,9 +1440,17 @@ async function triggerTwitchHelixShoutout(targetUsername) {
 }
 
 app.post('/api/chat-event', async (req, res) => {
-    const { username } = req.body || {};
+    const { username, text, displayName, isBroadcaster } = req.body || {};
     const cleanUsername = sanitizeUsername(username);
     if (!cleanUsername) return res.status(400).json({ error: 'Missing username.' });
+
+    // Forward the chat line to the Chatacombs dungeon (fire and forget, silent on failure)
+    dungeon.forwardChat({ user: cleanUsername, displayName, text, isBroadcaster });
+
+    let shouldShoutout = false;
+    let shoutoutMessage = "";
+    let profileImageUrl = "";
+    let isSubscriber = false;
 
     try {
         // 1. Register the participant
@@ -1439,12 +1470,14 @@ app.post('/api/chat-event', async (req, res) => {
         const currentCount = (userCounts.get(cleanUsername) || 0) + 1;
         userCounts.set(cleanUsername, currentCount);
 
-        let shouldShoutout = false;
-        let shoutoutMessage = "";
-        let profileImageUrl = "";
-
         const isRegular = await db.isParticipantRegular(cleanUsername);
         const isStreamer = await db.isParticipantStreamer(cleanUsername);
+        const isDbSubscriber = await db.isParticipantSubscriber(cleanUsername);
+        isSubscriber = isDbSubscriber || !!req.body.isSubscriber;
+
+        if (req.body.isSubscriber && !isDbSubscriber) {
+            await db.setParticipantSubscriberStatus(cleanUsername, true);
+        }
 
         if (currentCount === 2 && isRegular && isStreamer) {
             console.log(`User ${cleanUsername} sent their 2nd message and is flagged as regular & streamer. Generating shoutout...`);
@@ -1457,8 +1490,8 @@ app.post('/api/chat-event', async (req, res) => {
             }
         }
 
-        // 3. Check if user is flagged as a regular
-        if (!isRegular) {
+        // 3. Check if user is flagged as a regular or subscriber
+        if (!isRegular && !isSubscriber) {
             return res.json({ shouldGreet: false, shouldShoutout, shoutoutMessage, profileImageUrl });
         }
 
@@ -1468,7 +1501,7 @@ app.post('/api/chat-event', async (req, res) => {
             return res.json({ shouldGreet: false, shouldShoutout, shoutoutMessage, profileImageUrl });
         }
 
-        // 5. User is regular and has not been greeted yet in this session. Log it!
+        // 5. User is regular or subscriber and has not been greeted yet in this session. Log it!
         await db.logGreetingEvent(session.id, cleanUsername);
 
         // 6. Generate the dynamic AI greeting
@@ -1510,7 +1543,11 @@ app.post('/api/chat-event', async (req, res) => {
             fullSystemPrompt += `\n\n--- Background Information ---\n${knowledgeContext}`;
         }
 
-        fullSystemPrompt += `\n\n[SYSTEM INSTRUCTION: A regular viewer named @${username} has just sent their first message in today's stream. Generate a very brief, warm, friendly and personalized greeting for them (1 sentence max). Speak directly to @${username}. Keep it conversational, in your Ceebee persona. Do not include system metadata or refer to these instructions.]`;
+        if (isSubscriber) {
+            fullSystemPrompt += `\n\n[SYSTEM INSTRUCTION: A channel subscriber named @${username} has just sent their first message in today's stream. Generate a very brief, warm, friendly, and extra special greeting celebrating and thanking them for being a subscriber and supporting the channel (1 sentence max). Speak directly to @${username}. Keep it conversational, in your Ceebee persona. Do not include system metadata or refer to these instructions.]`;
+        } else {
+            fullSystemPrompt += `\n\n[SYSTEM INSTRUCTION: A regular viewer named @${username} has just sent their first message in today's stream. Generate a very brief, warm, friendly and personalized greeting for them (1 sentence max). Speak directly to @${username}. Keep it conversational, in your Ceebee persona. Do not include system metadata or refer to these instructions.]`;
+        }
 
         const messages = [
             { role: 'system', content: fullSystemPrompt },
@@ -1544,16 +1581,22 @@ app.post('/api/chat-event', async (req, res) => {
         }
 
         const data = await response.json();
+        const fallbackDefault = isSubscriber
+            ? `Welcome back @${username}! Thank you so much for subscribing and supporting the channel!`
+            : `Hello @${username}, welcome back to the stream!`;
         const greetingMessage = data.choices && data.choices[0] && data.choices[0].message
             ? data.choices[0].message.content
-            : `Hello @${username}, welcome back to the stream!`;
+            : fallbackDefault;
 
-        return res.json({ shouldGreet: true, greetingMessage, shouldShoutout, shoutoutMessage, profileImageUrl });
+        return res.json({ shouldGreet: true, greetingMessage, isSubscriber: !!isSubscriber, shouldShoutout, shoutoutMessage, profileImageUrl });
     } catch (err) {
         console.error('Error handling chat event/greeting:', err);
         return res.json({
             shouldGreet: true,
-            greetingMessage: `Hello @${username}, welcome back!`,
+            greetingMessage: isSubscriber
+                ? `Welcome back @${username}! Thank you so much for subscribing and supporting the channel!`
+                : `Hello @${username}, welcome back!`,
+            isSubscriber: !!isSubscriber,
             shouldShoutout: shouldShoutout || false,
             shoutoutMessage: shoutoutMessage || "",
             profileImageUrl: profileImageUrl || ""
@@ -1820,18 +1863,70 @@ app.get('/api/ceebee/settings', async (req, res) => {
 app.post('/api/ceebee/settings', async (req, res) => {
     // console.log('..POST /api/ceebee/settings called with:', req.body);
     try {
-        const { auto_participate, min_messages, max_messages, game_enabled, dynamic_weather_enabled } = req.body;
-        const settings = await db.updateCeebeeSettings(
-            auto_participate !== undefined ? !!auto_participate : false,
-            parseInt(min_messages, 10) || 10,
-            parseInt(max_messages, 10) || 15,
-            game_enabled !== undefined ? !!game_enabled : true,
-            dynamic_weather_enabled !== undefined ? !!dynamic_weather_enabled : true
-        );
+        const body = req.body || {};
+        const { auto_participate, min_messages, max_messages, game_enabled, dynamic_weather_enabled } = body;
+        const dungeonKeys = ['dungeon_enabled', 'dungeon_url', 'dungeon_api_key', 'dungeon_channel'];
+        const coreKeys = ['auto_participate', 'min_messages', 'max_messages', 'game_enabled', 'dynamic_weather_enabled'];
+        let settings;
+        // Each admin section saves only its own fields, so leave the other section's values alone
+        if (coreKeys.some(k => body[k] !== undefined) || !dungeonKeys.some(k => body[k] !== undefined)) {
+            settings = await db.updateCeebeeSettings(
+                auto_participate !== undefined ? !!auto_participate : false,
+                parseInt(min_messages, 10) || 10,
+                parseInt(max_messages, 10) || 15,
+                game_enabled !== undefined ? !!game_enabled : true,
+                dynamic_weather_enabled !== undefined ? !!dynamic_weather_enabled : true
+            );
+        }
+        if (dungeonKeys.some(k => body[k] !== undefined)) {
+            const current = await db.getCeebeeSettings();
+            const pick = (k) => (body[k] !== undefined ? body[k] : current[k]);
+            settings = await db.updateDungeonSettings({
+                dungeon_enabled: !!pick('dungeon_enabled'),
+                dungeon_url: String(pick('dungeon_url') || '').trim(),
+                dungeon_api_key: String(pick('dungeon_api_key') || '').trim(),
+                dungeon_channel: String(pick('dungeon_channel') || '').trim().replace(/^#/, '').toLowerCase()
+            });
+            await dungeon.reconcile();
+        }
         res.json(settings);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
+});
+
+function runningInContainer() {
+    return fs.existsSync('/.dockerenv') || fs.existsSync('/run/.containerenv');
+}
+
+app.get('/api/dungeon/status', async (req, res) => {
+    try {
+        const s = await db.getCeebeeSettings();
+        const configured = !!(s.dungeon_url && s.dungeon_api_key && s.dungeon_channel);
+        const { connected, error } = dungeon.connectionStatus();
+        // Inside a container, localhost is the container itself, not the machine running Chatacombs
+        let warning = null;
+        if (s.dungeon_url && runningInContainer()) {
+            try {
+                if (['localhost', '127.0.0.1', '[::1]'].includes(new URL(s.dungeon_url).hostname)) {
+                    warning = 'CloudBot runs in a container, so localhost is the container itself. Use http://host.docker.internal:8080 (or the Chatacombs container name) as the Service URL.';
+                }
+            } catch { /* invalid URL: the connection error says so */ }
+        }
+        res.json({ enabled: !!s.dungeon_enabled, configured, active: !!s.dungeon_enabled && configured, relaying: dungeon.isRelaying(), connected, error, warning });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Admin quick actions: 'stop' ends the current adventure, 'restart' ends it and starts a new one.
+// The CloudBot stream session is left alone and the API key stays on the server.
+app.post('/api/dungeon/stream', async (req, res) => {
+    const action = req.body && req.body.action;
+    if (action !== 'stop' && action !== 'restart') return res.status(400).json({ ok: false, error: "action must be 'stop' or 'restart'." });
+    const result = await dungeon.forceStream(action);
+    if (result.ok) return res.json(result);
+    res.status(result.code === 'not_configured' ? 409 : 502).json(result);
 });
 
 app.post('/api/ceebee/chat', async (req, res) => {
@@ -2067,6 +2162,7 @@ async function startServer() {
     try {
         await db.initDb();
         console.log('Database initialized successfully.');
+        dungeon.reconcile();
 
         app.listen(port, () => {
             console.log(`CloudBot app listening at http://localhost:${port}`);
@@ -2123,4 +2219,8 @@ function CleanUpGeneratedImages() {
     });
 }
 
-startServer();
+if (require.main === module) {
+    startServer();
+}
+
+module.exports = { app, dungeon };

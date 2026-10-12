@@ -102,6 +102,16 @@
         .btn-cb-danger {
             background-color: #dc3545;
         }
+
+        .btn-cb.btn-sm,
+        .btn-sm.btn-cb {
+            padding: 6px 14px;
+            font-size: 0.875rem;
+        }
+
+        #dungeonQuickActions {
+            display: contents;
+        }
         
         .status-indicator {
             width: 12px;
@@ -394,7 +404,7 @@
                             <span class="card-title">Quick Actions</span>
                         </div>
                         <div class="card-body">
-                            <div class="mb-3">
+                            <div class="d-flex flex-wrap gap-2 mb-3">
                                 <button class="btn btn-cb btn-sm" onclick="showAttentionPrompt()">
                                     <i class="bi bi-exclamation-triangle"></i> Attention
                                 </button>
@@ -416,6 +426,14 @@
                                 <button class="btn btn-cb btn-sm" onclick="triggerShoutout()">
                                     <i class="bi bi-megaphone"></i> Shoutout
                                 </button>
+                                <span id="dungeonQuickActions" style="display: none;">
+                                    <button class="btn btn-cb btn-sm" onclick="dungeonStreamAction('stop')" title="End the current Chatacombs adventure. The stream session keeps running.">
+                                        <i class="bi bi-stop-circle"></i> Stop dungeon
+                                    </button>
+                                    <button class="btn btn-cb btn-sm" onclick="dungeonStreamAction('restart')" title="End the current Chatacombs adventure and open a new theme vote.">
+                                        <i class="bi bi-arrow-repeat"></i> New adventure
+                                    </button>
+                                </span>
                             </div>
                             <div id="actionFeedback" class="mt-2 text-muted small"></div>
                         </div>
@@ -585,6 +603,7 @@
                                         <th>Username</th>
                                         <th>Regular</th>
                                         <th>Streamer</th>
+                                        <th>Subscriber</th>
                                         <th>Drops</th>
                                         <th>Landed</th>
                                         <th>High Score</th>
@@ -663,6 +682,36 @@
                         </div>
                     </div>
                     
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="card-title">Dungeon (Chatacombs)</span>
+                            <button class="btn btn-cb btn-sm" onclick="saveDungeonSettings()">
+                                <i class="bi bi-save"></i> Save Dungeon
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" role="switch" id="dungeonEnabledToggle" onchange="updateDungeonStatusText(null)">
+                                <label class="form-check-label text-light" for="dungeonEnabledToggle">Enable Dungeon (forward chat to Chatacombs and relay its narration and effects)</label>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label text-light">Service URL</label>
+                                    <input type="text" class="form-control bg-dark text-light border-secondary" id="dungeonUrl" placeholder="http://localhost:8080" oninput="updateDungeonStatusText(null)">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label text-light">Twitch Channel</label>
+                                    <input type="text" class="form-control bg-dark text-light border-secondary" id="dungeonChannel" placeholder="fboucheros" oninput="updateDungeonStatusText(null)">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-light">API Key</label>
+                                <input type="password" class="form-control bg-dark text-light border-secondary" id="dungeonApiKey" placeholder="The API_KEY from the Chatacombs .env (not the OVERLAY_KEY)" oninput="updateDungeonStatusText(null)">
+                            </div>
+                            <p class="small mb-0" id="dungeonStatusText"></p>
+                        </div>
+                    </div>
+
                     <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <span class="card-title">Stream Context</span>
@@ -825,6 +874,7 @@
             setupNavigation();
             loadVersion();
             setupSessionConfigModal();
+            refreshDungeonQuickActions();
             setInterval(loadActiveSession, 5000);
             setInterval(pollForEffects, 2000);
             setInterval(renderSessionNotes, 5000);
@@ -1664,7 +1714,7 @@
                 const participants = await response.json();
 
                 if (!Array.isArray(participants) || participants.length === 0) {
-                    container.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No user statistics available.</td></tr>';
+                    container.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No user statistics available.</td></tr>';
                     return;
                 }
 
@@ -1681,6 +1731,11 @@
                                 <input class="form-check-input" type="checkbox" role="switch" ${u.is_streamer ? 'checked' : ''} onchange="toggleStreamer('${escapeHtml(u.username)}', this.checked)">
                             </div>
                         </td>
+                        <td>
+                            <div class="form-check form-switch d-inline-block">
+                                <input class="form-check-input" type="checkbox" role="switch" ${u.is_subscriber ? 'checked' : ''} onchange="toggleSubscriber('${escapeHtml(u.username)}', this.checked)">
+                            </div>
+                        </td>
                         <td>${u.total_drops || 0}</td>
                         <td>${u.total_landed || 0}</td>
                         <td>${u.max_high_score || 0}</td>
@@ -1689,7 +1744,7 @@
                 `).join('');
             } catch (err) {
                 console.error('Error loading users:', err);
-                container.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading user statistics.</td></tr>';
+                container.innerHTML = '<tr><td colspan="8" class="text-center text-danger">Error loading user statistics.</td></tr>';
             }
         }
 
@@ -1727,6 +1782,25 @@
             } catch (err) {
                 console.error('Error toggling streamer:', err);
                 alert(`Error toggling streamer status for @${username}`);
+                loadUsers(); // reload to reset checkbox state
+            }
+        }
+
+        async function toggleSubscriber(username, isSubscriber) {
+            try {
+                const response = await fetch('/api/participants/subscriber', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, isSubscriber })
+                });
+                if (response.ok) {
+                    showFeedback(`Updated subscriber status for @${username}`);
+                } else {
+                    throw new Error('Failed to update');
+                }
+            } catch (err) {
+                console.error('Error toggling subscriber:', err);
+                alert(`Error toggling subscriber status for @${username}`);
                 loadUsers(); // reload to reset checkbox state
             }
         }
@@ -1785,12 +1859,47 @@
             return notes;
         }
 
-        function showFeedback(msg) {
+        function showFeedback(msg, durationMs = 3000) {
             const el = document.getElementById('actionFeedback');
             if (el) {
                 el.innerText = msg;
                 clearTimeout(el._timer);
-                el._timer = setTimeout(() => { el.innerText = ''; }, 3000);
+                el._timer = setTimeout(() => { el.innerText = ''; }, durationMs);
+            }
+        }
+
+        // Say what Chatacombs actually did, and on which channel, so a mismatch with the overlay is visible
+        function describeDungeonResult(action, result) {
+            const where = `channel "${result.channel}"`;
+            const status = result.status;
+            if (action === 'stop') {
+                if (result.changed === false) return `Nothing to stop on ${where}: Chatacombs says the adventure is ${status || 'not running'}.`;
+                return `Dungeon stopped on ${where}: the adventure has ended.`;
+            }
+            if (status && status !== 'voting') return `Chatacombs did not open a new theme vote on ${where} (adventure is ${status}).`;
+            return `New adventure on ${where}: the theme vote is open in chat.`;
+        }
+
+        async function dungeonStreamAction(action) {
+            const question = action === 'stop'
+                ? 'End the current Chatacombs adventure? The stream session keeps running.'
+                : 'End the current Chatacombs adventure and start a new one?';
+            if (!confirm(question)) return;
+            try {
+                const response = await fetch('/api/dungeon/stream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action })
+                });
+                const result = await response.json().catch(() => ({}));
+                if (response.ok && result.ok) {
+                    showFeedback(describeDungeonResult(action, result), 8000);
+                } else {
+                    showFeedback(`Dungeon ${action === 'stop' ? 'stop' : 'restart'} failed: ${result.error || `HTTP ${response.status}`}`, 8000);
+                }
+            } catch (err) {
+                console.error('Error sending dungeon action:', err);
+                showFeedback('Dungeon action failed: CloudBot could not be reached.', 8000);
             }
         }
 
@@ -2200,8 +2309,87 @@
                 updateLabelText(minVal, maxVal);
                 document.getElementById('gameEnabledToggle').checked = data.game_enabled !== undefined ? !!data.game_enabled : true;
                 document.getElementById('weatherEnabledToggle').checked = data.dynamic_weather_enabled !== undefined ? !!data.dynamic_weather_enabled : true;
+                loadDungeonSettings(data);
             } catch (err) {
                 console.error('Error loading Ceebee settings:', err);
+            }
+        }
+
+        // status: the last /api/dungeon/status answer, or null once the fields are edited and not saved yet
+        let dungeonStatus = null;
+        function updateDungeonStatusText(status) {
+            if (status !== undefined) dungeonStatus = status;
+            const el = document.getElementById('dungeonStatusText');
+            if (!el) return;
+            const enabled = document.getElementById('dungeonEnabledToggle').checked;
+            const configured = ['dungeonUrl', 'dungeonApiKey', 'dungeonChannel'].every(id => document.getElementById(id).value.trim() !== '');
+            if (!enabled) {
+                el.className = 'small mb-0 text-warning';
+                el.textContent = 'Dungeon is off: chat is not forwarded and no narration or effects are relayed.';
+            } else if (!configured) {
+                el.className = 'small mb-0 text-warning';
+                el.textContent = 'Dungeon is on but needs a service URL, API key and channel before anything is forwarded.';
+            } else if (!dungeonStatus || !dungeonStatus.relaying) {
+                el.className = 'small mb-0 text-light';
+                el.textContent = 'Dungeon is on (save to connect).';
+            } else if (dungeonStatus.warning || dungeonStatus.error) {
+                el.className = 'small mb-0 text-warning';
+                el.textContent = [dungeonStatus.warning, dungeonStatus.error].filter(Boolean).join(' ');
+            } else if (!dungeonStatus.connected) {
+                el.className = 'small mb-0 text-light';
+                el.textContent = 'Dungeon is on: connecting to Chatacombs...';
+            } else {
+                el.className = 'small mb-0 text-success';
+                el.textContent = 'Dungeon is on and connected: chat is forwarded and narration and effects are relayed.';
+            }
+        }
+
+        // Quick Actions sits on the session page, so check the dungeon status on page load too
+        async function refreshDungeonQuickActions() {
+            try {
+                const status = await (await fetch('/api/dungeon/status')).json();
+                document.getElementById('dungeonQuickActions').style.display = status.active ? '' : 'none';
+                return status;
+            } catch (err) {
+                console.error('Error loading Dungeon status:', err);
+                return null;
+            }
+        }
+
+        async function loadDungeonSettings(data) {
+            try {
+                if (!data) data = await (await fetch('/api/ceebee/settings')).json();
+                document.getElementById('dungeonEnabledToggle').checked = !!data.dungeon_enabled;
+                document.getElementById('dungeonUrl').value = data.dungeon_url || '';
+                document.getElementById('dungeonApiKey').value = data.dungeon_api_key || '';
+                document.getElementById('dungeonChannel').value = data.dungeon_channel || '';
+                updateDungeonStatusText(await refreshDungeonQuickActions());
+            } catch (err) {
+                console.error('Error loading Dungeon settings:', err);
+            }
+        }
+
+        async function saveDungeonSettings() {
+            const body = {
+                dungeon_enabled: document.getElementById('dungeonEnabledToggle').checked,
+                dungeon_url: document.getElementById('dungeonUrl').value.trim(),
+                dungeon_api_key: document.getElementById('dungeonApiKey').value.trim(),
+                dungeon_channel: document.getElementById('dungeonChannel').value.trim()
+            };
+            try {
+                const response = await fetch('/api/ceebee/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                await loadDungeonSettings(await response.json());
+                // The connection is made in the background, so look again once it had time to connect or fail
+                setTimeout(async () => updateDungeonStatusText(await refreshDungeonQuickActions()), 3000);
+                showFeedback('Dungeon settings saved.');
+            } catch (err) {
+                console.error('Error saving Dungeon settings:', err);
+                alert('Error saving dungeon settings: ' + err.message);
             }
         }
 
