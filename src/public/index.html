@@ -108,6 +108,42 @@
             console.log(`Ceebee auto-participation target set to ${ceebeeTargetLimit} messages.`);
         }
 
+        // ── Ceebee auto-drop: plays !drop after the channel has been silent for a random 10-15 minutes ──
+        let lastHumanActivity = Date.now();
+        let autoDropIdleMs = null;
+        let lastAutoDropAt = 0;
+
+        function pickAutoDropIdleMs() {
+            const min = ceebeeSettings.auto_drop_min_minutes ?? 10;
+            const max = ceebeeSettings.auto_drop_max_minutes ?? 15;
+            return (min + Math.random() * Math.max(0, max - min)) * 60000;
+        }
+
+        function noteHumanActivity(user) {
+            if (isGameBot(user)) return;
+            lastHumanActivity = Date.now();
+            autoDropIdleMs = null;
+        }
+
+        function checkAutoDrop() {
+            if (!ceebeeSettings.auto_drop_enabled) return;
+            if (autoDropIdleMs === null) autoDropIdleMs = pickAutoDropIdleMs();
+            if (Date.now() - lastHumanActivity < autoDropIdleMs) return;
+
+            // Restart the idle window so Ceebee plays again after another silent stretch
+            lastHumanActivity = Date.now();
+            autoDropIdleMs = null;
+            lastAutoDropAt = Date.now();
+            console.log("Channel has been quiet, Ceebee is dropping.");
+            CeebeeSay("!drop");
+            // Without the bot account the streamer account posts the line, which ComfyJS reports as a
+            // "self" message and never routes to the drop command, so run it here instead
+            if (ceebeeClient.readyState() !== "OPEN") {
+                ComfyJS.onCommand("ceebee_bot", "drop", "", {}, {});
+            }
+        }
+        setInterval(checkAutoDrop, 15000);
+
         function shouldCountMessage(user, message, flags) {
             const lowerUser = user.toLowerCase();
             if (lowerUser === 'ceebee_bot' || lowerUser === 'ceebee') return false;
@@ -208,8 +244,7 @@
 
         function handleUserChatEvent(user, text, flags, extra) {
             const lowerUser = user.toLowerCase();
-            const bots = ['ceebee_bot', 'ceebee', 'streamlabs', 'nightbot', 'streamelements'];
-            if (bots.includes(lowerUser)) return;
+            if (isGameBot(lowerUser)) return;
 
             fetch('/api/chat-event', {
                 method: 'POST',
@@ -249,6 +284,7 @@
         }
 
         ComfyJS.onCommand = async (user, command, message, flags, extra) => {
+            noteHumanActivity(user);
 
             const displayUser = user;
             user = user.toLowerCase();
@@ -569,6 +605,8 @@
         }
 
         ComfyJS.onChat = (user, message, flags, self, extra) => {
+            // The fallback !drop is posted by the streamer account and must not count as human chat
+            if (!(self && message.trim() === '!drop' && Date.now() - lastAutoDropAt < 5000)) noteHumanActivity(user);
             // Lines CloudBot posts itself (e.g. relayed dungeon narration) are not chat to forward
             handleUserChatEvent(user, self ? '' : message, flags, extra);
             user = user.toLowerCase();

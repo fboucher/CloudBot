@@ -132,6 +132,9 @@ async function createTables() {
       max_messages INTEGER DEFAULT 15,
       game_enabled INTEGER DEFAULT 1,
       dynamic_weather_enabled INTEGER DEFAULT 1,
+      auto_drop_enabled INTEGER DEFAULT 1,
+      auto_drop_min_minutes INTEGER DEFAULT 10,
+      auto_drop_max_minutes INTEGER DEFAULT 15,
       dungeon_enabled INTEGER DEFAULT 0,
       dungeon_url TEXT DEFAULT '',
       dungeon_api_key TEXT DEFAULT '',
@@ -205,6 +208,16 @@ async function createTables() {
       console.log("Migration: Added dynamic_weather_enabled column to ceebee_settings");
     } catch (e) {
       // Column probably already exists, ignore
+    }
+
+    // Migration: Add Ceebee auto-drop columns to ceebee_settings if they don't exist
+    for (const col of ["auto_drop_enabled INTEGER DEFAULT 1", "auto_drop_min_minutes INTEGER DEFAULT 10", "auto_drop_max_minutes INTEGER DEFAULT 15"]) {
+      try {
+        await db.exec(`ALTER TABLE ceebee_settings ADD COLUMN ${col}`);
+        console.log(`Migration: Added ${col.split(' ')[0]} column to ceebee_settings`);
+      } catch (e) {
+        // Column probably already exists, ignore
+      }
     }
 
     // Migration: Add Chatacombs dungeon columns to ceebee_settings if they don't exist (off by default)
@@ -738,15 +751,22 @@ async function setCeebeeSoul(system_prompt) {
 
 async function getCeebeeSettings() {
   if (!db) await initDb();
-  const row = await db.prepare("SELECT auto_participate, min_messages, max_messages, game_enabled, dynamic_weather_enabled, dungeon_enabled, dungeon_url, dungeon_api_key, dungeon_channel FROM ceebee_settings WHERE id = 1").get();
-  return row || { auto_participate: 0, min_messages: 10, max_messages: 15, game_enabled: 1, dynamic_weather_enabled: 1, dungeon_enabled: 0, dungeon_url: '', dungeon_api_key: '', dungeon_channel: 'fboucheros' };
+  const row = await db.prepare("SELECT auto_participate, min_messages, max_messages, game_enabled, dynamic_weather_enabled, auto_drop_enabled, auto_drop_min_minutes, auto_drop_max_minutes, dungeon_enabled, dungeon_url, dungeon_api_key, dungeon_channel FROM ceebee_settings WHERE id = 1").get();
+  return row || { auto_participate: 0, min_messages: 10, max_messages: 15, game_enabled: 1, dynamic_weather_enabled: 1, auto_drop_enabled: 1, auto_drop_min_minutes: 10, auto_drop_max_minutes: 15, dungeon_enabled: 0, dungeon_url: '', dungeon_api_key: '', dungeon_channel: 'fboucheros' };
 }
 
-async function updateCeebeeSettings(auto_participate, min_messages, max_messages, game_enabled = 1, dynamic_weather_enabled = 1) {
+async function updateCeebeeSettings(auto_participate, min_messages, max_messages, game_enabled = 1, dynamic_weather_enabled = 1, autoDrop = {}) {
   if (!db) await initDb();
   await db.prepare(
     "UPDATE ceebee_settings SET auto_participate = ?, min_messages = ?, max_messages = ?, game_enabled = ?, dynamic_weather_enabled = ? WHERE id = 1"
   ).run(auto_participate ? 1 : 0, min_messages, max_messages, game_enabled ? 1 : 0, dynamic_weather_enabled ? 1 : 0);
+  // Auto-drop fields are optional so callers that don't know about them leave them untouched
+  if (autoDrop.enabled !== undefined) {
+    await db.prepare("UPDATE ceebee_settings SET auto_drop_enabled = ? WHERE id = 1").run(autoDrop.enabled ? 1 : 0);
+  }
+  if (autoDrop.min !== undefined && autoDrop.max !== undefined) {
+    await db.prepare("UPDATE ceebee_settings SET auto_drop_min_minutes = ?, auto_drop_max_minutes = ? WHERE id = 1").run(autoDrop.min, autoDrop.max);
+  }
   return getCeebeeSettings();
 }
 

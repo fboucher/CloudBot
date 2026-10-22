@@ -200,6 +200,13 @@ loadUserSessions = function (savedUsers) {
     return merged;
 }
 
+// Bot accounts are not players: they stay out of the leaderboard, show notes and player records
+// (the server keeps the same list as GAME_BOT_ACCOUNTS in index.js)
+const GAME_BOT_ACCOUNTS = ['ceebee_bot', 'ceebee', 'streamlabs', 'nightbot', 'streamelements'];
+isGameBot = function (userName) {
+    return GAME_BOT_ACCOUNTS.includes(String(userName || '').toLowerCase());
+}
+
 getUserPosition = function (userName) {
     console.log("... Searching for: " + userName);
     userName = sanitizeUsername(userName);
@@ -276,7 +283,7 @@ scores = function () {
     const today = new Date();
     let cntScoreDisplayed = 1;
 
-    var sortedUsers = _streamSession.UserSession.sort(compareHightScore);
+    var sortedUsers = _streamSession.UserSession.sort(compareHightScore).filter(u => !isGameBot(u.user));
 
     for (i = 0; i < sortedUsers.length; i++) {
         //console.log(`... checking: ${sortedUsers[i].user} --- d2: ${sortedUsers[i].lastUpdate}`);
@@ -307,6 +314,7 @@ isSameDay = function (d1, d2) {
 
 
 UserLanded = function (user, curScore) {
+    if (isGameBot(user)) return;
     let userPos = getUserPosition(user);
 
     if (userPos >= 0) {
@@ -452,6 +460,7 @@ async function persistUserScore(user) {
 }
 
 IncrementDropCounter = function (user) {
+    if (isGameBot(user)) return;
     let userPos = getUserPosition(user);
     _streamSession.UserSession[userPos].dropCount++;
     _streamSession.UserSession[userPos].lastUpdate = new Date();
@@ -1033,11 +1042,12 @@ GenerateTimeLogSection = function () {
 
 GenerateParachuteSection = function () {
 
-    if (_streamSession.UserSession.length > 0) {
+    const players = _streamSession.UserSession.filter(u => !isGameBot(u.user));
+    if (players.length > 0) {
         const today = new Date();
         let parachuteSection = "\n### Game Results\n\n"
 
-        var sortedUsers = _streamSession.UserSession.sort(compareHightScore);
+        var sortedUsers = players.sort(compareHightScore);
 
         for (i = 0; i < sortedUsers.length; i++) {
             if (isSameDay(today, new Date(sortedUsers[i].lastUpdate))) {
@@ -1055,7 +1065,7 @@ GenerateParachuteSection = function () {
         let minDropForMaxScore = Infinity;
         let maxDropLoser = -Infinity;
 
-        _streamSession.UserSession.forEach(user => {
+        players.forEach(user => {
             // Best score
             if (user.highScore > maxScore) {
                 maxScore = user.highScore;
@@ -1074,7 +1084,7 @@ GenerateParachuteSection = function () {
         });
 
         // Luckiest: among users with the highest score, pick the one with the lowest dropCount
-        _streamSession.UserSession.forEach(user => {
+        players.forEach(user => {
             if (user.highScore === maxScore) {
                 if (user.dropCount < minDropForMaxScore) {
                     minDropForMaxScore = user.dropCount;
