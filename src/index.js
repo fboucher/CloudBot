@@ -1044,6 +1044,11 @@ app.post('/api/users/score', async (req, res) => {
         if (!session) return res.status(404).json({ error: 'No active session' });
         const { username, dropCount, landedCount, highScore, bestHighScore } = req.body;
         if (!username) return res.status(400).json({ error: 'username required' });
+        if ([highScore, bestHighScore].some(score =>
+            score !== undefined && score !== null && !Number.isFinite(Number(score))
+        )) {
+            return res.status(400).json({ error: 'scores must be numeric' });
+        }
         const cleanUsername = sanitizeUsername(username);
         if (!cleanUsername) return res.status(400).json({ error: 'username required' });
         await db.upsertUser(session.id, cleanUsername, { dropCount, landedCount, highScore, bestHighScore });

@@ -11,6 +11,11 @@ const sanitizeUsername = (name) =>
     .trim()
     .toLowerCase();
 
+const normalizeScore = (score) => {
+  const value = Number(score);
+  return Number.isFinite(value) ? value : 0;
+};
+
 // Collapse game score entries that belong to the same player ("@User", "@@user", "user")
 // into one: counts are added up, scores keep the best value.
 function mergeUserScores(users) {
@@ -18,15 +23,17 @@ function mergeUserScores(users) {
   for (const u of users) {
     const name = sanitizeUsername(u.user);
     if (!name) continue;
+    const highScore = normalizeScore(u.highScore);
+    const bestHighScore = normalizeScore(u.bestHighScore);
     const prev = merged.get(name);
     if (!prev) {
-      merged.set(name, { ...u, user: name });
+      merged.set(name, { ...u, user: name, highScore, bestHighScore });
       continue;
     }
     prev.dropCount = (prev.dropCount || 0) + (u.dropCount || 0);
     prev.landedCount = (prev.landedCount || 0) + (u.landedCount || 0);
-    prev.highScore = Math.max(prev.highScore || 0, u.highScore || 0);
-    prev.bestHighScore = Math.max(prev.bestHighScore || 0, u.bestHighScore || 0);
+    prev.highScore = Math.max(prev.highScore, highScore);
+    prev.bestHighScore = Math.max(prev.bestHighScore, bestHighScore);
     if (u.lastUpdate && (!prev.lastUpdate || new Date(u.lastUpdate) > new Date(prev.lastUpdate))) {
       prev.lastUpdate = u.lastUpdate;
     }
@@ -293,7 +300,11 @@ async function createTables() {
           highScore: r.high_score, bestHighScore: r.best_high_score, lastUpdate: r.last_update
         }));
         const merged = mergeUserScores(users);
-        const unchanged = merged.length === sessionRows.length && sessionRows.every(r => r.username === sanitizeUsername(r.username));
+        const unchanged = merged.length === sessionRows.length && sessionRows.every(r =>
+          r.username === sanitizeUsername(r.username) &&
+          r.high_score === normalizeScore(r.high_score) &&
+          r.best_high_score === normalizeScore(r.best_high_score)
+        );
         if (unchanged) continue;
         await db.prepare("DELETE FROM users WHERE session_id = ?").run(sessionId);
         for (const u of merged) {
@@ -658,7 +669,7 @@ async function upsertUser(sessionId, username, stats) {
        best_high_score = ?, last_update = ? WHERE session_id = ? AND username = ?`
     ).run(
       stats.dropCount ?? 0, stats.landedCount ?? 0,
-      stats.highScore ?? 0, stats.bestHighScore ?? 0,
+      normalizeScore(stats.highScore), normalizeScore(stats.bestHighScore),
       new Date().toISOString(), sessionId, username
     );
   } else {
@@ -668,7 +679,7 @@ async function upsertUser(sessionId, username, stats) {
     ).run(
       sessionId, username,
       stats.dropCount ?? 0, stats.landedCount ?? 0,
-      stats.highScore ?? 0, stats.bestHighScore ?? 0,
+      normalizeScore(stats.highScore), normalizeScore(stats.bestHighScore),
       new Date().toISOString()
     );
   }
@@ -676,9 +687,16 @@ async function upsertUser(sessionId, username, stats) {
 
 async function getSessionUsers(sessionId) {
   if (!db) await initDb();
-  return db.prepare(
-    'SELECT * FROM users WHERE session_id = ? ORDER BY best_high_score DESC'
+  const users = await db.prepare(
+    'SELECT * FROM users WHERE session_id = ?'
   ).all(sessionId);
+  return users
+    .map(user => ({
+      ...user,
+      high_score: normalizeScore(user.high_score),
+      best_high_score: normalizeScore(user.best_high_score)
+    }))
+    .sort((a, b) => b.best_high_score - a.best_high_score);
 }
 
 // Ceebee specific functions

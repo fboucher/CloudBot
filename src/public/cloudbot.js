@@ -73,7 +73,7 @@ class TimeLog {
 }
 
 compareHightScore = function (a, b) {
-    return a.highScore - b.highScore;
+    return b.highScore - a.highScore;
 }
 
 compareBestHightScore = function (a, b) {
@@ -186,13 +186,17 @@ loadUserSessions = function (savedUsers) {
                 newUser[key] = value;
             }
             newUser.user = name;
+            newUser.highScore = Number.isFinite(Number(o.highScore)) ? Number(o.highScore) : 0;
+            newUser.bestHighScore = Number.isFinite(Number(o.bestHighScore)) ? Number(o.bestHighScore) : 0;
             merged.push(newUser);
             continue;
         }
         existing.dropCount = (existing.dropCount || 0) + (o.dropCount || 0);
         existing.landedCount = (existing.landedCount || 0) + (o.landedCount || 0);
-        existing.highScore = Math.max(existing.highScore || 0, o.highScore || 0);
-        existing.bestHighScore = Math.max(existing.bestHighScore || 0, o.bestHighScore || 0);
+        const highScore = Number.isFinite(Number(o.highScore)) ? Number(o.highScore) : 0;
+        const bestHighScore = Number.isFinite(Number(o.bestHighScore)) ? Number(o.bestHighScore) : 0;
+        existing.highScore = Math.max(existing.highScore || 0, highScore);
+        existing.bestHighScore = Math.max(existing.bestHighScore || 0, bestHighScore);
         if (o.lastUpdate && (!existing.lastUpdate || new Date(o.lastUpdate) > new Date(existing.lastUpdate))) {
             existing.lastUpdate = o.lastUpdate;
         }
@@ -357,7 +361,9 @@ ParseMessage = function (message) {
 
     if (splitedMsg.length > 1 && splitedMsg[1] === "landed") {
         let user = sanitizeUsername(splitedMsg[0]);
-        let curScore = splitedMsg[3].slice(0, -1);
+        const scoreMatch = splitedMsg[3]?.match(/^(-?\d+(?:\.\d+)?)[!,.?]?$/);
+        if (!scoreMatch) return;
+        let curScore = Number(scoreMatch[1]);
 
         UserLanded(user, curScore);
     }
