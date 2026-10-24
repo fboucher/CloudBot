@@ -651,6 +651,9 @@ app.delete('/api/session/reminders/:id', async (req, res) => {
     }
 });
 
+// Accounts that are bots, not players: kept out of the game leaderboard and show notes (mirrors GAME_BOT_ACCOUNTS in public/cloudbot.js)
+const GAME_BOT_ACCOUNTS = ['ceebee_bot', 'ceebee', 'streamlabs', 'nightbot', 'streamelements'];
+
 // Helper function to generate and save show notes markdown
 async function generateAndSaveShowNotes(sessionId, options = {}) {
     const {
@@ -738,15 +741,17 @@ async function generateAndSaveShowNotes(sessionId, options = {}) {
     }
 
     // ── Game results ──────────────────────────────────────────────────────────
-    if (s.UserSession.length > 0) {
+    // Bot accounts (Ceebee's own auto-drops) are not players
+    const players = s.UserSession.filter(u => !GAME_BOT_ACCOUNTS.includes(String(u.user).toLowerCase()));
+    if (players.length > 0) {
         md += `\n### Game Results\n\n`;
-        const sorted = [...s.UserSession].sort((a, b) => (Number(b.highScore) || 0) - (Number(a.highScore) || 0));
+        const sorted = [...players].sort((a, b) => (Number(b.highScore) || 0) - (Number(a.highScore) || 0));
         sorted.forEach(u => { md += `- [@${u.user}](https://www.twitch.tv/${u.user}): ${u.highScore}\n`; });
 
         let bestScoreUser = null, biggestLoser = null, luckiest = null, superParticipant = null;
         let maxScore = -Infinity, maxDrop = -Infinity, minDropForMaxScore = Infinity, maxDropLoser = -Infinity;
 
-        s.UserSession.forEach(u => {
+        players.forEach(u => {
             const hScore = Number(u.highScore) || 0;
             const bScore = Number(u.bestHighScore) || 0;
             const drops = parseInt(u.dropCount, 10) || 0;
@@ -754,7 +759,7 @@ async function generateAndSaveShowNotes(sessionId, options = {}) {
             if (drops > maxDrop) { maxDrop = drops; superParticipant = u; }
             if (bScore === 0 && drops > maxDropLoser) { maxDropLoser = drops; biggestLoser = u; }
         });
-        s.UserSession.forEach(u => {
+        players.forEach(u => {
             const hScore = Number(u.highScore) || 0;
             const drops = parseInt(u.dropCount, 10) || 0;
             if (hScore === maxScore && drops < minDropForMaxScore) {
@@ -1878,9 +1883,14 @@ app.post('/api/ceebee/settings', async (req, res) => {
     // console.log('..POST /api/ceebee/settings called with:', req.body);
     try {
         const body = req.body || {};
-        const { auto_participate, min_messages, max_messages, game_enabled, dynamic_weather_enabled } = body;
+        const { auto_participate, min_messages, max_messages, game_enabled, dynamic_weather_enabled, auto_drop_enabled, auto_drop_min_minutes, auto_drop_max_minutes } = body;
         const dungeonKeys = ['dungeon_enabled', 'dungeon_url', 'dungeon_api_key', 'dungeon_channel'];
-        const coreKeys = ['auto_participate', 'min_messages', 'max_messages', 'game_enabled', 'dynamic_weather_enabled'];
+        const coreKeys = ['auto_participate', 'min_messages', 'max_messages', 'game_enabled', 'dynamic_weather_enabled', 'auto_drop_enabled', 'auto_drop_min_minutes', 'auto_drop_max_minutes'];
+        const dropMin = parseInt(auto_drop_min_minutes, 10);
+        const dropMax = parseInt(auto_drop_max_minutes, 10);
+        const dropBoundsGiven = dropMin >= 1 && dropMax >= dropMin;
+        const autoDropMin = dropBoundsGiven ? dropMin : undefined;
+        const autoDropMax = dropBoundsGiven ? dropMax : undefined;
         let settings;
         // Each admin section saves only its own fields, so leave the other section's values alone
         if (coreKeys.some(k => body[k] !== undefined) || !dungeonKeys.some(k => body[k] !== undefined)) {
@@ -1889,7 +1899,11 @@ app.post('/api/ceebee/settings', async (req, res) => {
                 parseInt(min_messages, 10) || 10,
                 parseInt(max_messages, 10) || 15,
                 game_enabled !== undefined ? !!game_enabled : true,
-                dynamic_weather_enabled !== undefined ? !!dynamic_weather_enabled : true
+                dynamic_weather_enabled !== undefined ? !!dynamic_weather_enabled : true,
+                {
+                    enabled: auto_drop_enabled !== undefined ? !!auto_drop_enabled : undefined,
+                    min: autoDropMin, max: autoDropMax
+                }
             );
         }
         if (dungeonKeys.some(k => body[k] !== undefined)) {

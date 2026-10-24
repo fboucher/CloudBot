@@ -108,6 +108,62 @@
             console.log(`Ceebee auto-participation target set to ${ceebeeTargetLimit} messages.`);
         }
 
+        // ── Ceebee auto-drop: plays !drop after the channel has been silent for a random 10-15 minutes ──
+        let lastHumanActivity = Date.now();
+        let autoDropIdleMs = null;
+        // Lines CeebeeSay posted from the streamer account while the bot was offline, so their echoes aren't counted as human chat
+        const ceebeeFallbackEchoes = [];
+
+        function autoDropBoundsMs() {
+            const min = ceebeeSettings.auto_drop_min_minutes ?? 10;
+            const max = Math.max(min, ceebeeSettings.auto_drop_max_minutes ?? 15);
+            return { min: min * 60000, max: max * 60000 };
+        }
+
+        function pickAutoDropIdleMs() {
+            const { min, max } = autoDropBoundsMs();
+            return min + Math.random() * (max - min);
+        }
+
+        // Twitch collapses whitespace, so compare lines by their collapsed form
+        function normalizeChatLine(text) {
+            return String(text).replace(/\s+/g, ' ').trim();
+        }
+
+        function isCeebeeFallbackEcho(message) {
+            const now = Date.now();
+            while (ceebeeFallbackEchoes.length && now - ceebeeFallbackEchoes[0].at > 30000) ceebeeFallbackEchoes.shift();
+            const idx = ceebeeFallbackEchoes.findIndex(e => e.msg === normalizeChatLine(message));
+            if (idx < 0) return false;
+            ceebeeFallbackEchoes.splice(idx, 1);
+            return true;
+        }
+
+        function noteHumanActivity(user) {
+            if (isGameBot(user)) return;
+            lastHumanActivity = Date.now();
+            autoDropIdleMs = null;
+        }
+
+        function checkAutoDrop() {
+            if (!ceebeeSettings.auto_drop_enabled) return;
+            // Re-sample when the admin changed the range since this idle window was picked
+            const bounds = autoDropBoundsMs();
+            if (autoDropIdleMs === null || autoDropIdleMs < bounds.min || autoDropIdleMs > bounds.max) {
+                autoDropIdleMs = pickAutoDropIdleMs();
+            }
+            if (Date.now() - lastHumanActivity < autoDropIdleMs) return;
+            // Only the bot account plays: a drop posted from the streamer account would be scored as the streamer
+            if (ceebeeClient.readyState() !== "OPEN") return;
+
+            // Restart the idle window so Ceebee plays again after another silent stretch
+            lastHumanActivity = Date.now();
+            autoDropIdleMs = null;
+            console.log("Channel has been quiet, Ceebee is dropping.");
+            CeebeeSay("!drop");
+        }
+        setInterval(checkAutoDrop, 15000);
+
         function shouldCountMessage(user, message, flags) {
             const lowerUser = user.toLowerCase();
             if (lowerUser === 'ceebee_bot' || lowerUser === 'ceebee') return false;
@@ -208,8 +264,7 @@
 
         function handleUserChatEvent(user, text, flags, extra) {
             const lowerUser = user.toLowerCase();
-            const bots = ['ceebee_bot', 'ceebee', 'streamlabs', 'nightbot', 'streamelements'];
-            if (bots.includes(lowerUser)) return;
+            if (isGameBot(lowerUser)) return;
 
             fetch('/api/chat-event', {
                 method: 'POST',
@@ -249,6 +304,7 @@
         }
 
         ComfyJS.onCommand = async (user, command, message, flags, extra) => {
+            noteHumanActivity(user);
 
             const displayUser = user;
             user = user.toLowerCase();
@@ -569,6 +625,8 @@
         }
 
         ComfyJS.onChat = (user, message, flags, self, extra) => {
+            // Ceebee lines posted from the streamer account (bot offline) must not count as human chat
+            if (!(self && isCeebeeFallbackEcho(message))) noteHumanActivity(user);
             // Lines CloudBot posts itself (e.g. relayed dungeon narration) are not chat to forward
             handleUserChatEvent(user, self ? '' : message, flags, extra);
             user = user.toLowerCase();
@@ -743,6 +801,7 @@
                 ceebeeClient.say("#fboucheros", msg).catch(console.error);
             } else {
                 console.warn("ceebee_bot is not connected. Falling back to fboucheros.");
+                ceebeeFallbackEchoes.push({ msg: normalizeChatLine(msg), at: Date.now() });
                 ComfyJS.Say(msg);
             }
         }

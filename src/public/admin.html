@@ -679,6 +679,21 @@
                                     </div>
                                 </div>
                             </div>
+                            <hr class="border-secondary my-3">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" role="switch" id="autoDropToggle">
+                                <label class="form-check-label text-light" for="autoDropToggle">Ceebee plays !drop when the channel is quiet</label>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label text-light">Min Idle Minutes</label>
+                                    <input type="number" class="form-control bg-dark text-light border-secondary" id="autoDropMin" min="1" step="1" value="10">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label text-light">Max Idle Minutes</label>
+                                    <input type="number" class="form-control bg-dark text-light border-secondary" id="autoDropMax" min="1" step="1" value="15">
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -2310,6 +2325,9 @@
                 updateLabelText(minVal, maxVal);
                 document.getElementById('gameEnabledToggle').checked = data.game_enabled !== undefined ? !!data.game_enabled : true;
                 document.getElementById('weatherEnabledToggle').checked = data.dynamic_weather_enabled !== undefined ? !!data.dynamic_weather_enabled : true;
+                document.getElementById('autoDropToggle').checked = data.auto_drop_enabled !== undefined ? !!data.auto_drop_enabled : true;
+                document.getElementById('autoDropMin').value = data.auto_drop_min_minutes ?? 10;
+                document.getElementById('autoDropMax').value = data.auto_drop_max_minutes ?? 15;
                 loadDungeonSettings(data);
             } catch (err) {
                 console.error('Error loading Ceebee settings:', err);
@@ -2400,6 +2418,9 @@
             const max_messages = parseInt(document.getElementById('autoParticipateMax').value, 10) || 15;
             const game_enabled = document.getElementById('gameEnabledToggle').checked;
             const dynamic_weather_enabled = document.getElementById('weatherEnabledToggle').checked;
+            const auto_drop_enabled = document.getElementById('autoDropToggle').checked;
+            const auto_drop_min_minutes = parseInt(document.getElementById('autoDropMin').value, 10) || 10;
+            const auto_drop_max_minutes = parseInt(document.getElementById('autoDropMax').value, 10) || 15;
 
             if (min_messages < 1 || max_messages < 1) {
                 alert('Message limits must be at least 1.');
@@ -2410,11 +2431,21 @@
                 return;
             }
 
+            if (auto_drop_min_minutes < 1 || auto_drop_max_minutes < 1) {
+                alert('Idle minutes must be at least 1.');
+                return;
+            }
+
+            if (auto_drop_min_minutes > auto_drop_max_minutes) {
+                alert('Minimum idle minutes cannot be greater than Maximum idle minutes.');
+                return;
+            }
+
             try {
                 await fetch('/api/ceebee/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ auto_participate, min_messages, max_messages, game_enabled, dynamic_weather_enabled })
+                    body: JSON.stringify({ auto_participate, min_messages, max_messages, game_enabled, dynamic_weather_enabled, auto_drop_enabled, auto_drop_min_minutes, auto_drop_max_minutes })
                 });
                 updateLabelText(min_messages, max_messages);
                 showFeedback('Settings saved successfully.');
