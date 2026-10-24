@@ -1850,7 +1850,8 @@
 
             if (data.UserSession?.length > 0) {
                 notes += `### Game Results\n\n`;
-                data.UserSession.forEach(u => {
+                const sortedUsers = [...data.UserSession].sort((a, b) => (Number(b.highScore) || 0) - (Number(a.highScore) || 0));
+                sortedUsers.forEach(u => {
                     notes += `- @${u.user}: ${u.highScore} (best: ${u.bestHighScore})\n`;
                 });
                 notes += '\n';
