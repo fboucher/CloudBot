@@ -2431,6 +2431,11 @@
                 return;
             }
 
+            if (auto_drop_min_minutes < 1 || auto_drop_max_minutes < 1) {
+                alert('Idle minutes must be at least 1.');
+                return;
+            }
+
             if (auto_drop_min_minutes > auto_drop_max_minutes) {
                 alert('Minimum idle minutes cannot be greater than Maximum idle minutes.');
                 return;
