@@ -745,20 +745,25 @@ async function generateAndSaveShowNotes(sessionId, options = {}) {
     const players = s.UserSession.filter(u => !GAME_BOT_ACCOUNTS.includes(String(u.user).toLowerCase()));
     if (players.length > 0) {
         md += `\n### Game Results\n\n`;
-        const sorted = [...players].sort((a, b) => b.highScore - a.highScore);
+        const sorted = [...players].sort((a, b) => (Number(b.highScore) || 0) - (Number(a.highScore) || 0));
         sorted.forEach(u => { md += `- [@${u.user}](https://www.twitch.tv/${u.user}): ${u.highScore}\n`; });
 
         let bestScoreUser = null, biggestLoser = null, luckiest = null, superParticipant = null;
         let maxScore = -Infinity, maxDrop = -Infinity, minDropForMaxScore = Infinity, maxDropLoser = -Infinity;
 
         players.forEach(u => {
-            if (u.highScore > maxScore) { maxScore = u.highScore; bestScoreUser = u; }
-            if (u.dropCount > maxDrop) { maxDrop = u.dropCount; superParticipant = u; }
-            if (u.bestHighScore == 0 && u.dropCount > maxDropLoser) { maxDropLoser = u.dropCount; biggestLoser = u; }
+            const hScore = Number(u.highScore) || 0;
+            const bScore = Number(u.bestHighScore) || 0;
+            const drops = parseInt(u.dropCount, 10) || 0;
+            if (hScore > maxScore) { maxScore = hScore; bestScoreUser = u; }
+            if (drops > maxDrop) { maxDrop = drops; superParticipant = u; }
+            if (bScore === 0 && drops > maxDropLoser) { maxDropLoser = drops; biggestLoser = u; }
         });
         players.forEach(u => {
-            if (u.highScore === maxScore && u.dropCount < minDropForMaxScore) {
-                minDropForMaxScore = u.dropCount; luckiest = u;
+            const hScore = Number(u.highScore) || 0;
+            const drops = parseInt(u.dropCount, 10) || 0;
+            if (hScore === maxScore && drops < minDropForMaxScore) {
+                minDropForMaxScore = drops; luckiest = u;
             }
         });
 
@@ -1051,7 +1056,16 @@ app.post('/api/users/score', async (req, res) => {
         if (!username) return res.status(400).json({ error: 'username required' });
         const cleanUsername = sanitizeUsername(username);
         if (!cleanUsername) return res.status(400).json({ error: 'username required' });
-        await db.upsertUser(session.id, cleanUsername, { dropCount, landedCount, highScore, bestHighScore });
+        const safeHighScore = Number.isFinite(Number(highScore)) ? Number(highScore) : 0;
+        const safeBestHighScore = Number.isFinite(Number(bestHighScore)) ? Number(bestHighScore) : 0;
+        const safeDropCount = parseInt(dropCount, 10) || 0;
+        const safeLandedCount = parseInt(landedCount, 10) || 0;
+        await db.upsertUser(session.id, cleanUsername, {
+            dropCount: safeDropCount,
+            landedCount: safeLandedCount,
+            highScore: safeHighScore,
+            bestHighScore: safeBestHighScore
+        });
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });

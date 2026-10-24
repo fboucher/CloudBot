@@ -679,7 +679,7 @@
                 }
             }
 
-            const trustedSenders = ['streamlabs', 'ceebee_bot', 'ceebee', 'streamelements', 'nightbot'];
+            const trustedSenders = ['streamlabs', 'streamelements', 'nightbot'];
             if (flags.broadcaster || trustedSenders.includes(user)) {
                 console.log(`...parsing message from trusted source: ${user}`);
                 ParseMessage(message);
