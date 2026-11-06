@@ -73,11 +73,11 @@ class TimeLog {
 }
 
 compareHightScore = function (a, b) {
-    return a.highScore - b.highScore;
+    return (Number(b.highScore) || 0) - (Number(a.highScore) || 0);
 }
 
 compareBestHightScore = function (a, b) {
-    return a.bestHighScore - b.bestHighScore;
+    return (Number(b.bestHighScore) || 0) - (Number(a.bestHighScore) || 0);
 }
 
 class StreamSession {
@@ -179,6 +179,11 @@ loadUserSessions = function (savedUsers) {
     for (const o of savedUsers || []) {
         const name = sanitizeUsername(o.user);
         if (!name) continue;
+        const oHighScore = Number.isFinite(Number(o.highScore)) ? Number(o.highScore) : 0;
+        const oBestHighScore = Number.isFinite(Number(o.bestHighScore)) ? Number(o.bestHighScore) : 0;
+        const oDropCount = parseInt(o.dropCount, 10) || 0;
+        const oLandedCount = parseInt(o.landedCount, 10) || 0;
+
         const existing = merged.find(u => u.user === name);
         if (!existing) {
             const newUser = new UserSession();
@@ -186,18 +191,29 @@ loadUserSessions = function (savedUsers) {
                 newUser[key] = value;
             }
             newUser.user = name;
+            newUser.dropCount = oDropCount;
+            newUser.landedCount = oLandedCount;
+            newUser.highScore = oHighScore;
+            newUser.bestHighScore = oBestHighScore;
             merged.push(newUser);
             continue;
         }
-        existing.dropCount = (existing.dropCount || 0) + (o.dropCount || 0);
-        existing.landedCount = (existing.landedCount || 0) + (o.landedCount || 0);
-        existing.highScore = Math.max(existing.highScore || 0, o.highScore || 0);
-        existing.bestHighScore = Math.max(existing.bestHighScore || 0, o.bestHighScore || 0);
+        existing.dropCount = (existing.dropCount || 0) + oDropCount;
+        existing.landedCount = (existing.landedCount || 0) + oLandedCount;
+        existing.highScore = Math.max(existing.highScore || 0, oHighScore);
+        existing.bestHighScore = Math.max(existing.bestHighScore || 0, oBestHighScore);
         if (o.lastUpdate && (!existing.lastUpdate || new Date(o.lastUpdate) > new Date(existing.lastUpdate))) {
             existing.lastUpdate = o.lastUpdate;
         }
     }
     return merged;
+}
+
+// Bot accounts are not players: they stay out of the leaderboard, show notes and player records
+// (the server keeps the same list as GAME_BOT_ACCOUNTS in index.js)
+const GAME_BOT_ACCOUNTS = ['ceebee_bot', 'ceebee', 'streamlabs', 'nightbot', 'streamelements'];
+isGameBot = function (userName) {
+    return GAME_BOT_ACCOUNTS.includes(String(userName || '').toLowerCase());
 }
 
 getUserPosition = function (userName) {
@@ -276,7 +292,7 @@ scores = function () {
     const today = new Date();
     let cntScoreDisplayed = 1;
 
-    var sortedUsers = _streamSession.UserSession.sort(compareHightScore);
+    var sortedUsers = _streamSession.UserSession.sort(compareHightScore).filter(u => !isGameBot(u.user));
 
     for (i = 0; i < sortedUsers.length; i++) {
         //console.log(`... checking: ${sortedUsers[i].user} --- d2: ${sortedUsers[i].lastUpdate}`);
@@ -307,19 +323,29 @@ isSameDay = function (d1, d2) {
 
 
 UserLanded = function (user, curScore) {
+    if (isGameBot(user)) return;
+
+    const numScore = parseFloat(curScore);
+    if (isNaN(numScore) || !Number.isFinite(numScore)) {
+        console.warn("... Invalid score ignored:", curScore);
+        return;
+    }
+
     let userPos = getUserPosition(user);
 
     if (userPos >= 0) {
         _streamSession.UserSession[userPos].landedCount++;
 
-        if (_streamSession.UserSession[userPos].highScore < curScore) {
-            console.log("... New highscore " + curScore);
-            _streamSession.UserSession[userPos].highScore = curScore;
+        const prevHighScore = Number(_streamSession.UserSession[userPos].highScore) || 0;
+        if (prevHighScore < numScore) {
+            console.log("... New highscore " + numScore);
+            _streamSession.UserSession[userPos].highScore = numScore;
 
-            if (_streamSession.UserSession[userPos].bestHighScore < curScore) {
-                _streamSession.UserSession[userPos].bestHighScore = curScore;
+            const prevBest = Number(_streamSession.UserSession[userPos].bestHighScore) || 0;
+            if (prevBest < numScore) {
+                _streamSession.UserSession[userPos].bestHighScore = numScore;
             }
-            HightScoreParty(user, curScore);
+            HightScoreParty(user, numScore);
         }
         else {
             console.log("... no new highscore, try again");
@@ -352,19 +378,26 @@ UserLanded = function (user, curScore) {
 
 
 ParseMessage = function (message) {
-    // FBoucheros: FBoucheros landed for 86.60!
-    let splitedMsg = message.split(" ");
+    if (!message || typeof message !== 'string') return;
 
-    if (splitedMsg.length > 1 && splitedMsg[1] === "landed") {
+    // Drop game message format: "FBoucheros landed for 86.60!" or "@FBoucheros landed for 86.60!"
+    let splitedMsg = message.trim().split(/\s+/);
+
+    if (splitedMsg.length >= 4 && splitedMsg[1] === "landed" && splitedMsg[2] === "for") {
         let user = sanitizeUsername(splitedMsg[0]);
-        let curScore = splitedMsg[3].slice(0, -1);
+        let rawScore = splitedMsg[3].replace(/[!.,;:]+$/, '');
+        let curScore = parseFloat(rawScore);
 
-        UserLanded(user, curScore);
+        if (!isNaN(curScore) && Number.isFinite(curScore) && user) {
+            UserLanded(user, curScore);
+        }
     }
     else if (message.startsWith("Thank you for following")) {
         let user = sanitizeUsername(splitedMsg[4]);
-        _streamSession.NewFollowers.push(user);
-        SaveToFile(false);
+        if (user) {
+            _streamSession.NewFollowers.push(user);
+            SaveToFile(false);
+        }
     }
 }
 
@@ -452,6 +485,7 @@ async function persistUserScore(user) {
 }
 
 IncrementDropCounter = function (user) {
+    if (isGameBot(user)) return;
     let userPos = getUserPosition(user);
     _streamSession.UserSession[userPos].dropCount++;
     _streamSession.UserSession[userPos].lastUpdate = new Date();
@@ -1033,11 +1067,12 @@ GenerateTimeLogSection = function () {
 
 GenerateParachuteSection = function () {
 
-    if (_streamSession.UserSession.length > 0) {
+    const players = _streamSession.UserSession.filter(u => !isGameBot(u.user));
+    if (players.length > 0) {
         const today = new Date();
         let parachuteSection = "\n### Game Results\n\n"
 
-        var sortedUsers = _streamSession.UserSession.sort(compareHightScore);
+        var sortedUsers = players.sort(compareHightScore);
 
         for (i = 0; i < sortedUsers.length; i++) {
             if (isSameDay(today, new Date(sortedUsers[i].lastUpdate))) {
@@ -1055,29 +1090,35 @@ GenerateParachuteSection = function () {
         let minDropForMaxScore = Infinity;
         let maxDropLoser = -Infinity;
 
-        _streamSession.UserSession.forEach(user => {
+        players.forEach(user => {
+            const hScore = Number(user.highScore) || 0;
+            const bScore = Number(user.bestHighScore) || 0;
+            const drops = parseInt(user.dropCount, 10) || 0;
+
             // Best score
-            if (user.highScore > maxScore) {
-                maxScore = user.highScore;
+            if (hScore > maxScore) {
+                maxScore = hScore;
                 bestScoreUser = user;
             }
             // Super participant
-            if (user.dropCount > maxDrop) {
-                maxDrop = user.dropCount;
+            if (drops > maxDrop) {
+                maxDrop = drops;
                 superParticipant = user;
             }
             // Biggest loser
-            if (user.bestHighScore == 0 && user.dropCount > maxDropLoser) {
-                maxDropLoser = user.dropCount;
+            if (bScore === 0 && drops > maxDropLoser) {
+                maxDropLoser = drops;
                 biggestLoser = user;
             }
         });
 
         // Luckiest: among users with the highest score, pick the one with the lowest dropCount
-        _streamSession.UserSession.forEach(user => {
-            if (user.highScore === maxScore) {
-                if (user.dropCount < minDropForMaxScore) {
-                    minDropForMaxScore = user.dropCount;
+        players.forEach(user => {
+            const hScore = Number(user.highScore) || 0;
+            const drops = parseInt(user.dropCount, 10) || 0;
+            if (hScore === maxScore) {
+                if (drops < minDropForMaxScore) {
+                    minDropForMaxScore = drops;
                     luckiest = user;
                 }
             }
